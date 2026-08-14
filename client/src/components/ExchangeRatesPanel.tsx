@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { formatOrganizationDate, formatOrganizationNumber } from "@/lib/formatting";
 import { trpc } from "@/lib/trpc";
-import { Download, FileSpreadsheet, FileText, Loader2, Plus, RefreshCw } from "lucide-react";
+import { FileSpreadsheet, FileText, Loader2, Plus, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
