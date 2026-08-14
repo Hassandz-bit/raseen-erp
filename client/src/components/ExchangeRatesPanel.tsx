@@ -19,7 +19,7 @@ function downloadFile(name: string, type: string, content: string) {
 }
 
 export function ExchangeRatesPanel() {
-  const { language, formatSettings, t } = useLanguage();
+  const { formatSettings, t } = useLanguage();
   const [quoteCurrencyCode, setQuoteCurrencyCode] = useState("EUR");
   const [rate, setRate] = useState("");
   const [currencyCode, setCurrencyCode] = useState("");

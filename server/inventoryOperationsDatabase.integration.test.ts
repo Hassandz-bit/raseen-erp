@@ -10,7 +10,7 @@ afterEach(async () => {
   if (!fixture) return;
   const db = await getDb();
   if (!db) return;
-  const { organizationId, productId, sourceWarehouseId, destinationWarehouseId, sourceBatchId, transferId, countId } = fixture;
+  const { organizationId, productId, sourceWarehouseId, destinationWarehouseId, transferId, countId } = fixture;
   await db.delete(auditLogs).where(eq(auditLogs.organizationId, organizationId));
   await db.delete(stockMovements).where(eq(stockMovements.organizationId, organizationId));
   await db.delete(inventoryBalances).where(eq(inventoryBalances.organizationId, organizationId));
