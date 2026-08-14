@@ -1,0 +1,1 @@
+ALTER TABLE `organizations` ADD `monthlyBudget` decimal(15,2) DEFAULT '0' NOT NULL;

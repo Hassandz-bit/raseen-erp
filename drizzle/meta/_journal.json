@@ -1,5 +1,27 @@
 {
   "version": "7",
   "dialect": "mysql",
-  "entries": []
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1786718062605,
+      "tag": "0000_conscious_miss_america",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1786718409011,
+      "tag": "0001_silky_prodigy",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1786719102417,
+      "tag": "0002_square_winter_soldier",
+      "breakpoints": true
+    }
+  ]
 }
