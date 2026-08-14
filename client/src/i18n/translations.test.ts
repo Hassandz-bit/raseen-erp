@@ -23,4 +23,12 @@ describe("i18n foundation", () => {
       expect(translations[language].documentPreviewTitle).toBeTruthy();
     });
   });
+
+  it("يوفر مفردات ملخص مساحة العمل والتنبيهات والاشتراك بكل لغة", () => {
+    (['ar', 'fr', 'en'] as const).forEach(language => {
+      expect(translations[language].financialSummary).toBeTruthy();
+      expect(translations[language].notificationCenter).toBeTruthy();
+      expect(translations[language].subscriptionModules).toBeTruthy();
+    });
+  });
 });
