@@ -140,7 +140,7 @@ function MetricCard({ label, value, trend, icon: Icon, tone }: { label: string; 
 }
 
 function DashboardContent({ onOpenModule }: { onOpenModule: (key: SectionKey) => void }) {
-  const { t } = useLanguage();
+  const { t, formatCurrency } = useLanguage();
   return (
     <div className="enter space-y-6">
       <section className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
@@ -175,7 +175,7 @@ function DashboardContent({ onOpenModule }: { onOpenModule: (key: SectionKey) =>
                 <CartesianGrid vertical={false} stroke="#ffffff" strokeOpacity={0.06} strokeDasharray="3 3" />
                 <XAxis dataKey="month" tick={{ fill: "#8d96a8", fontSize: 11 }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fill: "#8d96a8", fontSize: 11 }} axisLine={false} tickLine={false} />
-                <Tooltip cursor={{ stroke: "#d9b46b", strokeOpacity: 0.28 }} contentStyle={{ background: "#171c27", border: "1px solid #394153", borderRadius: 14, color: "#f7f1e7", direction: "rtl" }} formatter={(value: number) => [`${value} ألف ر.س`, "المبيعات"]} />
+                <Tooltip cursor={{ stroke: "#d9b46b", strokeOpacity: 0.28 }} contentStyle={{ background: "#171c27", border: "1px solid #394153", borderRadius: 14, color: "#f7f1e7", direction: "rtl" }} formatter={(value: number) => [formatCurrency(value * 1000), t("totalSalesMetric")]} />
                 <Area type="monotone" dataKey="value" stroke="#d9b46b" strokeWidth={3} fill="url(#nawaSales)" activeDot={{ r: 5, fill: "#f4db9d", stroke: "#18202c", strokeWidth: 3 }} />
               </AreaChart>
             </ResponsiveContainer>
