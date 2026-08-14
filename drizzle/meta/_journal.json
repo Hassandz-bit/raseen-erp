@@ -57,6 +57,13 @@
       "when": 1786727349639,
       "tag": "0007_soft_blockbuster",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1786730817884,
+      "tag": "0008_bright_cyclops",
+      "breakpoints": true
     }
   ]
 }

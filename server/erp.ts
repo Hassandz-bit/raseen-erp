@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { addOrganizationExchangeRate, createOperationalNotifications, createOperationalRecord, createOrganizationForUser, getDashboardMetrics, getDefaultTenantContext, getFinancialReportSummary, getOrCreateOrganizationSettings, getOrCreateUserPreferences, listNotificationsForOrganization, listOperationalRecords, listOrganizationCurrencies, listOrganizationExchangeRates, listProductsForOrganization, markNotificationRead, saveOrganizationCurrency, updateOrganizationSettings, updateUserPreferences, type OperationalModule } from "./db";
+import { addOrganizationExchangeRate, createOperationalNotifications, createOperationalRecord, createOrganizationForUser, getDashboardMetrics, getDefaultTenantContext, getFinancialReportSummary, getOrCreateOrganizationSettings, getOrCreateUserPreferences, listNotificationsForOrganization, listOperationalRecords, listOrganizationCurrencies, listOrganizationExchangeRates, listProductsForOrganization, markNotificationRead, recordStockMovement, saveOrganizationCurrency, updateOrganizationSettings, updateUserPreferences, type OperationalModule } from "./db";
 import { currencyCatalog } from "../shared/currencyCatalog";
 import { invokeLLM } from "./_core/llm";
 import { notifyOwner } from "./_core/notification";
@@ -154,6 +154,19 @@ export const erpRouter = router({
     listProducts: protectedProcedure.query(async ({ ctx }) => {
       const context = await requireModule(ctx.user.id, "inventory");
       return listProductsForOrganization(context.organization.id);
+    }),
+    recordMovement: protectedProcedure.input(z.object({
+      warehouseId: z.number().int().positive(),
+      productId: z.number().int().positive(),
+      batchId: z.number().int().positive().optional(),
+      movementType: z.enum(["purchase_receipt", "sales_issue", "sales_return", "supplier_return", "transfer_out", "transfer_in", "adjustment", "opening_balance", "count_adjustment"]),
+      quantity: z.number().finite().refine(value => value !== 0, "الكمية لا يمكن أن تكون صفراً."),
+      unit: z.string().trim().min(1).max(32),
+      sourceDocumentType: z.string().trim().max(64).optional(),
+      sourceDocumentId: z.number().int().positive().optional(),
+    })).mutation(async ({ ctx, input }) => {
+      const context = await requireModule(ctx.user.id, "inventory");
+      return recordStockMovement({ organizationId: context.organization.id, actorUserId: ctx.user.id, ...input });
     }),
   }),
 

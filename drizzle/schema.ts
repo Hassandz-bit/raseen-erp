@@ -11,379 +11,45 @@ import {
   varchar,
 } from "drizzle-orm/mysql-core";
 
-export const users = mysqlTable("users", {
-  id: int("id").autoincrement().primaryKey(),
-  openId: varchar("openId", { length: 64 }).notNull().unique(),
-  name: text("name"),
-  email: varchar("email", { length: 320 }),
-  loginMethod: varchar("loginMethod", { length: 64 }),
-  role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-  lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
-});
-
-export const userPreferences = mysqlTable(
-  "user_preferences",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    userId: int("userId").notNull(),
-    language: mysqlEnum("language", ["ar", "fr", "en"]).default("ar").notNull(),
-    themeMode: mysqlEnum("themeMode", ["light", "dark", "system"]).default("system").notNull(),
-    sidebarMode: mysqlEnum("sidebarMode", ["expanded", "compact", "collapsed"]).default("expanded").notNull(),
-    density: mysqlEnum("density", ["comfortable", "compact"]).default("comfortable").notNull(),
-    fontFamily: varchar("fontFamily", { length: 64 }).default("ibm-plex").notNull(),
-    fontScale: mysqlEnum("fontScale", ["small", "normal", "large", "extra_large"]).default("normal").notNull(),
-    numeralStyle: mysqlEnum("numeralStyle", ["western", "arabic_indic"]).default("western").notNull(),
-    accentColor: varchar("accentColor", { length: 16 }).default("gold").notNull(),
-    radiusPreset: mysqlEnum("radiusPreset", ["soft", "rounded", "sharp"]).default("rounded").notNull(),
-    moduleViewMode: mysqlEnum("moduleViewMode", ["classic", "nawa_flow"]).default("classic").notNull(),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-  },
-  table => [uniqueIndex("user_preferences_user_unique").on(table.userId)],
-);
-
-export const organizations = mysqlTable("organizations", {
-  id: int("id").autoincrement().primaryKey(),
-  name: varchar("name", { length: 180 }).notNull(),
-  slug: varchar("slug", { length: 96 }).notNull().unique(),
-  status: mysqlEnum("status", ["active", "suspended", "trial"]).default("trial").notNull(),
-  baseCurrency: varchar("baseCurrency", { length: 8 }).default("SAR").notNull(),
-  locale: varchar("locale", { length: 12 }).default("ar-SA").notNull(),
-  monthlyBudget: decimal("monthlyBudget", { precision: 15, scale: 2 }).default("0").notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
-
-export const organizationSettings = mysqlTable(
-  "organization_settings",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    organizationId: int("organizationId").notNull(),
-    currencyCode: varchar("currencyCode", { length: 8 }).default("SAR").notNull(),
-    currencySymbolPosition: mysqlEnum("currencySymbolPosition", ["before", "after"]).default("after").notNull(),
-    decimalPlaces: int("decimalPlaces").default(2).notNull(),
-    dateFormat: varchar("dateFormat", { length: 24 }).default("DD/MM/YYYY").notNull(),
-    timeFormat: mysqlEnum("timeFormat", ["12h", "24h"]).default("24h").notNull(),
-    timeZone: varchar("timeZone", { length: 64 }).default("Africa/Algiers").notNull(),
-    firstDayOfWeek: mysqlEnum("firstDayOfWeek", ["monday", "sunday", "saturday"]).default("monday").notNull(),
-    decimalSeparator: mysqlEnum("decimalSeparator", ["dot", "comma"]).default("dot").notNull(),
-    thousandsSeparator: mysqlEnum("thousandsSeparator", ["comma", "dot", "space"]).default("comma").notNull(),
-    documentSettings: json("documentSettings").$type<{ paperSize: "A4" | "A5" | "thermal"; logoUrl?: string; address?: string; phone?: string; legalInfo?: string; headerText?: string; footerText?: string; showSignature?: boolean; fontFamily?: "ibm-plex" | "tajawal" | "noto-arabic" | "inter" | "system"; fontSize?: "small" | "normal" | "large" }>().notNull(),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-  },
-  table => [uniqueIndex("organization_settings_organization_unique").on(table.organizationId)],
-);
-
-export const organizationCurrencies = mysqlTable(
-  "organization_currencies",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    organizationId: int("organizationId").notNull(),
-    currencyCode: varchar("currencyCode", { length: 8 }).notNull(),
-    symbol: varchar("symbol", { length: 16 }).notNull(),
-    decimalPlaces: int("decimalPlaces").default(2).notNull(),
-    displayStyle: mysqlEnum("displayStyle", ["symbol", "code", "symbol_and_code"]).default("symbol").notNull(),
-    isBase: mysqlEnum("isBase", ["yes", "no"]).default("no").notNull(),
-    status: mysqlEnum("status", ["active", "inactive"]).default("active").notNull(),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-  },
-  table => [uniqueIndex("organization_currency_code_unique").on(table.organizationId, table.currencyCode), index("organization_currency_active_idx").on(table.organizationId, table.status)],
-);
-
-export const organizationExchangeRates = mysqlTable(
-  "organization_exchange_rates",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    organizationId: int("organizationId").notNull(),
-    baseCurrencyCode: varchar("baseCurrencyCode", { length: 8 }).notNull(),
-    quoteCurrencyCode: varchar("quoteCurrencyCode", { length: 8 }).notNull(),
-    rate: decimal("rate", { precision: 18, scale: 8 }).notNull(),
-    effectiveAt: timestamp("effectiveAt").notNull(),
-    source: varchar("source", { length: 64 }).default("manual").notNull(),
-    createdByUserId: int("createdByUserId"),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-  },
-  table => [index("exchange_rate_organization_pair_date_idx").on(table.organizationId, table.baseCurrencyCode, table.quoteCurrencyCode, table.effectiveAt)],
-);
-
-export const organizationMemberships = mysqlTable(
-  "organization_memberships",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    organizationId: int("organizationId").notNull(),
-    userId: int("userId").notNull(),
-    roleKey: varchar("roleKey", { length: 48 }).default("member").notNull(),
-    dataScope: json("dataScope").$type<{ branchIds?: number[]; warehouseIds?: number[]; regionIds?: number[] } | null>(),
-    status: mysqlEnum("status", ["active", "invited", "suspended"]).default("active").notNull(),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-  },
-  table => [
-    uniqueIndex("membership_organization_user_unique").on(table.organizationId, table.userId),
-    index("membership_user_idx").on(table.userId),
-  ],
-);
-
-export const organizationRoles = mysqlTable(
-  "organization_roles",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    organizationId: int("organizationId").notNull(),
-    key: varchar("key", { length: 48 }).notNull(),
-    name: varchar("name", { length: 120 }).notNull(),
-    description: text("description"),
-    permissions: json("permissions").$type<string[]>().notNull(),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-  },
-  table => [uniqueIndex("organization_role_key_unique").on(table.organizationId, table.key)],
-);
-
-export const organizationModules = mysqlTable(
-  "organization_modules",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    organizationId: int("organizationId").notNull(),
-    moduleKey: varchar("moduleKey", { length: 64 }).notNull(),
-    status: mysqlEnum("status", ["active", "suspended", "expired"]).default("active").notNull(),
-    effectiveFrom: timestamp("effectiveFrom").defaultNow().notNull(),
-    effectiveUntil: timestamp("effectiveUntil"),
-    changedByUserId: int("changedByUserId"),
-    changeSource: varchar("changeSource", { length: 80 }).default("manual").notNull(),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-  },
-  table => [uniqueIndex("organization_module_unique").on(table.organizationId, table.moduleKey)],
-);
-
-export const businessParties = mysqlTable(
-  "business_parties",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    organizationId: int("organizationId").notNull(),
-    name: varchar("name", { length: 220 }).notNull(),
-    types: json("types").$type<string[]>().notNull(),
-    contactName: varchar("contactName", { length: 160 }),
-    phone: varchar("phone", { length: 32 }),
-    email: varchar("email", { length: 320 }),
-    taxNumber: varchar("taxNumber", { length: 80 }),
-    creditLimit: decimal("creditLimit", { precision: 15, scale: 2 }).default("0").notNull(),
-    status: mysqlEnum("status", ["active", "inactive", "blocked"]).default("active").notNull(),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-  },
-  table => [index("party_organization_idx").on(table.organizationId)],
-);
-
-export const productCategories = mysqlTable(
-  "product_categories",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    organizationId: int("organizationId").notNull(),
-    name: varchar("name", { length: 160 }).notNull(),
-    color: varchar("color", { length: 16 }).default("#D7B56D").notNull(),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-  },
-  table => [uniqueIndex("category_organization_name_unique").on(table.organizationId, table.name)],
-);
-
-export const products = mysqlTable(
-  "products",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    organizationId: int("organizationId").notNull(),
-    categoryId: int("categoryId"),
-    name: varchar("name", { length: 220 }).notNull(),
-    sku: varchar("sku", { length: 96 }).notNull(),
-    barcode: varchar("barcode", { length: 96 }),
-    unit: varchar("unit", { length: 32 }).default("قطعة").notNull(),
-    purchasePrice: decimal("purchasePrice", { precision: 15, scale: 2 }).default("0").notNull(),
-    salePrice: decimal("salePrice", { precision: 15, scale: 2 }).default("0").notNull(),
-    reorderPoint: decimal("reorderPoint", { precision: 15, scale: 3 }).default("0").notNull(),
-    imageUrl: varchar("imageUrl", { length: 1024 }),
-    status: mysqlEnum("status", ["active", "inactive", "archived"]).default("active").notNull(),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-  },
-  table => [
-    uniqueIndex("product_organization_sku_unique").on(table.organizationId, table.sku),
-    index("product_organization_category_idx").on(table.organizationId, table.categoryId),
-  ],
-);
-
-export const warehouses = mysqlTable(
-  "warehouses",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    organizationId: int("organizationId").notNull(),
-    name: varchar("name", { length: 160 }).notNull(),
-    code: varchar("code", { length: 48 }).notNull(),
-    isMobile: mysqlEnum("isMobile", ["yes", "no"]).default("no").notNull(),
-    status: mysqlEnum("status", ["active", "inactive"]).default("active").notNull(),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-  },
-  table => [uniqueIndex("warehouse_organization_code_unique").on(table.organizationId, table.code)],
-);
-
-export const inventoryBalances = mysqlTable(
-  "inventory_balances",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    organizationId: int("organizationId").notNull(),
-    productId: int("productId").notNull(),
-    warehouseId: int("warehouseId").notNull(),
-    quantity: decimal("quantity", { precision: 15, scale: 3 }).default("0").notNull(),
-    reservedQuantity: decimal("reservedQuantity", { precision: 15, scale: 3 }).default("0").notNull(),
-    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-  },
-  table => [
-    uniqueIndex("inventory_balance_unique").on(table.organizationId, table.productId, table.warehouseId),
-    index("inventory_product_idx").on(table.organizationId, table.productId),
-  ],
-);
-
-export const salesInvoices = mysqlTable(
-  "sales_invoices",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    organizationId: int("organizationId").notNull(),
-    customerId: int("customerId"),
-    invoiceNumber: varchar("invoiceNumber", { length: 64 }).notNull(),
-    status: mysqlEnum("status", ["draft", "issued", "partial", "paid", "overdue", "cancelled"]).default("draft").notNull(),
-    grandTotal: decimal("grandTotal", { precision: 15, scale: 2 }).default("0").notNull(),
-    amountPaid: decimal("amountPaid", { precision: 15, scale: 2 }).default("0").notNull(),
-    dueDate: timestamp("dueDate"),
-    issuedAt: timestamp("issuedAt"),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-  },
-  table => [
-    uniqueIndex("invoice_organization_number_unique").on(table.organizationId, table.invoiceNumber),
-    index("invoice_organization_status_idx").on(table.organizationId, table.status),
-  ],
-);
-
-export const purchaseOrders = mysqlTable(
-  "purchase_orders",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    organizationId: int("organizationId").notNull(),
-    supplierId: int("supplierId"),
-    orderNumber: varchar("orderNumber", { length: 64 }).notNull(),
-    status: mysqlEnum("status", ["draft", "sent", "partial", "received", "cancelled"]).default("draft").notNull(),
-    grandTotal: decimal("grandTotal", { precision: 15, scale: 2 }).default("0").notNull(),
-    expectedAt: timestamp("expectedAt"),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-  },
-  table => [
-    uniqueIndex("purchase_order_organization_number_unique").on(table.organizationId, table.orderNumber),
-    index("purchase_order_organization_status_idx").on(table.organizationId, table.status),
-  ],
-);
-
-export const financialTransactions = mysqlTable(
-  "financial_transactions",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    organizationId: int("organizationId").notNull(),
-    type: mysqlEnum("type", ["income", "expense", "transfer", "adjustment"]).notNull(),
-    category: varchar("category", { length: 120 }).notNull(),
-    amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
-    occurredAt: timestamp("occurredAt").defaultNow().notNull(),
-    referenceType: varchar("referenceType", { length: 64 }),
-    referenceId: int("referenceId"),
-    notes: text("notes"),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-  },
-  table => [index("finance_organization_date_idx").on(table.organizationId, table.occurredAt)],
-);
-
-export const employees = mysqlTable(
-  "employees",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    organizationId: int("organizationId").notNull(),
-    fullName: varchar("fullName", { length: 180 }).notNull(),
-    employeeNumber: varchar("employeeNumber", { length: 64 }).notNull(),
-    department: varchar("department", { length: 120 }),
-    jobTitle: varchar("jobTitle", { length: 120 }),
-    status: mysqlEnum("status", ["active", "leave", "inactive"]).default("active").notNull(),
-    joinedAt: timestamp("joinedAt"),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-  },
-  table => [uniqueIndex("employee_organization_number_unique").on(table.organizationId, table.employeeNumber)],
-);
-
-export const attendanceRecords = mysqlTable(
-  "attendance_records",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    organizationId: int("organizationId").notNull(),
-    employeeId: int("employeeId").notNull(),
-    attendanceDate: timestamp("attendanceDate").notNull(),
-    status: mysqlEnum("status", ["present", "absent", "leave", "late"]).notNull(),
-    notes: text("notes"),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-  },
-  table => [
-    uniqueIndex("attendance_employee_date_unique").on(table.organizationId, table.employeeId, table.attendanceDate),
-    index("attendance_organization_date_idx").on(table.organizationId, table.attendanceDate),
-  ],
-);
-
-export const payrollRuns = mysqlTable(
-  "payroll_runs",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    organizationId: int("organizationId").notNull(),
-    periodLabel: varchar("periodLabel", { length: 32 }).notNull(),
-    status: mysqlEnum("status", ["draft", "approved", "paid"]).default("draft").notNull(),
-    totalAmount: decimal("totalAmount", { precision: 15, scale: 2 }).default("0").notNull(),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-  },
-  table => [uniqueIndex("payroll_organization_period_unique").on(table.organizationId, table.periodLabel)],
-);
-
-export const notifications = mysqlTable(
-  "notifications",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    organizationId: int("organizationId").notNull(),
-    type: varchar("type", { length: 64 }).notNull(),
-    severity: mysqlEnum("severity", ["info", "success", "warning", "critical"]).default("info").notNull(),
-    title: varchar("title", { length: 220 }).notNull(),
-    content: text("content").notNull(),
-    isRead: mysqlEnum("isRead", ["yes", "no"]).default("no").notNull(),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-  },
-  table => [index("notification_organization_read_idx").on(table.organizationId, table.isRead)],
-);
-
-export const auditLogs = mysqlTable(
-  "audit_logs",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    organizationId: int("organizationId").notNull(),
-    actorUserId: int("actorUserId"),
-    action: varchar("action", { length: 120 }).notNull(),
-    entityType: varchar("entityType", { length: 80 }).notNull(),
-    entityId: varchar("entityId", { length: 80 }),
-    metadata: json("metadata").$type<Record<string, unknown> | null>(),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-  },
-  table => [index("audit_organization_created_idx").on(table.organizationId, table.createdAt)],
-);
-
+export const users = mysqlTable("users", { id: int("id").autoincrement().primaryKey(), openId: varchar("openId", { length: 64 }).notNull().unique(), name: text("name"), email: varchar("email", { length: 320 }), loginMethod: varchar("loginMethod", { length: 64 }), role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(), createdAt: timestamp("createdAt").defaultNow().notNull(), updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(), lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull() });
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
+
+export const userPreferences = mysqlTable("user_preferences", { id: int("id").autoincrement().primaryKey(), userId: int("userId").notNull(), language: mysqlEnum("language", ["ar", "fr", "en"]).default("ar").notNull(), themeMode: mysqlEnum("themeMode", ["light", "dark", "system"]).default("system").notNull(), sidebarMode: mysqlEnum("sidebarMode", ["expanded", "compact", "collapsed"]).default("expanded").notNull(), density: mysqlEnum("density", ["comfortable", "compact"]).default("comfortable").notNull(), fontFamily: varchar("fontFamily", { length: 64 }).default("ibm-plex").notNull(), fontScale: mysqlEnum("fontScale", ["small", "normal", "large", "extra_large"]).default("normal").notNull(), numeralStyle: mysqlEnum("numeralStyle", ["western", "arabic_indic"]).default("western").notNull(), accentColor: varchar("accentColor", { length: 16 }).default("gold").notNull(), radiusPreset: mysqlEnum("radiusPreset", ["soft", "rounded", "sharp"]).default("rounded").notNull(), moduleViewMode: mysqlEnum("moduleViewMode", ["classic", "nawa_flow"]).default("classic").notNull(), createdAt: timestamp("createdAt").defaultNow().notNull(), updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull() }, t => [uniqueIndex("user_preferences_user_unique").on(t.userId)]);
+
+export const organizations = mysqlTable("organizations", { id: int("id").autoincrement().primaryKey(), name: varchar("name", { length: 180 }).notNull(), slug: varchar("slug", { length: 96 }).notNull().unique(), status: mysqlEnum("status", ["active", "suspended", "trial"]).default("trial").notNull(), baseCurrency: varchar("baseCurrency", { length: 8 }).default("SAR").notNull(), locale: varchar("locale", { length: 12 }).default("ar-SA").notNull(), monthlyBudget: decimal("monthlyBudget", { precision: 15, scale: 2 }).default("0").notNull(), createdAt: timestamp("createdAt").defaultNow().notNull(), updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull() });
 export type Organization = typeof organizations.$inferSelect;
+
+export const organizationSettings = mysqlTable("organization_settings", { id: int("id").autoincrement().primaryKey(), organizationId: int("organizationId").notNull(), currencyCode: varchar("currencyCode", { length: 8 }).default("SAR").notNull(), currencySymbolPosition: mysqlEnum("currencySymbolPosition", ["before", "after"]).default("after").notNull(), decimalPlaces: int("decimalPlaces").default(2).notNull(), dateFormat: varchar("dateFormat", { length: 24 }).default("DD/MM/YYYY").notNull(), timeFormat: mysqlEnum("timeFormat", ["12h", "24h"]).default("24h").notNull(), timeZone: varchar("timeZone", { length: 64 }).default("Africa/Algiers").notNull(), firstDayOfWeek: mysqlEnum("firstDayOfWeek", ["monday", "sunday", "saturday"]).default("monday").notNull(), decimalSeparator: mysqlEnum("decimalSeparator", ["dot", "comma"]).default("dot").notNull(), thousandsSeparator: mysqlEnum("thousandsSeparator", ["comma", "dot", "space"]).default("comma").notNull(), documentSettings: json("documentSettings").$type<{ paperSize: "A4" | "A5" | "thermal"; logoUrl?: string; address?: string; phone?: string; legalInfo?: string; headerText?: string; footerText?: string; showSignature?: boolean; fontFamily?: "ibm-plex" | "tajawal" | "noto-arabic" | "inter" | "system"; fontSize?: "small" | "normal" | "large" }>().notNull(), createdAt: timestamp("createdAt").defaultNow().notNull(), updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull() }, t => [uniqueIndex("organization_settings_organization_unique").on(t.organizationId)]);
+export const organizationCurrencies = mysqlTable("organization_currencies", { id: int("id").autoincrement().primaryKey(), organizationId: int("organizationId").notNull(), currencyCode: varchar("currencyCode", { length: 8 }).notNull(), symbol: varchar("symbol", { length: 16 }).notNull(), decimalPlaces: int("decimalPlaces").default(2).notNull(), displayStyle: mysqlEnum("displayStyle", ["symbol", "code", "symbol_and_code"]).default("symbol").notNull(), isBase: mysqlEnum("isBase", ["yes", "no"]).default("no").notNull(), status: mysqlEnum("status", ["active", "inactive"]).default("active").notNull(), createdAt: timestamp("createdAt").defaultNow().notNull(), updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull() }, t => [uniqueIndex("organization_currency_code_unique").on(t.organizationId, t.currencyCode), index("organization_currency_active_idx").on(t.organizationId, t.status)]);
+export const organizationExchangeRates = mysqlTable("organization_exchange_rates", { id: int("id").autoincrement().primaryKey(), organizationId: int("organizationId").notNull(), baseCurrencyCode: varchar("baseCurrencyCode", { length: 8 }).notNull(), quoteCurrencyCode: varchar("quoteCurrencyCode", { length: 8 }).notNull(), rate: decimal("rate", { precision: 18, scale: 8 }).notNull(), effectiveAt: timestamp("effectiveAt").notNull(), source: varchar("source", { length: 64 }).default("manual").notNull(), createdByUserId: int("createdByUserId"), createdAt: timestamp("createdAt").defaultNow().notNull() }, t => [index("exchange_rate_organization_pair_date_idx").on(t.organizationId, t.baseCurrencyCode, t.quoteCurrencyCode, t.effectiveAt)]);
+
+export const organizationMemberships = mysqlTable("organization_memberships", { id: int("id").autoincrement().primaryKey(), organizationId: int("organizationId").notNull(), userId: int("userId").notNull(), roleKey: varchar("roleKey", { length: 48 }).default("member").notNull(), dataScope: json("dataScope").$type<{ branchIds?: number[]; warehouseIds?: number[]; regionIds?: number[] } | null>(), status: mysqlEnum("status", ["active", "invited", "suspended"]).default("active").notNull(), createdAt: timestamp("createdAt").defaultNow().notNull(), updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull() }, t => [uniqueIndex("membership_organization_user_unique").on(t.organizationId, t.userId), index("membership_user_idx").on(t.userId)]);
 export type OrganizationMembership = typeof organizationMemberships.$inferSelect;
+export const organizationRoles = mysqlTable("organization_roles", { id: int("id").autoincrement().primaryKey(), organizationId: int("organizationId").notNull(), key: varchar("key", { length: 48 }).notNull(), name: varchar("name", { length: 120 }).notNull(), description: text("description"), permissions: json("permissions").$type<string[]>().notNull(), createdAt: timestamp("createdAt").defaultNow().notNull(), updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull() }, t => [uniqueIndex("organization_role_key_unique").on(t.organizationId, t.key)]);
+export const organizationModules = mysqlTable("organization_modules", { id: int("id").autoincrement().primaryKey(), organizationId: int("organizationId").notNull(), moduleKey: varchar("moduleKey", { length: 64 }).notNull(), status: mysqlEnum("status", ["active", "suspended", "expired"]).default("active").notNull(), effectiveFrom: timestamp("effectiveFrom").defaultNow().notNull(), effectiveUntil: timestamp("effectiveUntil"), changedByUserId: int("changedByUserId"), changeSource: varchar("changeSource", { length: 80 }).default("manual").notNull(), createdAt: timestamp("createdAt").defaultNow().notNull(), updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull() }, t => [uniqueIndex("organization_module_unique").on(t.organizationId, t.moduleKey)]);
+
+export const branches = mysqlTable("branches", { id: int("id").autoincrement().primaryKey(), organizationId: int("organizationId").notNull(), code: varchar("code", { length: 48 }).notNull(), name: varchar("name", { length: 160 }).notNull(), status: mysqlEnum("status", ["active", "inactive"]).default("active").notNull(), createdAt: timestamp("createdAt").defaultNow().notNull() }, t => [uniqueIndex("branch_org_code_unique").on(t.organizationId, t.code)]);
+export const businessParties = mysqlTable("business_parties", { id: int("id").autoincrement().primaryKey(), organizationId: int("organizationId").notNull(), code: varchar("code", { length: 64 }), name: varchar("name", { length: 220 }).notNull(), tradeName: varchar("tradeName", { length: 220 }), types: json("types").$type<string[]>().notNull(), contactName: varchar("contactName", { length: 160 }), phone: varchar("phone", { length: 32 }), email: varchar("email", { length: 320 }), address: text("address"), region: varchar("region", { length: 120 }), locationData: json("locationData").$type<Record<string, unknown> | null>(), taxNumber: varchar("taxNumber", { length: 80 }), paymentTermsDays: int("paymentTermsDays").default(0).notNull(), preferredCurrencyCode: varchar("preferredCurrencyCode", { length: 8 }), priceListId: int("priceListId"), customerSegment: varchar("customerSegment", { length: 96 }), creditLimit: decimal("creditLimit", { precision: 15, scale: 2 }).default("0").notNull(), notes: text("notes"), status: mysqlEnum("status", ["active", "inactive", "blocked"]).default("active").notNull(), createdAt: timestamp("createdAt").defaultNow().notNull(), updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull() }, t => [uniqueIndex("party_org_code_unique").on(t.organizationId, t.code), index("party_organization_idx").on(t.organizationId)]);
+export const productCategories = mysqlTable("product_categories", { id: int("id").autoincrement().primaryKey(), organizationId: int("organizationId").notNull(), parentId: int("parentId"), name: varchar("name", { length: 160 }).notNull(), color: varchar("color", { length: 16 }).default("#D7B56D").notNull(), status: mysqlEnum("status", ["active", "inactive"]).default("active").notNull(), createdAt: timestamp("createdAt").defaultNow().notNull(), updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull() }, t => [uniqueIndex("category_organization_name_unique").on(t.organizationId, t.name)]);
+export const productBrands = mysqlTable("product_brands", { id: int("id").autoincrement().primaryKey(), organizationId: int("organizationId").notNull(), name: varchar("name", { length: 160 }).notNull(), status: mysqlEnum("status", ["active", "inactive"]).default("active").notNull(), createdAt: timestamp("createdAt").defaultNow().notNull() }, t => [uniqueIndex("brand_org_name_unique").on(t.organizationId, t.name)]);
+export const products = mysqlTable("products", { id: int("id").autoincrement().primaryKey(), organizationId: int("organizationId").notNull(), categoryId: int("categoryId"), brandId: int("brandId"), productId: varchar("productId", { length: 64 }), name: varchar("name", { length: 220 }).notNull(), nameAr: varchar("nameAr", { length: 220 }), nameFr: varchar("nameFr", { length: 220 }), nameEn: varchar("nameEn", { length: 220 }), description: text("description"), sku: varchar("sku", { length: 96 }).notNull(), barcode: varchar("barcode", { length: 96 }), productType: mysqlEnum("productType", ["standard", "food", "expiring", "manufacturable"]).default("standard").notNull(), baseUnit: varchar("baseUnit", { length: 32 }).default("قطعة").notNull(), unit: varchar("unit", { length: 32 }).default("قطعة").notNull(), purchaseUnit: varchar("purchaseUnit", { length: 32 }).default("قطعة").notNull(), salesUnit: varchar("salesUnit", { length: 32 }).default("قطعة").notNull(), unitsPerCarton: decimal("unitsPerCarton", { precision: 15, scale: 3 }).default("1").notNull(), netWeight: decimal("netWeight", { precision: 15, scale: 3 }), grossWeight: decimal("grossWeight", { precision: 15, scale: 3 }), length: decimal("length", { precision: 15, scale: 3 }), width: decimal("width", { precision: 15, scale: 3 }), height: decimal("height", { precision: 15, scale: 3 }), purchasePrice: decimal("purchasePrice", { precision: 15, scale: 2 }).default("0").notNull(), salePrice: decimal("salePrice", { precision: 15, scale: 2 }).default("0").notNull(), taxRate: decimal("taxRate", { precision: 8, scale: 4 }).default("0").notNull(), minimumStock: decimal("minimumStock", { precision: 15, scale: 3 }).default("0").notNull(), reorderPoint: decimal("reorderPoint", { precision: 15, scale: 3 }).default("0").notNull(), imageUrl: varchar("imageUrl", { length: 1024 }), status: mysqlEnum("status", ["active", "inactive", "archived"]).default("active").notNull(), createdAt: timestamp("createdAt").defaultNow().notNull(), updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull() }, t => [uniqueIndex("product_organization_sku_unique").on(t.organizationId, t.sku), uniqueIndex("product_org_barcode_unique").on(t.organizationId, t.barcode), index("product_organization_category_idx").on(t.organizationId, t.categoryId)]);
+export const productUnitConversions = mysqlTable("product_unit_conversions", { id: int("id").autoincrement().primaryKey(), organizationId: int("organizationId").notNull(), productId: int("productId").notNull(), fromUnit: varchar("fromUnit", { length: 32 }).notNull(), toUnit: varchar("toUnit", { length: 32 }).notNull(), factor: decimal("factor", { precision: 18, scale: 6 }).notNull(), createdAt: timestamp("createdAt").defaultNow().notNull() }, t => [uniqueIndex("product_unit_conversion_unique").on(t.organizationId, t.productId, t.fromUnit, t.toUnit)]);
+export const priceLists = mysqlTable("price_lists", { id: int("id").autoincrement().primaryKey(), organizationId: int("organizationId").notNull(), name: varchar("name", { length: 160 }).notNull(), kind: mysqlEnum("kind", ["default", "wholesale", "retail", "customer", "segment", "region", "promotion"]).default("default").notNull(), priority: int("priority").default(100).notNull(), currencyCode: varchar("currencyCode", { length: 8 }).notNull(), status: mysqlEnum("status", ["active", "inactive"]).default("active").notNull(), startsAt: timestamp("startsAt"), endsAt: timestamp("endsAt"), createdAt: timestamp("createdAt").defaultNow().notNull() }, t => [index("price_list_org_priority_idx").on(t.organizationId, t.priority)]);
+export const priceListItems = mysqlTable("price_list_items", { id: int("id").autoincrement().primaryKey(), organizationId: int("organizationId").notNull(), priceListId: int("priceListId").notNull(), productId: int("productId").notNull(), unit: varchar("unit", { length: 32 }), price: decimal("price", { precision: 15, scale: 2 }).notNull(), minimumQuantity: decimal("minimumQuantity", { precision: 15, scale: 3 }).default("1").notNull(), createdAt: timestamp("createdAt").defaultNow().notNull() }, t => [uniqueIndex("price_list_item_unique").on(t.organizationId, t.priceListId, t.productId, t.unit)]);
+export const warehouses = mysqlTable("warehouses", { id: int("id").autoincrement().primaryKey(), organizationId: int("organizationId").notNull(), branchId: int("branchId"), name: varchar("name", { length: 160 }).notNull(), code: varchar("code", { length: 48 }).notNull(), isMobile: mysqlEnum("isMobile", ["yes", "no"]).default("no").notNull(), status: mysqlEnum("status", ["active", "inactive"]).default("active").notNull(), createdAt: timestamp("createdAt").defaultNow().notNull(), updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull() }, t => [uniqueIndex("warehouse_organization_code_unique").on(t.organizationId, t.code)]);
+export const productBatches = mysqlTable("product_batches", { id: int("id").autoincrement().primaryKey(), organizationId: int("organizationId").notNull(), productId: int("productId").notNull(), warehouseId: int("warehouseId").notNull(), lotNumber: varchar("lotNumber", { length: 96 }).notNull(), sourcePartyId: int("sourcePartyId"), receivedQuantity: decimal("receivedQuantity", { precision: 15, scale: 3 }).default("0").notNull(), currentQuantity: decimal("currentQuantity", { precision: 15, scale: 3 }).default("0").notNull(), reservedQuantity: decimal("reservedQuantity", { precision: 15, scale: 3 }).default("0").notNull(), cost: decimal("cost", { precision: 15, scale: 2 }).default("0").notNull(), manufacturingDate: timestamp("manufacturingDate"), expiryDate: timestamp("expiryDate"), status: mysqlEnum("status", ["active", "blocked", "quarantined", "expired"]).default("active").notNull(), createdAt: timestamp("createdAt").defaultNow().notNull() }, t => [uniqueIndex("batch_org_warehouse_lot_unique").on(t.organizationId, t.warehouseId, t.lotNumber), index("batch_fefo_idx").on(t.organizationId, t.productId, t.warehouseId, t.expiryDate)]);
+export const inventoryBalances = mysqlTable("inventory_balances", { id: int("id").autoincrement().primaryKey(), organizationId: int("organizationId").notNull(), productId: int("productId").notNull(), warehouseId: int("warehouseId").notNull(), quantity: decimal("quantity", { precision: 15, scale: 3 }).default("0").notNull(), reservedQuantity: decimal("reservedQuantity", { precision: 15, scale: 3 }).default("0").notNull(), updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull() }, t => [uniqueIndex("inventory_balance_unique").on(t.organizationId, t.productId, t.warehouseId), index("inventory_product_idx").on(t.organizationId, t.productId)]);
+export const stockMovements = mysqlTable("stock_movements", { id: int("id").autoincrement().primaryKey(), organizationId: int("organizationId").notNull(), warehouseId: int("warehouseId").notNull(), productId: int("productId").notNull(), batchId: int("batchId"), movementType: mysqlEnum("movementType", ["purchase_receipt", "sales_issue", "sales_return", "supplier_return", "transfer_out", "transfer_in", "adjustment", "opening_balance", "count_adjustment"]).notNull(), quantity: decimal("quantity", { precision: 15, scale: 3 }).notNull(), unit: varchar("unit", { length: 32 }).notNull(), sourceDocumentType: varchar("sourceDocumentType", { length: 64 }), sourceDocumentId: int("sourceDocumentId"), occurredAt: timestamp("occurredAt").defaultNow().notNull(), actorUserId: int("actorUserId"), auditReference: varchar("auditReference", { length: 96 }), createdAt: timestamp("createdAt").defaultNow().notNull() }, t => [index("stock_movement_org_warehouse_product_idx").on(t.organizationId, t.warehouseId, t.productId, t.occurredAt)]);
+export const stockTransfers = mysqlTable("stock_transfers", { id: int("id").autoincrement().primaryKey(), organizationId: int("organizationId").notNull(), transferNumber: varchar("transferNumber", { length: 64 }).notNull(), sourceWarehouseId: int("sourceWarehouseId").notNull(), destinationWarehouseId: int("destinationWarehouseId").notNull(), status: mysqlEnum("status", ["draft", "approved", "in_transit", "received", "cancelled"]).default("draft").notNull(), sentAt: timestamp("sentAt"), receivedAt: timestamp("receivedAt"), notes: text("notes"), createdByUserId: int("createdByUserId"), approvedByUserId: int("approvedByUserId"), createdAt: timestamp("createdAt").defaultNow().notNull(), updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull() }, t => [uniqueIndex("transfer_org_number_unique").on(t.organizationId, t.transferNumber)]);
+export const stockTransferItems = mysqlTable("stock_transfer_items", { id: int("id").autoincrement().primaryKey(), organizationId: int("organizationId").notNull(), transferId: int("transferId").notNull(), productId: int("productId").notNull(), batchId: int("batchId"), requestedQuantity: decimal("requestedQuantity", { precision: 15, scale: 3 }).notNull(), receivedQuantity: decimal("receivedQuantity", { precision: 15, scale: 3 }).default("0").notNull(), createdAt: timestamp("createdAt").defaultNow().notNull() });
+export const inventoryCounts = mysqlTable("inventory_counts", { id: int("id").autoincrement().primaryKey(), organizationId: int("organizationId").notNull(), countNumber: varchar("countNumber", { length: 64 }).notNull(), warehouseId: int("warehouseId").notNull(), scope: mysqlEnum("scope", ["full", "partial", "category", "product", "location"]).default("full").notNull(), movementMode: mysqlEnum("movementMode", ["freeze", "reconcile"]).default("freeze").notNull(), status: mysqlEnum("status", ["draft", "in_progress", "review", "approved", "cancelled"]).default("draft").notNull(), startedAt: timestamp("startedAt"), approvedAt: timestamp("approvedAt"), responsibleUserId: int("responsibleUserId"), reviewedByUserId: int("reviewedByUserId"), approvedByUserId: int("approvedByUserId"), createdAt: timestamp("createdAt").defaultNow().notNull() }, t => [uniqueIndex("count_org_number_unique").on(t.organizationId, t.countNumber)]);
+export const inventoryCountItems = mysqlTable("inventory_count_items", { id: int("id").autoincrement().primaryKey(), organizationId: int("organizationId").notNull(), countId: int("countId").notNull(), productId: int("productId").notNull(), batchId: int("batchId"), expectedQuantity: decimal("expectedQuantity", { precision: 15, scale: 3 }).default("0").notNull(), actualQuantity: decimal("actualQuantity", { precision: 15, scale: 3 }), createdAt: timestamp("createdAt").defaultNow().notNull() });
+export const salesInvoices = mysqlTable("sales_invoices", { id: int("id").autoincrement().primaryKey(), organizationId: int("organizationId").notNull(), customerId: int("customerId"), invoiceNumber: varchar("invoiceNumber", { length: 64 }).notNull(), status: mysqlEnum("status", ["draft", "issued", "partial", "paid", "overdue", "cancelled", "returned"]).default("draft").notNull(), currencyCode: varchar("currencyCode", { length: 8 }).default("SAR").notNull(), baseCurrencyCode: varchar("baseCurrencyCode", { length: 8 }).default("SAR").notNull(), exchangeRateUsed: decimal("exchangeRateUsed", { precision: 18, scale: 8 }).default("1").notNull(), exchangeRateEffectiveAt: timestamp("exchangeRateEffectiveAt"), discountAmount: decimal("discountAmount", { precision: 15, scale: 2 }).default("0").notNull(), taxAmount: decimal("taxAmount", { precision: 15, scale: 2 }).default("0").notNull(), grandTotal: decimal("grandTotal", { precision: 15, scale: 2 }).default("0").notNull(), amountPaid: decimal("amountPaid", { precision: 15, scale: 2 }).default("0").notNull(), dueDate: timestamp("dueDate"), issuedAt: timestamp("issuedAt"), createdAt: timestamp("createdAt").defaultNow().notNull(), updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull() }, t => [uniqueIndex("invoice_organization_number_unique").on(t.organizationId, t.invoiceNumber), index("invoice_organization_status_idx").on(t.organizationId, t.status)]);
+export const purchaseOrders = mysqlTable("purchase_orders", { id: int("id").autoincrement().primaryKey(), organizationId: int("organizationId").notNull(), supplierId: int("supplierId"), orderNumber: varchar("orderNumber", { length: 64 }).notNull(), status: mysqlEnum("status", ["draft", "sent", "partial", "received", "cancelled"]).default("draft").notNull(), currencyCode: varchar("currencyCode", { length: 8 }).default("SAR").notNull(), baseCurrencyCode: varchar("baseCurrencyCode", { length: 8 }).default("SAR").notNull(), exchangeRateUsed: decimal("exchangeRateUsed", { precision: 18, scale: 8 }).default("1").notNull(), exchangeRateEffectiveAt: timestamp("exchangeRateEffectiveAt"), grandTotal: decimal("grandTotal", { precision: 15, scale: 2 }).default("0").notNull(), expectedAt: timestamp("expectedAt"), createdAt: timestamp("createdAt").defaultNow().notNull(), updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull() }, t => [uniqueIndex("purchase_order_organization_number_unique").on(t.organizationId, t.orderNumber), index("purchase_order_organization_status_idx").on(t.organizationId, t.status)]);
+export const financialTransactions = mysqlTable("financial_transactions", { id: int("id").autoincrement().primaryKey(), organizationId: int("organizationId").notNull(), type: mysqlEnum("type", ["income", "expense", "transfer", "adjustment"]).notNull(), category: varchar("category", { length: 120 }).notNull(), amount: decimal("amount", { precision: 15, scale: 2 }).notNull(), occurredAt: timestamp("occurredAt").defaultNow().notNull(), referenceType: varchar("referenceType", { length: 64 }), referenceId: int("referenceId"), notes: text("notes"), createdAt: timestamp("createdAt").defaultNow().notNull() }, t => [index("finance_organization_date_idx").on(t.organizationId, t.occurredAt)]);
+export const employees = mysqlTable("employees", { id: int("id").autoincrement().primaryKey(), organizationId: int("organizationId").notNull(), fullName: varchar("fullName", { length: 180 }).notNull(), employeeNumber: varchar("employeeNumber", { length: 64 }).notNull(), department: varchar("department", { length: 120 }), jobTitle: varchar("jobTitle", { length: 120 }), status: mysqlEnum("status", ["active", "leave", "inactive"]).default("active").notNull(), joinedAt: timestamp("joinedAt"), createdAt: timestamp("createdAt").defaultNow().notNull(), updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull() }, t => [uniqueIndex("employee_organization_number_unique").on(t.organizationId, t.employeeNumber)]);
+export const attendanceRecords = mysqlTable("attendance_records", { id: int("id").autoincrement().primaryKey(), organizationId: int("organizationId").notNull(), employeeId: int("employeeId").notNull(), attendanceDate: timestamp("attendanceDate").notNull(), status: mysqlEnum("status", ["present", "absent", "leave", "late"]).notNull(), notes: text("notes"), createdAt: timestamp("createdAt").defaultNow().notNull() }, t => [uniqueIndex("attendance_employee_date_unique").on(t.organizationId, t.employeeId, t.attendanceDate), index("attendance_organization_date_idx").on(t.organizationId, t.attendanceDate)]);
+export const payrollRuns = mysqlTable("payroll_runs", { id: int("id").autoincrement().primaryKey(), organizationId: int("organizationId").notNull(), periodLabel: varchar("periodLabel", { length: 32 }).notNull(), status: mysqlEnum("status", ["draft", "approved", "paid"]).default("draft").notNull(), totalAmount: decimal("totalAmount", { precision: 15, scale: 2 }).default("0").notNull(), createdAt: timestamp("createdAt").defaultNow().notNull(), updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull() }, t => [uniqueIndex("payroll_organization_period_unique").on(t.organizationId, t.periodLabel)]);
+export const notifications = mysqlTable("notifications", { id: int("id").autoincrement().primaryKey(), organizationId: int("organizationId").notNull(), type: varchar("type", { length: 64 }).notNull(), severity: mysqlEnum("severity", ["info", "success", "warning", "critical"]).default("info").notNull(), title: varchar("title", { length: 220 }).notNull(), content: text("content").notNull(), isRead: mysqlEnum("isRead", ["yes", "no"]).default("no").notNull(), createdAt: timestamp("createdAt").defaultNow().notNull() }, t => [index("notification_organization_read_idx").on(t.organizationId, t.isRead)]);
+export const auditLogs = mysqlTable("audit_logs", { id: int("id").autoincrement().primaryKey(), organizationId: int("organizationId").notNull(), actorUserId: int("actorUserId"), action: varchar("action", { length: 120 }).notNull(), entityType: varchar("entityType", { length: 80 }).notNull(), entityId: varchar("entityId", { length: 80 }), metadata: json("metadata").$type<Record<string, unknown> | null>(), createdAt: timestamp("createdAt").defaultNow().notNull() }, t => [index("audit_organization_created_idx").on(t.organizationId, t.createdAt)]);

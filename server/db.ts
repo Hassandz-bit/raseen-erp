@@ -5,6 +5,7 @@ import {
   financialTransactions,
   InsertUser,
   inventoryBalances,
+  productBatches,
   notifications,
   organizationMemberships,
   organizationCurrencies,
@@ -16,6 +17,7 @@ import {
   products,
   purchaseOrders,
   salesInvoices,
+  stockMovements,
   userPreferences,
   users,
 } from "../drizzle/schema";
@@ -191,6 +193,23 @@ export async function listProductsForOrganization(organizationId: number) {
   const db = await getDb();
   if (!db) return [];
   return db.select().from(products).where(eq(products.organizationId, organizationId)).orderBy(desc(products.updatedAt));
+}
+
+export async function recordStockMovement({ organizationId, warehouseId, productId, batchId, movementType, quantity, unit, actorUserId, sourceDocumentType, sourceDocumentId }: { organizationId: number; warehouseId: number; productId: number; batchId?: number; movementType: "purchase_receipt" | "sales_issue" | "sales_return" | "supplier_return" | "transfer_out" | "transfer_in" | "adjustment" | "opening_balance" | "count_adjustment"; quantity: number; unit: string; actorUserId: number; sourceDocumentType?: string; sourceDocumentId?: number }) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  if (quantity === 0) throw new Error("كمية الحركة لا يمكن أن تكون صفراً.");
+  return db.transaction(async tx => {
+    await tx.insert(stockMovements).values({ organizationId, warehouseId, productId, batchId, movementType, quantity: String(quantity), unit, actorUserId, sourceDocumentType, sourceDocumentId, auditReference: `STK-${Date.now()}` });
+    await tx.insert(inventoryBalances).values({ organizationId, warehouseId, productId, quantity: String(quantity), reservedQuantity: "0" }).onDuplicateKeyUpdate({ set: { quantity: sql`${inventoryBalances.quantity} + ${quantity}` } });
+    if (batchId) {
+      const batch = await tx.select().from(productBatches).where(and(eq(productBatches.id, batchId), eq(productBatches.organizationId, organizationId), eq(productBatches.warehouseId, warehouseId), eq(productBatches.productId, productId))).limit(1);
+      if (!batch[0]) throw new Error("الدفعة غير متاحة ضمن نطاق المخزن والمنتج الحالي.");
+      if (quantity < 0 && (batch[0].status !== "active" || (batch[0].expiryDate && batch[0].expiryDate <= new Date()) || Number(batch[0].currentQuantity) < Math.abs(quantity))) throw new Error("لا يمكن الصرف من دفعة محجوبة أو منتهية أو بكمية غير متاحة.");
+      await tx.update(productBatches).set({ currentQuantity: sql`${productBatches.currentQuantity} + ${quantity}` }).where(eq(productBatches.id, batchId));
+    }
+    return { success: true } as const;
+  });
 }
 
 export type OperationalModule = "inventory" | "sales" | "purchases" | "finance" | "hr";
