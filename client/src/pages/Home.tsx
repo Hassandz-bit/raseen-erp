@@ -150,7 +150,7 @@ function DashboardContent({ onOpenModule }: { onOpenModule: (key: SectionKey) =>
           <p className="mt-2 max-w-xl text-sm leading-7 text-muted-foreground">راقب الأداء، عالج التنبيهات، وانتقل مباشرة إلى ما يحتاج قرارك اليوم.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button onClick={() => toast.success("تم فتح نموذج فاتورة جديدة في النسخة التشغيلية.")} className="gap-2 rounded-xl bg-primary px-4 text-primary-foreground hover:bg-primary/90"><Plus className="h-4 w-4" />فاتورة جديدة</Button>
+          <Button onClick={() => toast.success(t("saved"))} className="gap-2 rounded-xl bg-primary px-4 text-primary-foreground hover:bg-primary/90"><Plus className="h-4 w-4" />فاتورة جديدة</Button>
           <Button variant="outline" onClick={() => onOpenModule("reports")} className="gap-2 rounded-xl border-white/10 bg-white/[.03] text-slate-200 hover:bg-white/[.07]"><FileBarChart2 className="h-4 w-4" />عرض التقارير</Button>
         </div>
       </section>
