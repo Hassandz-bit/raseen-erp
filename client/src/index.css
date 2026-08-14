@@ -119,3 +119,11 @@ html:not(.dark) .text-slate-300 { color: oklch(.36 .018 255) !important; }
   .enter-delay { animation: rise 520ms 70ms cubic-bezier(0.23, 1, 0.32, 1) both; }
   @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 }
+
+@media print {
+  body { background: white !important; color: black !important; }
+  [data-slot="sidebar"], aside, header, button, .no-print { display: none !important; }
+  .surface { background: white !important; box-shadow: none !important; border-color: #d1d5db !important; }
+  .print-a5 { width: 148mm; min-height: 210mm; }
+  .print-thermal { width: 80mm; min-height: auto; }
+}
