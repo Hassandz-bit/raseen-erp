@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { createOperationalNotifications, createOperationalRecord, createOrganizationForUser, getDashboardMetrics, getDefaultTenantContext, getFinancialReportSummary, listNotificationsForOrganization, listOperationalRecords, listProductsForOrganization, markNotificationRead, type OperationalModule } from "./db";
+import { createOperationalNotifications, createOperationalRecord, createOrganizationForUser, getDashboardMetrics, getDefaultTenantContext, getFinancialReportSummary, getOrCreateOrganizationSettings, getOrCreateUserPreferences, listNotificationsForOrganization, listOperationalRecords, listProductsForOrganization, markNotificationRead, updateOrganizationSettings, updateUserPreferences, type OperationalModule } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { notifyOwner } from "./_core/notification";
 import { protectedProcedure, router } from "./_core/trpc";
@@ -26,6 +26,14 @@ async function requireModule(userId: number, moduleKey: ModuleKey) {
       code: "FORBIDDEN",
       message: "هذه الوحدة غير مفعلة ضمن اشتراك مؤسستك.",
     });
+  }
+  return context;
+}
+
+async function requireOrganizationOwner(userId: number) {
+  const context = await getTenantContext(userId);
+  if (context.membership.roleKey !== "owner") {
+    throw new TRPCError({ code: "FORBIDDEN", message: "يلزم دور مالك المؤسسة لتعديل هذه الإعدادات." });
   }
   return context;
 }
@@ -58,6 +66,48 @@ export const erpRouter = router({
         effectiveUntil: module.effectiveUntil,
       })),
     };
+  }),
+
+  preferences: router({
+    user: protectedProcedure.query(({ ctx }) => getOrCreateUserPreferences(ctx.user.id)),
+    saveUser: protectedProcedure.input(z.object({
+      language: z.enum(["ar", "fr", "en"]).optional(),
+      themeMode: z.enum(["light", "dark", "system"]).optional(),
+      sidebarMode: z.enum(["expanded", "compact", "collapsed"]).optional(),
+      density: z.enum(["comfortable", "compact"]).optional(),
+      fontFamily: z.enum(["ibm-plex", "tajawal", "noto-arabic", "inter", "system"]).optional(),
+      fontScale: z.enum(["small", "normal", "large"]).optional(),
+      accentColor: z.enum(["gold", "blue", "emerald", "violet"]).optional(),
+      radiusPreset: z.enum(["soft", "rounded", "sharp"]).optional(),
+    })).mutation(({ ctx, input }) => updateUserPreferences(ctx.user.id, input)),
+    organization: protectedProcedure.query(async ({ ctx }) => {
+      const context = await getTenantContext(ctx.user.id);
+      return getOrCreateOrganizationSettings(context.organization.id);
+    }),
+    saveOrganization: protectedProcedure.input(z.object({
+      currencyCode: z.enum(["DZD", "EUR", "USD", "SAR"]).optional(),
+      currencySymbolPosition: z.enum(["before", "after"]).optional(),
+      decimalPlaces: z.number().int().min(0).max(4).optional(),
+      dateFormat: z.enum(["DD/MM/YYYY", "MM/DD/YYYY", "YYYY-MM-DD"]).optional(),
+      timeFormat: z.enum(["12h", "24h"]).optional(),
+      timeZone: z.string().min(1).max(64).optional(),
+      firstDayOfWeek: z.enum(["monday", "sunday", "saturday"]).optional(),
+      decimalSeparator: z.enum(["dot", "comma"]).optional(),
+      thousandsSeparator: z.enum(["comma", "dot", "space"]).optional(),
+      documentSettings: z.object({
+        paperSize: z.enum(["A4", "A5", "thermal"]),
+        logoUrl: z.string().url().optional(),
+        address: z.string().max(300).optional(),
+        phone: z.string().max(64).optional(),
+        legalInfo: z.string().max(500).optional(),
+        headerText: z.string().max(180).optional(),
+        footerText: z.string().max(300).optional(),
+        showSignature: z.boolean().optional(),
+      }).optional(),
+    })).mutation(async ({ ctx, input }) => {
+      const context = await requireOrganizationOwner(ctx.user.id);
+      return updateOrganizationSettings(context.organization.id, input);
+    }),
   }),
 
   dashboard: protectedProcedure.query(async ({ ctx }) => {

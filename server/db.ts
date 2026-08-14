@@ -9,15 +9,24 @@ import {
   organizationMemberships,
   organizationModules,
   organizationRoles,
+  organizationSettings,
   organizations,
   products,
   purchaseOrders,
   salesInvoices,
+  userPreferences,
   users,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
+
+export const defaultDocumentSettings = {
+  paperSize: "A4" as const,
+  headerText: "",
+  footerText: "",
+  showSignature: true,
+};
 
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
@@ -56,6 +65,36 @@ export async function getUserByOpenId(openId: string) {
   return result[0];
 }
 
+export async function getOrCreateUserPreferences(userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  await db.insert(userPreferences).values({ userId }).onDuplicateKeyUpdate({ set: { userId } });
+  const result = await db.select().from(userPreferences).where(eq(userPreferences.userId, userId)).limit(1);
+  return result[0];
+}
+
+export async function updateUserPreferences(userId: number, values: Partial<typeof userPreferences.$inferInsert>) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  await db.insert(userPreferences).values({ userId, ...values }).onDuplicateKeyUpdate({ set: values });
+  return getOrCreateUserPreferences(userId);
+}
+
+export async function getOrCreateOrganizationSettings(organizationId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  await db.insert(organizationSettings).values({ organizationId, documentSettings: defaultDocumentSettings }).onDuplicateKeyUpdate({ set: { organizationId } });
+  const result = await db.select().from(organizationSettings).where(eq(organizationSettings.organizationId, organizationId)).limit(1);
+  return result[0];
+}
+
+export async function updateOrganizationSettings(organizationId: number, values: Partial<typeof organizationSettings.$inferInsert>) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  await db.insert(organizationSettings).values({ organizationId, documentSettings: defaultDocumentSettings, ...values }).onDuplicateKeyUpdate({ set: values });
+  return getOrCreateOrganizationSettings(organizationId);
+}
+
 export async function createOrganizationForUser({ userId, name }: { userId: number; name: string }) {
   const db = await getDb();
   if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
@@ -86,6 +125,8 @@ export async function createOrganizationForUser({ userId, name }: { userId: numb
       status: "active" as const,
       changeSource: "onboarding",
     })));
+    await tx.insert(organizationSettings).values({ organizationId, documentSettings: defaultDocumentSettings });
+    await tx.insert(userPreferences).values({ userId }).onDuplicateKeyUpdate({ set: { userId } });
     return { organizationId, name };
   });
 }

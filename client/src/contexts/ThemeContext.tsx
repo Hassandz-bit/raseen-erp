@@ -1,64 +1,58 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
-type Theme = "light" | "dark";
+export type ThemeMode = "light" | "dark" | "system";
+export type AppearancePreferences = {
+  themeMode: ThemeMode;
+  sidebarMode: "expanded" | "compact" | "collapsed";
+  density: "comfortable" | "compact";
+  fontFamily: "ibm-plex" | "tajawal" | "noto-arabic" | "inter" | "system";
+  fontScale: "small" | "normal" | "large";
+  accentColor: "gold" | "blue" | "emerald" | "violet";
+  radiusPreset: "soft" | "rounded" | "sharp";
+};
 
-interface ThemeContextType {
-  theme: Theme;
-  toggleTheme?: () => void;
+type ThemeContextType = {
+  theme: "light" | "dark";
+  preferences: AppearancePreferences;
+  updatePreferences: (next: Partial<AppearancePreferences>) => void;
+  toggleTheme: () => void;
   switchable: boolean;
-}
+};
 
+const defaultPreferences: AppearancePreferences = { themeMode: "dark", sidebarMode: "expanded", density: "comfortable", fontFamily: "ibm-plex", fontScale: "normal", accentColor: "gold", radiusPreset: "rounded" };
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-interface ThemeProviderProps {
-  children: React.ReactNode;
-  defaultTheme?: Theme;
-  switchable?: boolean;
-}
-
-export function ThemeProvider({
-  children,
-  defaultTheme = "light",
-  switchable = false,
-}: ThemeProviderProps) {
-  const [theme, setTheme] = useState<Theme>(() => {
-    if (switchable) {
-      const stored = localStorage.getItem("theme");
-      return (stored as Theme) || defaultTheme;
-    }
-    return defaultTheme;
-  });
+export function ThemeProvider({ children, defaultTheme = "dark" }: { children: React.ReactNode; defaultTheme?: "light" | "dark" }) {
+  const [preferences, setPreferences] = useState<AppearancePreferences>(() => ({ ...defaultPreferences, themeMode: defaultTheme, ...(JSON.parse(localStorage.getItem("nawa-appearance") || "{}") as Partial<AppearancePreferences>) }));
+  const [systemDark, setSystemDark] = useState(() => window.matchMedia("(prefers-color-scheme: dark)").matches);
+  const theme = preferences.themeMode === "system" ? (systemDark ? "dark" : "light") : preferences.themeMode;
+  const updatePreferences = useCallback((next: Partial<AppearancePreferences>) => setPreferences(current => ({ ...current, ...next })), []);
 
   useEffect(() => {
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const listener = () => setSystemDark(media.matches);
+    media.addEventListener("change", listener);
+    return () => media.removeEventListener("change", listener);
+  }, []);
+  useEffect(() => {
     const root = document.documentElement;
-    if (theme === "dark") {
-      root.classList.add("dark");
-    } else {
-      root.classList.remove("dark");
-    }
+    root.classList.toggle("dark", theme === "dark");
+    root.dataset.density = preferences.density;
+    root.dataset.font = preferences.fontFamily;
+    root.dataset.accent = preferences.accentColor;
+    root.dataset.radius = preferences.radiusPreset;
+    root.dataset.sidebar = preferences.sidebarMode;
+    root.dataset.fontScale = preferences.fontScale;
+    localStorage.setItem("nawa-appearance", JSON.stringify(preferences));
+  }, [theme, preferences]);
 
-    if (switchable) {
-      localStorage.setItem("theme", theme);
-    }
-  }, [theme, switchable]);
-
-  const toggleTheme = switchable
-    ? () => {
-        setTheme(prev => (prev === "light" ? "dark" : "light"));
-      }
-    : undefined;
-
-  return (
-    <ThemeContext.Provider value={{ theme, toggleTheme, switchable }}>
-      {children}
-    </ThemeContext.Provider>
-  );
+  const toggleTheme = () => updatePreferences({ themeMode: theme === "dark" ? "light" : "dark" });
+  const value = useMemo(() => ({ theme, preferences, updatePreferences, toggleTheme, switchable: true }), [theme, preferences, updatePreferences]);
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 
 export function useTheme() {
   const context = useContext(ThemeContext);
-  if (!context) {
-    throw new Error("useTheme must be used within ThemeProvider");
-  }
+  if (!context) throw new Error("useTheme must be used within ThemeProvider");
   return context;
 }

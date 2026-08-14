@@ -23,6 +23,25 @@ export const users = mysqlTable("users", {
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
 });
 
+export const userPreferences = mysqlTable(
+  "user_preferences",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull(),
+    language: mysqlEnum("language", ["ar", "fr", "en"]).default("ar").notNull(),
+    themeMode: mysqlEnum("themeMode", ["light", "dark", "system"]).default("system").notNull(),
+    sidebarMode: mysqlEnum("sidebarMode", ["expanded", "compact", "collapsed"]).default("expanded").notNull(),
+    density: mysqlEnum("density", ["comfortable", "compact"]).default("comfortable").notNull(),
+    fontFamily: varchar("fontFamily", { length: 64 }).default("ibm-plex").notNull(),
+    fontScale: mysqlEnum("fontScale", ["small", "normal", "large"]).default("normal").notNull(),
+    accentColor: varchar("accentColor", { length: 16 }).default("gold").notNull(),
+    radiusPreset: mysqlEnum("radiusPreset", ["soft", "rounded", "sharp"]).default("rounded").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [uniqueIndex("user_preferences_user_unique").on(table.userId)],
+);
+
 export const organizations = mysqlTable("organizations", {
   id: int("id").autoincrement().primaryKey(),
   name: varchar("name", { length: 180 }).notNull(),
@@ -34,6 +53,27 @@ export const organizations = mysqlTable("organizations", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
+
+export const organizationSettings = mysqlTable(
+  "organization_settings",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    organizationId: int("organizationId").notNull(),
+    currencyCode: varchar("currencyCode", { length: 8 }).default("SAR").notNull(),
+    currencySymbolPosition: mysqlEnum("currencySymbolPosition", ["before", "after"]).default("after").notNull(),
+    decimalPlaces: int("decimalPlaces").default(2).notNull(),
+    dateFormat: varchar("dateFormat", { length: 24 }).default("DD/MM/YYYY").notNull(),
+    timeFormat: mysqlEnum("timeFormat", ["12h", "24h"]).default("24h").notNull(),
+    timeZone: varchar("timeZone", { length: 64 }).default("Africa/Algiers").notNull(),
+    firstDayOfWeek: mysqlEnum("firstDayOfWeek", ["monday", "sunday", "saturday"]).default("monday").notNull(),
+    decimalSeparator: mysqlEnum("decimalSeparator", ["dot", "comma"]).default("dot").notNull(),
+    thousandsSeparator: mysqlEnum("thousandsSeparator", ["comma", "dot", "space"]).default("comma").notNull(),
+    documentSettings: json("documentSettings").$type<{ paperSize: "A4" | "A5" | "thermal"; logoUrl?: string; address?: string; phone?: string; legalInfo?: string; headerText?: string; footerText?: string; showSignature?: boolean }>().notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [uniqueIndex("organization_settings_organization_unique").on(table.organizationId)],
+);
 
 export const organizationMemberships = mysqlTable(
   "organization_memberships",
