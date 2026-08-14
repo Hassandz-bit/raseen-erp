@@ -140,6 +140,7 @@ function MetricCard({ label, value, trend, icon: Icon, tone }: { label: string; 
 }
 
 function DashboardContent({ onOpenModule }: { onOpenModule: (key: SectionKey) => void }) {
+  const { t } = useLanguage();
   return (
     <div className="enter space-y-6">
       <section className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
@@ -155,10 +156,10 @@ function DashboardContent({ onOpenModule }: { onOpenModule: (key: SectionKey) =>
       </section>
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="إجمالي المبيعات" value={154280} trend="12.6%" icon={CircleDollarSign} tone="gold" />
-        <MetricCard label="صافي الإيرادات" value={48920} trend="8.4%" icon={WalletCards} tone="blue" />
-        <MetricCard label="قيمة المخزون" value={286740} trend="3.2%" icon={Package} tone="green" />
-        <MetricCard label="فواتير مستحقة" value={18320} trend="-4.1%" icon={ReceiptText} tone="rose" />
+        <MetricCard label={t("totalSalesMetric")} value={154280} trend="12.6%" icon={CircleDollarSign} tone="gold" />
+        <MetricCard label={t("netRevenueMetric")} value={48920} trend="8.4%" icon={WalletCards} tone="blue" />
+        <MetricCard label={t("inventoryValueMetric")} value={286740} trend="3.2%" icon={Package} tone="green" />
+        <MetricCard label={t("dueInvoicesMetric")} value={18320} trend="-4.1%" icon={ReceiptText} tone="rose" />
       </section>
 
       <section className="grid gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(310px,0.9fr)]">
