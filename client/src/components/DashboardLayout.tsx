@@ -112,6 +112,7 @@ function DashboardLayoutContent({
   const sidebarRef = useRef<HTMLDivElement>(null);
   const menuItems = [
     { icon: LayoutDashboard, label: t("dashboard"), path: "/" },
+    { icon: Boxes, label: t("commerceInventory"), path: "/commerce" },
     { icon: Boxes, label: t("modules"), path: "/modules" },
     { icon: Bot, label: t("workspace"), path: "/workspace" },
     { icon: GitBranch, label: t("nawaFlow"), path: "/workspace?view=nawa_flow" },

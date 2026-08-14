@@ -1,0 +1,16 @@
+import DashboardLayout from "@/components/DashboardLayout";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { trpc } from "@/lib/trpc";
+import { Boxes, Loader2, PackageSearch, Plus } from "lucide-react";
+import { useLocation } from "wouter";
+
+export default function CommerceInventory() {
+  const { direction, t } = useLanguage();
+  const [, setLocation] = useLocation();
+  const products = trpc.erp.inventory.listProducts.useQuery(undefined, { retry: false });
+
+  const needsOnboarding = products.error?.message.includes("عضوية نشطة") ?? false;
+  return <DashboardLayout><section dir={direction} className="mx-auto max-w-7xl space-y-6"><header className="surface relative overflow-hidden rounded-3xl border p-6 md:p-8"><div className="absolute -left-8 -top-12 h-48 w-48 rounded-full bg-primary/10 blur-3xl" /><div className="relative flex flex-col gap-5 md:flex-row md:items-end md:justify-between"><div className="flex items-start gap-4"><div className="grid h-12 w-12 place-items-center rounded-2xl bg-primary/10 text-primary"><Boxes className="h-6 w-6" /></div><div><p className="text-sm text-primary">{t("commerceInventory")}</p><h1 className="mt-1 text-2xl font-bold text-foreground">{t("inventory")}</h1><p className="mt-2 max-w-2xl text-sm leading-7 text-muted-foreground">{t("flowOverview")}</p></div></div><Button onClick={() => setLocation("/workspace")} className="gap-2 rounded-xl"><Plus className="h-4 w-4" />{t("workspace")}</Button></div></header><article className="surface overflow-hidden rounded-3xl border"><div className="flex items-center justify-between border-b border-border/70 p-5"><div><p className="font-semibold text-foreground">{t("inventory")}</p><p className="mt-1 text-xs text-muted-foreground">{t("flowOverview")}</p></div><Badge variant="outline">{products.data?.length ?? 0}</Badge></div>{products.isLoading ? <div className="grid min-h-56 place-items-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div> : needsOnboarding ? <div className="grid min-h-56 place-items-center gap-4 p-6 text-center"><PackageSearch className="h-8 w-8 text-primary" /><p className="max-w-md text-sm leading-7 text-muted-foreground">{t("workspaceAccountRequired")}</p><Button onClick={() => setLocation("/workspace")}>{t("setupOrganization")}</Button></div> : products.isError ? <div className="grid min-h-56 place-items-center p-6 text-sm text-destructive">{t("error")}</div> : products.data?.length ? <div className="divide-y divide-border/70">{products.data.map(product => <div key={product.id} className="flex items-center justify-between gap-4 p-4"><div className="min-w-0"><p className="truncate text-sm font-semibold text-foreground">{product.name}</p><p className="mt-1 text-xs text-muted-foreground">{product.sku}</p></div><div className="text-end"><p className="text-sm text-foreground">{product.salePrice}</p><Badge variant="secondary" className="mt-1">{product.status}</Badge></div></div>)}</div> : <div className="grid min-h-56 place-items-center gap-3 p-6 text-center"><PackageSearch className="h-8 w-8 text-muted-foreground" /><p className="text-sm text-muted-foreground">{t("empty")}</p></div>}</article></section></DashboardLayout>;
+}
