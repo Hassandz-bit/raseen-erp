@@ -247,6 +247,37 @@ export const employees = mysqlTable(
   table => [uniqueIndex("employee_organization_number_unique").on(table.organizationId, table.employeeNumber)],
 );
 
+export const attendanceRecords = mysqlTable(
+  "attendance_records",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    organizationId: int("organizationId").notNull(),
+    employeeId: int("employeeId").notNull(),
+    attendanceDate: timestamp("attendanceDate").notNull(),
+    status: mysqlEnum("status", ["present", "absent", "leave", "late"]).notNull(),
+    notes: text("notes"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex("attendance_employee_date_unique").on(table.organizationId, table.employeeId, table.attendanceDate),
+    index("attendance_organization_date_idx").on(table.organizationId, table.attendanceDate),
+  ],
+);
+
+export const payrollRuns = mysqlTable(
+  "payroll_runs",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    organizationId: int("organizationId").notNull(),
+    periodLabel: varchar("periodLabel", { length: 32 }).notNull(),
+    status: mysqlEnum("status", ["draft", "approved", "paid"]).default("draft").notNull(),
+    totalAmount: decimal("totalAmount", { precision: 15, scale: 2 }).default("0").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [uniqueIndex("payroll_organization_period_unique").on(table.organizationId, table.periodLabel)],
+);
+
 export const notifications = mysqlTable(
   "notifications",
   {

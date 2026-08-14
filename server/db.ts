@@ -11,6 +11,7 @@ import {
   organizationRoles,
   organizations,
   products,
+  purchaseOrders,
   salesInvoices,
   users,
 } from "../drizzle/schema";
@@ -108,6 +109,107 @@ export async function listProductsForOrganization(organizationId: number) {
   const db = await getDb();
   if (!db) return [];
   return db.select().from(products).where(eq(products.organizationId, organizationId)).orderBy(desc(products.updatedAt));
+}
+
+export type OperationalModule = "inventory" | "sales" | "purchases" | "finance" | "hr";
+
+export type OperationalRecord = {
+  id: number;
+  title: string;
+  reference: string;
+  status: string;
+  amount: string;
+  updatedAt: Date;
+};
+
+export async function listOperationalRecords(organizationId: number, module: OperationalModule): Promise<OperationalRecord[]> {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  switch (module) {
+    case "inventory": {
+      const rows = await db.select().from(products).where(eq(products.organizationId, organizationId)).orderBy(desc(products.updatedAt)).limit(50);
+      return rows.map(row => ({ id: row.id, title: row.name, reference: row.sku, status: row.status, amount: `${row.salePrice} ر.س`, updatedAt: row.updatedAt }));
+    }
+    case "sales": {
+      const rows = await db.select().from(salesInvoices).where(eq(salesInvoices.organizationId, organizationId)).orderBy(desc(salesInvoices.updatedAt)).limit(50);
+      return rows.map(row => ({ id: row.id, title: "فاتورة مبيعات", reference: row.invoiceNumber, status: row.status, amount: `${row.grandTotal} ر.س`, updatedAt: row.updatedAt }));
+    }
+    case "purchases": {
+      const rows = await db.select().from(purchaseOrders).where(eq(purchaseOrders.organizationId, organizationId)).orderBy(desc(purchaseOrders.updatedAt)).limit(50);
+      return rows.map(row => ({ id: row.id, title: "أمر شراء", reference: row.orderNumber, status: row.status, amount: `${row.grandTotal} ر.س`, updatedAt: row.updatedAt }));
+    }
+    case "finance": {
+      const rows = await db.select().from(financialTransactions).where(eq(financialTransactions.organizationId, organizationId)).orderBy(desc(financialTransactions.occurredAt)).limit(50);
+      return rows.map(row => ({ id: row.id, title: row.category, reference: row.type, status: "مسجل", amount: `${row.amount} ر.س`, updatedAt: row.occurredAt }));
+    }
+    case "hr": {
+      const rows = await db.select().from(employees).where(eq(employees.organizationId, organizationId)).orderBy(desc(employees.updatedAt)).limit(50);
+      return rows.map(row => ({ id: row.id, title: row.fullName, reference: row.employeeNumber, status: row.status, amount: row.jobTitle ?? "موظف", updatedAt: row.updatedAt }));
+    }
+  }
+}
+
+export async function createOperationalRecord({ organizationId, module, title, reference, amount, category }: { organizationId: number; module: OperationalModule; title: string; reference?: string; amount?: number; category?: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const token = Date.now().toString().slice(-7);
+  switch (module) {
+    case "inventory": {
+      const created = await db.insert(products).values({ organizationId, name: title, sku: reference?.trim() || `PRD-${token}`, salePrice: String(amount ?? 0), reorderPoint: "0", status: "active" });
+      return { id: Number(created[0].insertId), label: "تمت إضافة الصنف." };
+    }
+    case "sales": {
+      const created = await db.insert(salesInvoices).values({ organizationId, invoiceNumber: reference?.trim() || `INV-${token}`, grandTotal: String(amount ?? 0), amountPaid: "0", status: "issued", issuedAt: new Date() });
+      return { id: Number(created[0].insertId), label: "تم إنشاء فاتورة المبيعات." };
+    }
+    case "purchases": {
+      const created = await db.insert(purchaseOrders).values({ organizationId, orderNumber: reference?.trim() || `PO-${token}`, grandTotal: String(amount ?? 0), status: "draft" });
+      return { id: Number(created[0].insertId), label: "تم إنشاء أمر الشراء." };
+    }
+    case "finance": {
+      const created = await db.insert(financialTransactions).values({ organizationId, type: "expense", category: category?.trim() || title, amount: String(amount ?? 0), occurredAt: new Date() });
+      return { id: Number(created[0].insertId), label: "تم تسجيل المعاملة المالية." };
+    }
+    case "hr": {
+      const created = await db.insert(employees).values({ organizationId, fullName: title, employeeNumber: reference?.trim() || `EMP-${token}`, department: category?.trim() || null, jobTitle: "موظف", status: "active", joinedAt: new Date() });
+      return { id: Number(created[0].insertId), label: "تمت إضافة الموظف." };
+    }
+  }
+}
+
+export async function getFinancialReportSummary(organizationId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const monthStart = new Date();
+  monthStart.setUTCDate(1);
+  monthStart.setUTCHours(0, 0, 0, 0);
+  const [income, expenses, issuedInvoices, productCount] = await Promise.all([
+    db.select({ value: sql<string>`coalesce(sum(${financialTransactions.amount}), 0)` }).from(financialTransactions).where(and(eq(financialTransactions.organizationId, organizationId), eq(financialTransactions.type, "income"), gte(financialTransactions.occurredAt, monthStart))),
+    db.select({ value: sql<string>`coalesce(sum(${financialTransactions.amount}), 0)` }).from(financialTransactions).where(and(eq(financialTransactions.organizationId, organizationId), eq(financialTransactions.type, "expense"), gte(financialTransactions.occurredAt, monthStart))),
+    db.select({ value: count() }).from(salesInvoices).where(and(eq(salesInvoices.organizationId, organizationId), eq(salesInvoices.status, "issued"))),
+    db.select({ value: count() }).from(products).where(eq(products.organizationId, organizationId)),
+  ]);
+  const totalIncome = Number(income[0]?.value ?? 0);
+  const totalExpenses = Number(expenses[0]?.value ?? 0);
+  return { totalIncome, totalExpenses, netProfit: totalIncome - totalExpenses, issuedInvoices: Number(issuedInvoices[0]?.value ?? 0), products: Number(productCount[0]?.value ?? 0) };
+}
+
+export async function listNotificationsForOrganization(organizationId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(notifications).where(eq(notifications.organizationId, organizationId)).orderBy(desc(notifications.createdAt)).limit(30);
+}
+
+export async function createOperationalNotifications(organizationId: number, reasons: string[]) {
+  const db = await getDb();
+  if (!db || reasons.length === 0) return;
+  await db.insert(notifications).values(reasons.map(content => ({ organizationId, type: "operational_alert", severity: "warning" as const, title: "تنبيه تشغيلي", content, isRead: "no" as const })));
+}
+
+export async function markNotificationRead(organizationId: number, notificationId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  await db.update(notifications).set({ isRead: "yes" }).where(and(eq(notifications.id, notificationId), eq(notifications.organizationId, organizationId)));
 }
 
 export async function getDashboardMetrics(organizationId: number) {

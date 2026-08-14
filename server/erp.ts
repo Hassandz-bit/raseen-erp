@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { createOrganizationForUser, getDashboardMetrics, getDefaultTenantContext, listProductsForOrganization } from "./db";
+import { createOperationalNotifications, createOperationalRecord, createOrganizationForUser, getDashboardMetrics, getDefaultTenantContext, getFinancialReportSummary, listNotificationsForOrganization, listOperationalRecords, listProductsForOrganization, markNotificationRead, type OperationalModule } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { notifyOwner } from "./_core/notification";
 import { protectedProcedure, router } from "./_core/trpc";
@@ -8,6 +8,7 @@ import { buildOwnerAlertReasons, canAccessTenantModule, hasActiveMembership } fr
 
 const moduleKeys = ["inventory", "sales", "purchases", "finance", "hr", "reports", "ai_assistant"] as const;
 type ModuleKey = (typeof moduleKeys)[number];
+const operationalModuleKeys = ["inventory", "sales", "purchases", "finance", "hr"] as const;
 
 async function getTenantContext(userId: number) {
   const context = await getDefaultTenantContext(userId);
@@ -71,6 +72,44 @@ export const erpRouter = router({
     }),
   }),
 
+  operations: router({
+    list: protectedProcedure.input(z.object({ module: z.enum(operationalModuleKeys) })).query(async ({ ctx, input }) => {
+      const context = await requireModule(ctx.user.id, input.module);
+      return listOperationalRecords(context.organization.id, input.module as OperationalModule);
+    }),
+    create: protectedProcedure
+      .input(z.object({
+        module: z.enum(operationalModuleKeys),
+        title: z.string().trim().min(2).max(220),
+        reference: z.string().trim().max(96).optional(),
+        amount: z.number().nonnegative().max(999999999).optional(),
+        category: z.string().trim().max(120).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const context = await requireModule(ctx.user.id, input.module);
+        return createOperationalRecord({ ...input, organizationId: context.organization.id, module: input.module as OperationalModule });
+      }),
+  }),
+
+  reports: router({
+    summary: protectedProcedure.query(async ({ ctx }) => {
+      const context = await requireModule(ctx.user.id, "reports");
+      return getFinancialReportSummary(context.organization.id);
+    }),
+  }),
+
+  notifications: router({
+    list: protectedProcedure.query(async ({ ctx }) => {
+      const context = await getTenantContext(ctx.user.id);
+      return listNotificationsForOrganization(context.organization.id);
+    }),
+    markRead: protectedProcedure.input(z.object({ notificationId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+      const context = await getTenantContext(ctx.user.id);
+      await markNotificationRead(context.organization.id, input.notificationId);
+      return { success: true } as const;
+    }),
+  }),
+
   ai: router({
     ask: protectedProcedure
       .input(z.object({ prompt: z.string().trim().min(3).max(1200) }))
@@ -106,6 +145,7 @@ export const erpRouter = router({
       const context = await getTenantContext(ctx.user.id);
       const metrics = await getDashboardMetrics(context.organization.id);
       const reasons = buildOwnerAlertReasons(metrics);
+      await createOperationalNotifications(context.organization.id, reasons);
 
       const notified = reasons.length
         ? await notifyOwner({
