@@ -16,4 +16,11 @@ describe("i18n foundation", () => {
     expect(glossary.fr.inventory).toBeTruthy();
     expect(glossary.en.inventory).toBeTruthy();
   });
+
+  it("يوفر مفردات معاينة الطباعة ومقاس الورق الحراري بكل لغة", () => {
+    (['ar', 'fr', 'en'] as const).forEach(language => {
+      expect(translations[language].thermalPaper).toBeTruthy();
+      expect(translations[language].documentPreviewTitle).toBeTruthy();
+    });
+  });
 });
