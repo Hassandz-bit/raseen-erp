@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useTheme } from "@/contexts/ThemeContext";
+import { buildDocumentPreviewHtml } from "@/lib/documentPreviewExport";
 import { formatOrganizationCurrency, formatOrganizationDate } from "@/lib/formatting";
 import { trpc } from "@/lib/trpc";
 import { Bell, Building2, CalendarDays, ChevronLeft, Languages, Loader2, LockKeyhole, Palette, Printer, RefreshCw, Route, Settings2, ShieldCheck, Type, UsersRound, WalletCards } from "lucide-react";
@@ -53,6 +54,29 @@ export default function SettingsPage() {
   const resetAppearance = () => { resetPreferences(); saveUser.mutate({ themeMode: "dark", accentColor: "gold", fontFamily: "ibm-plex", fontScale: "normal", numeralStyle: "western", density: "comfortable", radiusPreset: "rounded", sidebarMode: "expanded", moduleViewMode: "classic" }); };
   const settings = organizationPrefs.data;
   const previewSettings = useMemo(() => ({ currencyCode: settings?.currencyCode ?? "DZD", currencySymbolPosition: settings?.currencySymbolPosition ?? "after", decimalPlaces: settings?.decimalPlaces ?? 2, decimalSeparator: settings?.decimalSeparator ?? "dot", thousandsSeparator: settings?.thousandsSeparator ?? "comma", dateFormat: settings?.dateFormat ?? "DD/MM/YYYY", timeZone: settings?.timeZone ?? "Africa/Algiers", numeralStyle: preferences.numeralStyle }), [settings, preferences.numeralStyle]);
+  useEffect(() => {
+    const relabelPdfAction = () => document.querySelectorAll("button").forEach(button => {
+      if (button.textContent?.trim() !== t("printPreview")) return;
+      button.setAttribute("aria-label", t("downloadPdf"));
+      Array.from(button.childNodes).find(node => node.nodeType === Node.TEXT_NODE)?.replaceWith(t("downloadPdf"));
+    });
+    const printPreview = (event: MouseEvent) => {
+      const button = event.target instanceof Element ? event.target.closest("button") : null;
+      if (!button || ![t("printPreview"), t("downloadPdf")].includes(button.textContent?.trim() ?? "")) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const preview = window.open("", "_blank", "noopener,noreferrer");
+      if (!preview) return;
+      preview.document.open();
+      preview.document.write(buildDocumentPreviewHtml({ direction: language === "ar" ? "rtl" : "ltr", title: documentDraft.headerText || t("documentPreviewTitle"), date: formatOrganizationDate(new Date(), previewSettings), documentLabel: t("document"), amount: formatOrganizationCurrency(123456.75, previewSettings), footer: documentDraft.footerText || documentDraft.legalInfo, signatureLabel: documentDraft.showSignature ? t("signature") : undefined }));
+      preview.document.close();
+      preview.focus();
+      preview.print();
+    };
+    const relabelTimer = window.setTimeout(relabelPdfAction, 0);
+    document.addEventListener("click", printPreview, true);
+    return () => { window.clearTimeout(relabelTimer); document.removeEventListener("click", printPreview, true); };
+  }, [documentDraft, language, previewSettings, t]);
 
   const renderLanguage = () => <div className="surface rounded-3xl border p-7"><h2 className="text-xl font-bold text-white">{t("language")}</h2><div className="mt-6 grid gap-3 sm:grid-cols-3">{(["ar", "fr", "en"] as const).map(item => <button key={item} onClick={() => { setLanguage(item); saveUser.mutate({ language: item }); }} className={`rounded-2xl border p-5 text-start ${language === item ? "border-primary/40 bg-primary/10 text-primary" : "border-white/10 bg-white/[.025] text-slate-200"}`}><p className="font-bold">{item === "ar" ? "العربية" : item === "fr" ? "Français" : "English"}</p><p className="mt-2 text-xs text-muted-foreground">{item === "ar" ? "RTL" : "LTR"}</p></button>)}</div></div>;
   const renderAppearance = () => <div className="grid gap-5 xl:grid-cols-2"><div className="surface rounded-3xl border p-7"><h2 className="text-xl font-bold text-white">{t("appearance")}</h2><div className="mt-6 space-y-5"><div className="flex flex-wrap gap-2">{(["light", "dark", "system"] as const).map(mode => <Button key={mode} onClick={() => saveAppearance({ themeMode: mode })} variant={preferences.themeMode === mode ? "default" : "outline"}>{t(mode)}</Button>)}</div><div className="flex gap-3">{(["gold", "blue", "emerald", "violet"] as const).map(color => <button key={color} onClick={() => saveAppearance({ accentColor: color })} className={`h-9 w-9 rounded-full ring-2 ${preferences.accentColor === color ? "ring-white" : "ring-transparent"} ${color === "gold" ? "bg-[#d9b46b]" : color === "blue" ? "bg-sky-400" : color === "emerald" ? "bg-emerald-400" : "bg-violet-400"}`} aria-label={color} />)}</div><label className="block text-sm text-slate-200">{t("numeralStyle")}<select value={preferences.numeralStyle} onChange={event => saveAppearance({ numeralStyle: event.target.value as "western" | "arabic_indic" })} className="mt-2 h-10 w-full rounded-xl border border-white/10 bg-white/[.04] px-3 text-white"><option value="western">{t("westernDigits")}</option><option value="arabic_indic">{t("arabicIndicDigits")}</option></select></label><Button variant="outline" onClick={resetAppearance} className="w-full border-white/10 bg-white/[.03] text-slate-200">{t("resetAppearance")}</Button></div></div><div className="surface rounded-3xl border p-7"><h2 className="text-xl font-bold text-white">{t("livePreview")}</h2><div className="mt-6 rounded-2xl border border-primary/20 bg-primary/[.06] p-5"><p className="text-sm text-muted-foreground">{t("totalSales")}</p><p className="mt-2 text-2xl font-bold text-white">{formatOrganizationCurrency(123456.75, previewSettings)}</p><p className="mt-5 text-sm font-semibold text-white">{t("sampleCustomer")}</p><p className="mt-2 text-sm text-muted-foreground">{formatOrganizationDate(new Date("2026-08-14"), previewSettings)}</p></div></div></div>;

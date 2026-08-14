@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useTheme } from "@/contexts/ThemeContext";
+import { buildWorkspaceSummaryCsv } from "@/lib/workspaceSummaryExport";
 import { trpc } from "@/lib/trpc";
 import { Bell, BellRing, Bot, Building2, Check, FileDown, Loader2, LockKeyhole, ShieldCheck, Sparkles } from "lucide-react";
 import { useState } from "react";
@@ -50,8 +51,8 @@ function InsightsPanel({ modules }: { modules: { key: string; status: string }[]
   const markRead = trpc.erp.notifications.markRead.useMutation({ onSuccess: () => notifications.refetch() });
   const exportReport = () => {
     if (!report.data) return;
-    const lines = ["المؤشر,القيمة", `الإيرادات,${report.data.totalIncome}`, `المصروفات,${report.data.totalExpenses}`, `صافي الربح,${report.data.netProfit}`, `الفواتير الصادرة,${report.data.issuedInvoices}`, `عدد الأصناف,${report.data.products}`];
-    const blob = new Blob(["\ufeff" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
+    const csv = buildWorkspaceSummaryCsv({ metric: t("metric"), value: t("value"), revenue: t("revenue"), expenses: t("expenses"), netProfit: t("netProfit"), issuedInvoices: t("issuedInvoices"), products: t("productsCount") }, report.data);
+    const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
