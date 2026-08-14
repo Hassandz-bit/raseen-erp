@@ -36,6 +36,13 @@
       "when": 1786720847211,
       "tag": "0004_gorgeous_red_skull",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1786724519224,
+      "tag": "0005_panoramic_tinkerer",
+      "breakpoints": true
     }
   ]
 }

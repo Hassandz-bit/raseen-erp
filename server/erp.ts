@@ -6,8 +6,7 @@ import { notifyOwner } from "./_core/notification";
 import { protectedProcedure, router } from "./_core/trpc";
 import { buildOwnerAlertReasons, canAccessTenantModule, hasActiveMembership } from "./tenantPolicy";
 
-const moduleKeys = ["inventory", "sales", "purchases", "finance", "hr", "reports", "ai_assistant"] as const;
-type ModuleKey = (typeof moduleKeys)[number];
+type ModuleKey = "inventory" | "sales" | "purchases" | "finance" | "hr" | "reports" | "ai_assistant";
 const operationalModuleKeys = ["inventory", "sales", "purchases", "finance", "hr"] as const;
 
 async function getTenantContext(userId: number) {
@@ -79,6 +78,7 @@ export const erpRouter = router({
       fontScale: z.enum(["small", "normal", "large"]).optional(),
       accentColor: z.enum(["gold", "blue", "emerald", "violet"]).optional(),
       radiusPreset: z.enum(["soft", "rounded", "sharp"]).optional(),
+      moduleViewMode: z.enum(["classic", "nawa_flow"]).optional(),
     })).mutation(({ ctx, input }) => updateUserPreferences(ctx.user.id, input)),
     organization: protectedProcedure.query(async ({ ctx }) => {
       const context = await getTenantContext(ctx.user.id);

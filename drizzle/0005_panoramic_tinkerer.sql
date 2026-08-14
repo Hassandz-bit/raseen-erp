@@ -1,0 +1,1 @@
+ALTER TABLE `user_preferences` ADD `moduleViewMode` enum('classic','nawa_flow') DEFAULT 'classic' NOT NULL;

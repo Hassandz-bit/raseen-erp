@@ -3,24 +3,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import {
-  Activity,
-  ArrowDownLeft,
   ArrowUpLeft,
   Bell,
   Bot,
-  Box,
-  BriefcaseBusiness,
   Building2,
   ChevronDown,
   ChevronLeft,
   CircleDollarSign,
-  ClipboardCheck,
-  CreditCard,
   FileBarChart2,
-  FileText,
   Grid2X2,
   HelpCircle,
-  Layers3,
   Menu,
   MoreHorizontal,
   Package,
@@ -38,7 +30,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
@@ -226,7 +218,6 @@ export default function Home() {
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [, setLocation] = useLocation();
-  const activeItem = useMemo(() => navItems.find(item => item.key === section), [section]);
 
   const changeSection = (key: SectionKey) => { setSection(key); setSidebarOpen(false); };
   const submitAssistant = () => {

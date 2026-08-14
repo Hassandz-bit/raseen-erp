@@ -9,6 +9,7 @@ export type AppearancePreferences = {
   fontScale: "small" | "normal" | "large";
   accentColor: "gold" | "blue" | "emerald" | "violet";
   radiusPreset: "soft" | "rounded" | "sharp";
+  moduleViewMode: "classic" | "nawa_flow";
 };
 
 type ThemeContextType = {
@@ -19,7 +20,7 @@ type ThemeContextType = {
   switchable: boolean;
 };
 
-const defaultPreferences: AppearancePreferences = { themeMode: "dark", sidebarMode: "expanded", density: "comfortable", fontFamily: "ibm-plex", fontScale: "normal", accentColor: "gold", radiusPreset: "rounded" };
+const defaultPreferences: AppearancePreferences = { themeMode: "dark", sidebarMode: "expanded", density: "comfortable", fontFamily: "ibm-plex", fontScale: "normal", accentColor: "gold", radiusPreset: "rounded", moduleViewMode: "classic" };
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children, defaultTheme = "dark" }: { children: React.ReactNode; defaultTheme?: "light" | "dark" }) {

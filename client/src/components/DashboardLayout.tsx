@@ -23,7 +23,7 @@ import { startLogin } from "@/const";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useIsMobile } from "@/hooks/useMobile";
-import { Bot, Boxes, LayoutDashboard, LogOut, PanelLeft, Settings2 } from "lucide-react";
+import { Bot, Boxes, GitBranch, LayoutDashboard, LogOut, PanelLeft, Settings2 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -113,6 +113,7 @@ function DashboardLayoutContent({
     { icon: LayoutDashboard, label: t("dashboard"), path: "/" },
     { icon: Boxes, label: t("modules"), path: "/modules" },
     { icon: Bot, label: t("workspace"), path: "/workspace" },
+    { icon: GitBranch, label: t("nawaFlow"), path: "/workspace?view=nawa_flow" },
     { icon: Settings2, label: t("settings"), path: "/settings" },
   ];
   const activeMenuItem = menuItems.find(item => item.path === location);

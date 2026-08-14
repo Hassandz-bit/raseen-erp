@@ -34,6 +34,7 @@ function PreferencesHydrator({ children }: { children: React.ReactNode }) {
       fontScale: preferences.data.fontScale,
       accentColor: preferences.data.accentColor as "gold" | "blue" | "emerald" | "violet",
       radiusPreset: preferences.data.radiusPreset,
+      moduleViewMode: preferences.data.moduleViewMode,
     });
   }, [preferences.data, setLanguage, updatePreferences]);
   return <>{children}</>;

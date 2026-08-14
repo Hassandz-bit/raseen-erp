@@ -36,6 +36,7 @@ export const userPreferences = mysqlTable(
     fontScale: mysqlEnum("fontScale", ["small", "normal", "large"]).default("normal").notNull(),
     accentColor: varchar("accentColor", { length: 16 }).default("gold").notNull(),
     radiusPreset: mysqlEnum("radiusPreset", ["soft", "rounded", "sharp"]).default("rounded").notNull(),
+    moduleViewMode: mysqlEnum("moduleViewMode", ["classic", "nawa_flow"]).default("classic").notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },

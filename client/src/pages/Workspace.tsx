@@ -1,9 +1,11 @@
 import { AIChatBox, type Message } from "@/components/AIChatBox";
 import DashboardLayout from "@/components/DashboardLayout";
+import NawaFlow from "@/components/NawaFlow";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useTheme } from "@/contexts/ThemeContext";
 import { trpc } from "@/lib/trpc";
 import { Bell, BellRing, Bot, Building2, Check, FileDown, Loader2, LockKeyhole, ShieldCheck, Sparkles } from "lucide-react";
 import { useState } from "react";
@@ -114,5 +116,10 @@ function WorkspaceContent({ organizationName, activeModules, modules }: { organi
 
 export default function Workspace() {
   const bootstrap = trpc.erp.bootstrap.useQuery(undefined, { retry: false });
-  return <DashboardLayout>{bootstrap.isLoading ? <div className="grid min-h-[55vh] place-items-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div> : bootstrap.data ? <WorkspaceContent organizationName={bootstrap.data.organization.name} activeModules={bootstrap.data.modules.filter(module => module.status === "active").length} modules={bootstrap.data.modules} /> : <OnboardingPanel onComplete={() => bootstrap.refetch()} />}</DashboardLayout>;
+  const { preferences, updatePreferences } = useTheme();
+  const saveViewMode = trpc.erp.preferences.saveUser.useMutation();
+  const openClassic = () => { updatePreferences({ moduleViewMode: "classic" }); saveViewMode.mutate({ moduleViewMode: "classic" }); };
+  const previewFlow = new URLSearchParams(window.location.search).get("view") === "nawa_flow";
+  const restrictedNodeIds = bootstrap.data?.membership.roleKey === "owner" ? [] : ["finance", "hr"] as const;
+  return <DashboardLayout>{bootstrap.isLoading ? <div className="grid min-h-[55vh] place-items-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div> : bootstrap.data ? preferences.moduleViewMode === "nawa_flow" || previewFlow ? <NawaFlow modules={bootstrap.data.modules} restrictedNodeIds={[...restrictedNodeIds]} onOpenClassic={openClassic} /> : <WorkspaceContent organizationName={bootstrap.data.organization.name} activeModules={bootstrap.data.modules.filter(module => module.status === "active").length} modules={bootstrap.data.modules} /> : previewFlow ? <NawaFlow modules={[]} onOpenClassic={openClassic} /> : <OnboardingPanel onComplete={() => bootstrap.refetch()} />}</DashboardLayout>;
 }
