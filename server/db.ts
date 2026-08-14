@@ -252,6 +252,16 @@ export async function createProductBatch(organizationId: number, input: { produc
   return { id: Number(result[0].insertId) };
 }
 
+export async function listStockMovementsForOrganization(organizationId: number, filters?: { productId?: number; warehouseId?: number; movementType?: "purchase_receipt" | "sales_issue" | "sales_return" | "supplier_return" | "transfer_out" | "transfer_in" | "adjustment" | "opening_balance" | "count_adjustment" }) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const conditions = [eq(stockMovements.organizationId, organizationId)];
+  if (filters?.productId) conditions.push(eq(stockMovements.productId, filters.productId));
+  if (filters?.warehouseId) conditions.push(eq(stockMovements.warehouseId, filters.warehouseId));
+  if (filters?.movementType) conditions.push(eq(stockMovements.movementType, filters.movementType));
+  return db.select().from(stockMovements).where(and(...conditions)).orderBy(desc(stockMovements.occurredAt), desc(stockMovements.id)).limit(200);
+}
+
 export async function issueStockByFefo({ organizationId, warehouseId, productId, quantity, unit, actorUserId, sourceDocumentType, sourceDocumentId }: { organizationId: number; warehouseId: number; productId: number; quantity: number; unit: string; actorUserId: number; sourceDocumentType?: string; sourceDocumentId?: number }) {
   const allocation = await previewFefoAllocation(organizationId, warehouseId, productId, quantity);
   if (allocation.remainingQuantity > 0) throw new Error("لا توجد كميات صالحة كافية لتغطية الصرف وفق FEFO.");

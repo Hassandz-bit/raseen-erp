@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { addOrganizationExchangeRate, createOperationalNotifications, createOperationalRecord, createOrganizationForUser, createProductBatch, createProductMaster, getDashboardMetrics, getDefaultTenantContext, getFinancialReportSummary, getOrCreateOrganizationSettings, getOrCreateUserPreferences, issueStockByFefo, listNotificationsForOrganization, listOperationalRecords, listOrganizationCurrencies, listOrganizationExchangeRates, listProductBatchesForOrganization, listProductsForOrganization, markNotificationRead, previewFefoAllocation, recordStockMovement, saveOrganizationCurrency, updateOrganizationSettings, updateUserPreferences, type OperationalModule } from "./db";
+import { addOrganizationExchangeRate, createOperationalNotifications, createOperationalRecord, createOrganizationForUser, createProductBatch, createProductMaster, getDashboardMetrics, getDefaultTenantContext, getFinancialReportSummary, getOrCreateOrganizationSettings, getOrCreateUserPreferences, issueStockByFefo, listNotificationsForOrganization, listOperationalRecords, listOrganizationCurrencies, listOrganizationExchangeRates, listProductBatchesForOrganization, listProductsForOrganization, listStockMovementsForOrganization, markNotificationRead, previewFefoAllocation, recordStockMovement, saveOrganizationCurrency, updateOrganizationSettings, updateUserPreferences, type OperationalModule } from "./db";
 import { currencyCatalog } from "../shared/currencyCatalog";
 import { invokeLLM } from "./_core/llm";
 import { notifyOwner } from "./_core/notification";
@@ -183,6 +183,10 @@ export const erpRouter = router({
     createBatch: protectedProcedure.input(z.object({ productId: z.number().int().positive(), warehouseId: z.number().int().positive(), lotNumber: z.string().trim().min(1).max(96), receivedQuantity: z.number().positive(), cost: z.number().nonnegative(), sourcePartyId: z.number().int().positive().optional(), manufacturingDate: z.coerce.date().optional(), expiryDate: z.coerce.date().optional() })).mutation(async ({ ctx, input }) => {
       const context = await requireModule(ctx.user.id, "inventory");
       return createProductBatch(context.organization.id, input);
+    }),
+    listMovements: protectedProcedure.input(z.object({ productId: z.number().int().positive().optional(), warehouseId: z.number().int().positive().optional(), movementType: z.enum(["purchase_receipt", "sales_issue", "sales_return", "supplier_return", "transfer_out", "transfer_in", "adjustment", "opening_balance", "count_adjustment"]).optional() }).optional()).query(async ({ ctx, input }) => {
+      const context = await requireModule(ctx.user.id, "inventory");
+      return listStockMovementsForOrganization(context.organization.id, input);
     }),
     issueFefo: protectedProcedure.input(z.object({ warehouseId: z.number().int().positive(), productId: z.number().int().positive(), quantity: z.number().positive(), unit: z.string().trim().min(1).max(32), sourceDocumentType: z.string().trim().max(64).optional(), sourceDocumentId: z.number().int().positive().optional() })).mutation(async ({ ctx, input }) => {
       const context = await requireModule(ctx.user.id, "inventory");
