@@ -44,6 +44,7 @@ export default function DashboardLayout({
     return saved ? parseInt(saved, 10) : DEFAULT_WIDTH;
   });
   const { loading, user } = useAuth();
+  const { direction, t } = useLanguage();
 
   useEffect(() => {
     localStorage.setItem(SIDEBAR_WIDTH_KEY, sidebarWidth.toString());
@@ -55,14 +56,14 @@ export default function DashboardLayout({
 
   if (!user) {
     return (
-      <div className="flex min-h-screen items-center justify-center" dir="rtl">
+      <div className="flex min-h-screen items-center justify-center" dir={direction}>
         <div className="flex flex-col items-center gap-8 p-8 max-w-md w-full">
           <div className="flex flex-col items-center gap-6">
             <h1 className="text-2xl font-semibold tracking-tight text-center">
-              سجّل الدخول للمتابعة
+              {t("signInToContinue")}
             </h1>
             <p className="text-sm text-muted-foreground text-center max-w-sm">
-              تتطلب مساحة المؤسسة حساباً موثقاً لحماية بياناتك.
+              {t("workspaceAccountRequired")}
             </p>
           </div>
           <Button
@@ -70,7 +71,7 @@ export default function DashboardLayout({
             size="lg"
             className="w-full shadow-lg hover:shadow-xl transition-all"
           >
-            تسجيل الدخول
+            {t("signIn")}
           </Button>
         </div>
       </div>
