@@ -245,6 +245,13 @@ export async function listProductBatchesForOrganization(organizationId: number, 
   return db.select().from(productBatches).where(and(...conditions)).orderBy(asc(productBatches.expiryDate), desc(productBatches.createdAt)).limit(200);
 }
 
+export async function createProductBatch(organizationId: number, input: { productId: number; warehouseId: number; lotNumber: string; receivedQuantity: number; cost: number; sourcePartyId?: number; manufacturingDate?: Date; expiryDate?: Date }) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const result = await db.insert(productBatches).values({ organizationId, productId: input.productId, warehouseId: input.warehouseId, lotNumber: input.lotNumber, sourcePartyId: input.sourcePartyId, receivedQuantity: String(input.receivedQuantity), currentQuantity: String(input.receivedQuantity), reservedQuantity: "0", cost: String(input.cost), manufacturingDate: input.manufacturingDate, expiryDate: input.expiryDate, status: "active" });
+  return { id: Number(result[0].insertId) };
+}
+
 export async function issueStockByFefo({ organizationId, warehouseId, productId, quantity, unit, actorUserId, sourceDocumentType, sourceDocumentId }: { organizationId: number; warehouseId: number; productId: number; quantity: number; unit: string; actorUserId: number; sourceDocumentType?: string; sourceDocumentId?: number }) {
   const allocation = await previewFefoAllocation(organizationId, warehouseId, productId, quantity);
   if (allocation.remainingQuantity > 0) throw new Error("لا توجد كميات صالحة كافية لتغطية الصرف وفق FEFO.");
