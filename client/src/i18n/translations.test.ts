@@ -31,4 +31,13 @@ describe("i18n foundation", () => {
       expect(translations[language].subscriptionModules).toBeTruthy();
     });
   });
+
+  it("يوفر مفردات التاريخ والوقت والفواصل الرقمية بكل لغة", () => {
+    (["ar", "fr", "en"] as const).forEach(language => {
+      expect(translations[language].timeFormat).toBeTruthy();
+      expect(translations[language].firstDay).toBeTruthy();
+      expect(translations[language].decimalSeparator).toBeTruthy();
+      expect(translations[language].thousandsSeparator).toBeTruthy();
+    });
+  });
 });
