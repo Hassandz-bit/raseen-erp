@@ -29,6 +29,11 @@ const rawCurrencyCatalog: Array<[string, string, number, string, string, string]
   ["KMF", "CF", 0, "الفرنك القمري", "Franc comorien", "Comorian Franc"],
   ["EUR", "€", 2, "اليورو", "Euro", "Euro"],
   ["USD", "$", 2, "الدولار الأمريكي", "Dollar des États-Unis", "US Dollar"],
+  ["GBP", "£", 2, "الجنيه الإسترليني", "Livre sterling", "British Pound"],
+  ["CHF", "CHF", 2, "الفرنك السويسري", "Franc suisse", "Swiss Franc"],
+  ["CNY", "¥", 2, "اليوان الصيني", "Yuan chinois", "Chinese Yuan"],
+  ["TRY", "₺", 2, "الليرة التركية", "Livre turque", "Turkish Lira"],
+  ["ILS", "₪", 2, "الشيكل الإسرائيلي", "Shekel israélien", "Israeli New Shekel"],
 ];
 
 export const currencyCatalog: CurrencyCatalogEntry[] = rawCurrencyCatalog.map(([code, symbol, decimalPlaces, ar, fr, en]) => ({ code, symbol, decimalPlaces, names: { ar, fr, en } }));
