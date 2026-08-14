@@ -101,12 +101,12 @@ function OnboardingPanel({ onComplete }: { onComplete: () => void }) {
 }
 
 function WorkspaceContent({ organizationName, activeModules, modules }: { organizationName: string; activeModules: number; modules: { key: string; status: string }[] }) {
-  const { direction } = useLanguage();
+  const { direction, t } = useLanguage();
   const [messages, setMessages] = useState<Message[]>([]);
   const [alertReasons, setAlertReasons] = useState<string[]>([]);
   const askAssistant = trpc.erp.ai.ask.useMutation({
     onSuccess: response => setMessages(current => [...current, { role: "assistant", content: response.reply }]),
-    onError: error => toast.error(error.message || "تعذر تنفيذ طلب المساعد الآن."),
+    onError: error => toast.error(error.message || t("assistantRequestError")),
   });
   const handleSendMessage = (content: string) => {
     setMessages(current => [...current, { role: "user", content }]);
@@ -115,11 +115,11 @@ function WorkspaceContent({ organizationName, activeModules, modules }: { organi
   const evaluateAlerts = trpc.erp.alerts.evaluate.useMutation({
     onSuccess: result => {
       setAlertReasons(result.reasons);
-      if (result.reasons.length === 0) toast.success("لا توجد تنبيهات حرجة ضمن البيانات الحالية.");
-      else if (result.notified) toast.success("تم تقييم التنبيهات وإرسال إشعار لمالك المنصة.");
-      else toast.info("تم تقييم التنبيهات، وتعذر تسليم الإشعار الخارجي مؤقتاً.");
+      if (result.reasons.length === 0) toast.success(t("noCriticalAlerts"));
+      else if (result.notified) toast.success(t("alertsNotified"));
+      else toast.info(t("alertsDeliveryDeferred"));
     },
-    onError: error => toast.error(error.message || "تعذر تقييم التنبيهات الآن."),
+    onError: error => toast.error(error.message || t("alertsEvaluationError")),
   });
 
   return (
