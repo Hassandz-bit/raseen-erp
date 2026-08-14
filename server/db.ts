@@ -2,6 +2,7 @@ import { and, asc, count, desc, eq, gte, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   employees,
+  businessParties,
   financialTransactions,
   InsertUser,
   inventoryBalances,
@@ -199,6 +200,13 @@ export async function createProductMaster(organizationId: number, values: { sku:
   const db = await getDb();
   if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
   const result = await db.insert(products).values({ organizationId, sku: values.sku, name: values.name, nameAr: values.nameAr, nameFr: values.nameFr, nameEn: values.nameEn, barcode: values.barcode, categoryId: values.categoryId, brandId: values.brandId, productType: values.productType, baseUnit: values.baseUnit, unit: values.baseUnit, purchaseUnit: values.purchaseUnit, salesUnit: values.salesUnit, unitsPerCarton: String(values.unitsPerCarton), purchasePrice: String(values.purchasePrice), salePrice: String(values.salePrice), taxRate: String(values.taxRate), minimumStock: String(values.minimumStock), reorderPoint: String(values.reorderPoint), description: values.description, status: "active" });
+  return { id: Number(result[0].insertId) };
+}
+
+export async function createBusinessParty(organizationId: number, input: { name: string; types: string[]; code?: string; contactName?: string; phone?: string; email?: string; paymentTermsDays?: number; creditLimit?: number; preferredCurrencyCode?: string; customerSegment?: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const result = await db.insert(businessParties).values({ organizationId, name: input.name, types: input.types, code: input.code, contactName: input.contactName, phone: input.phone, email: input.email, paymentTermsDays: input.paymentTermsDays ?? 0, creditLimit: String(input.creditLimit ?? 0), preferredCurrencyCode: input.preferredCurrencyCode, customerSegment: input.customerSegment, status: "active" });
   return { id: Number(result[0].insertId) };
 }
 

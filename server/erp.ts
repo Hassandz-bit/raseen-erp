@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { addOrganizationExchangeRate, createOperationalNotifications, createOperationalRecord, createOrganizationForUser, createProductBatch, createProductMaster, getDashboardMetrics, getDefaultTenantContext, getFinancialReportSummary, getOrCreateOrganizationSettings, getOrCreateUserPreferences, issueStockByFefo, listNotificationsForOrganization, listOperationalRecords, listOrganizationCurrencies, listOrganizationExchangeRates, listProductBatchesForOrganization, listProductsForOrganization, listStockMovementsForOrganization, markNotificationRead, previewFefoAllocation, recordStockMovement, saveOrganizationCurrency, updateOrganizationSettings, updateUserPreferences, type OperationalModule } from "./db";
+import { addOrganizationExchangeRate, createBusinessParty, createOperationalNotifications, createOperationalRecord, createOrganizationForUser, createProductBatch, createProductMaster, getDashboardMetrics, getDefaultTenantContext, getFinancialReportSummary, getOrCreateOrganizationSettings, getOrCreateUserPreferences, issueStockByFefo, listNotificationsForOrganization, listOperationalRecords, listOrganizationCurrencies, listOrganizationExchangeRates, listProductBatchesForOrganization, listProductsForOrganization, listStockMovementsForOrganization, markNotificationRead, previewFefoAllocation, recordStockMovement, saveOrganizationCurrency, updateOrganizationSettings, updateUserPreferences, type OperationalModule } from "./db";
 import { currencyCatalog } from "../shared/currencyCatalog";
 import { invokeLLM } from "./_core/llm";
 import { notifyOwner } from "./_core/notification";
@@ -191,6 +191,13 @@ export const erpRouter = router({
     issueFefo: protectedProcedure.input(z.object({ warehouseId: z.number().int().positive(), productId: z.number().int().positive(), quantity: z.number().positive(), unit: z.string().trim().min(1).max(32), sourceDocumentType: z.string().trim().max(64).optional(), sourceDocumentId: z.number().int().positive().optional() })).mutation(async ({ ctx, input }) => {
       const context = await requireModule(ctx.user.id, "inventory");
       return issueStockByFefo({ organizationId: context.organization.id, actorUserId: ctx.user.id, ...input });
+    }),
+  }),
+
+  parties: router({
+    create: protectedProcedure.input(z.object({ name: z.string().trim().min(2).max(220), types: z.array(z.enum(["customer", "supplier"])).min(1), code: z.string().trim().max(64).optional(), contactName: z.string().trim().max(160).optional(), phone: z.string().trim().max(32).optional(), email: z.string().trim().email().max(320).optional(), paymentTermsDays: z.number().int().min(0).max(365).optional(), creditLimit: z.number().nonnegative().optional(), preferredCurrencyCode: z.string().length(3).optional(), customerSegment: z.string().trim().max(96).optional() })).mutation(async ({ ctx, input }) => {
+      const context = await requireModule(ctx.user.id, "sales");
+      return createBusinessParty(context.organization.id, input);
     }),
   }),
 
