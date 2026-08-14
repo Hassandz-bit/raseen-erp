@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { createOperationalNotifications, createOperationalRecord, createOrganizationForUser, getDashboardMetrics, getDefaultTenantContext, getFinancialReportSummary, getOrCreateOrganizationSettings, getOrCreateUserPreferences, listNotificationsForOrganization, listOperationalRecords, listOrganizationCurrencies, listProductsForOrganization, markNotificationRead, saveOrganizationCurrency, updateOrganizationSettings, updateUserPreferences, type OperationalModule } from "./db";
+import { addOrganizationExchangeRate, createOperationalNotifications, createOperationalRecord, createOrganizationForUser, getDashboardMetrics, getDefaultTenantContext, getFinancialReportSummary, getOrCreateOrganizationSettings, getOrCreateUserPreferences, listNotificationsForOrganization, listOperationalRecords, listOrganizationCurrencies, listOrganizationExchangeRates, listProductsForOrganization, markNotificationRead, saveOrganizationCurrency, updateOrganizationSettings, updateUserPreferences, type OperationalModule } from "./db";
 import { currencyCatalog } from "../shared/currencyCatalog";
 import { invokeLLM } from "./_core/llm";
 import { notifyOwner } from "./_core/notification";
@@ -125,6 +125,20 @@ export const erpRouter = router({
     })).mutation(async ({ ctx, input }) => {
       const context = await requireOrganizationOwner(ctx.user.id);
       return saveOrganizationCurrency(context.organization.id, input);
+    }),
+    exchangeRates: protectedProcedure.query(async ({ ctx }) => {
+      const context = await getTenantContext(ctx.user.id);
+      return listOrganizationExchangeRates(context.organization.id);
+    }),
+    addExchangeRate: protectedProcedure.input(z.object({
+      baseCurrencyCode: z.string().length(3),
+      quoteCurrencyCode: z.string().length(3),
+      rate: z.number().positive().max(1_000_000_000),
+      effectiveAt: z.coerce.date(),
+      source: z.string().trim().max(64).optional(),
+    })).mutation(async ({ ctx, input }) => {
+      const context = await requireOrganizationOwner(ctx.user.id);
+      return addOrganizationExchangeRate(context.organization.id, ctx.user.id, input);
     }),
   }),
 

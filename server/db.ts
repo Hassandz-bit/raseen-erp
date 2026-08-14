@@ -8,6 +8,7 @@ import {
   notifications,
   organizationMemberships,
   organizationCurrencies,
+  organizationExchangeRates,
   organizationModules,
   organizationRoles,
   organizationSettings,
@@ -115,6 +116,20 @@ export async function saveOrganizationCurrency(organizationId: number, values: {
   }
   await db.insert(organizationCurrencies).values({ organizationId, ...values, isBase: values.isBase ?? "no" }).onDuplicateKeyUpdate({ set: { symbol: values.symbol, decimalPlaces: values.decimalPlaces, displayStyle: values.displayStyle, status: values.status, isBase: values.isBase ?? "no" } });
   return listOrganizationCurrencies(organizationId);
+}
+
+export async function listOrganizationExchangeRates(organizationId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  return db.select().from(organizationExchangeRates).where(eq(organizationExchangeRates.organizationId, organizationId)).orderBy(desc(organizationExchangeRates.effectiveAt), desc(organizationExchangeRates.id)).limit(200);
+}
+
+export async function addOrganizationExchangeRate(organizationId: number, userId: number, values: { baseCurrencyCode: string; quoteCurrencyCode: string; rate: number; effectiveAt: Date; source?: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  if (values.baseCurrencyCode === values.quoteCurrencyCode) throw new Error("يجب أن تختلف عملة الأساس عن عملة الاقتباس.");
+  const result = await db.insert(organizationExchangeRates).values({ organizationId, baseCurrencyCode: values.baseCurrencyCode, quoteCurrencyCode: values.quoteCurrencyCode, rate: String(values.rate), effectiveAt: values.effectiveAt, source: values.source?.trim() || "manual", createdByUserId: userId });
+  return { id: Number(result[0].insertId) };
 }
 
 export async function createOrganizationForUser({ userId, name }: { userId: number; name: string }) {

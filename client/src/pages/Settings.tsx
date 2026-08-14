@@ -1,16 +1,17 @@
 import DashboardLayout from "@/components/DashboardLayout";
+import { ExchangeRatesPanel } from "@/components/ExchangeRatesPanel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { formatOrganizationCurrency, formatOrganizationDate } from "@/lib/formatting";
 import { trpc } from "@/lib/trpc";
-import { Bell, Building2, CalendarDays, ChevronLeft, Languages, Loader2, LockKeyhole, Palette, Printer, Route, Settings2, ShieldCheck, Type, UsersRound, WalletCards } from "lucide-react";
+import { Bell, Building2, CalendarDays, ChevronLeft, Languages, Loader2, LockKeyhole, Palette, Printer, RefreshCw, Route, Settings2, ShieldCheck, Type, UsersRound, WalletCards } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 const sections = [
-  { key: "organization", icon: Building2 }, { key: "branches", icon: Settings2 }, { key: "users", icon: UsersRound }, { key: "language", icon: Languages }, { key: "currencies", icon: WalletCards }, { key: "dateAndNumbers", icon: CalendarDays }, { key: "appearance", icon: Palette }, { key: "typography", icon: Type }, { key: "moduleView", icon: Route }, { key: "notifications", icon: Bell }, { key: "printing", icon: Printer }, { key: "security", icon: LockKeyhole }, { key: "subscriptions", icon: ShieldCheck },
+  { key: "organization", icon: Building2 }, { key: "branches", icon: Settings2 }, { key: "users", icon: UsersRound }, { key: "language", icon: Languages }, { key: "currencies", icon: WalletCards }, { key: "exchangeRates", icon: RefreshCw }, { key: "dateAndNumbers", icon: CalendarDays }, { key: "appearance", icon: Palette }, { key: "typography", icon: Type }, { key: "moduleView", icon: Route }, { key: "notifications", icon: Bell }, { key: "printing", icon: Printer }, { key: "security", icon: LockKeyhole }, { key: "subscriptions", icon: ShieldCheck },
 ] as const;
 type SectionKey = (typeof sections)[number]["key"];
 
@@ -23,7 +24,8 @@ export default function SettingsPage() {
   const { preferences, updatePreferences, resetPreferences } = useTheme();
   const [active, setActive] = useState<SectionKey>("organization");
   const [documentDraft, setDocumentDraft] = useState({ paperSize: "A4" as "A4" | "A5" | "thermal", headerText: "", footerText: "", address: "", phone: "", legalInfo: "", showSignature: true });
-  const userPrefs = trpc.erp.preferences.user.useQuery();
+  const isPreviewLanguage = ["ar", "fr", "en"].includes(new URLSearchParams(window.location.search).get("lang") ?? "");
+  const userPrefs = trpc.erp.preferences.user.useQuery(undefined, { enabled: !isPreviewLanguage });
   const organizationPrefs = trpc.erp.preferences.organization.useQuery();
   const currencyCatalog = trpc.erp.preferences.currencyCatalog.useQuery();
   const activeCurrencies = trpc.erp.preferences.currencies.useQuery();
@@ -64,6 +66,7 @@ export default function SettingsPage() {
     if (active === "appearance") return renderAppearance();
     if (active === "typography") return renderTypography();
     if (active === "currencies") return renderCurrencies();
+    if (active === "exchangeRates") return <ExchangeRatesPanel />;
     if (active === "dateAndNumbers") return renderDates();
     if (active === "printing") return renderPrinting();
     if (active === "moduleView") return <div className="surface rounded-3xl border p-7"><h2 className="text-xl font-bold text-white">{t("moduleViewMode")}</h2><div className="mt-6 flex gap-3"><Button onClick={() => saveAppearance({ moduleViewMode: "classic" })} variant={preferences.moduleViewMode === "classic" ? "default" : "outline"}>{t("classic")}</Button><Button onClick={() => saveAppearance({ moduleViewMode: "nawa_flow" })} variant={preferences.moduleViewMode === "nawa_flow" ? "default" : "outline"}>{t("nawaFlow")}</Button></div></div>;

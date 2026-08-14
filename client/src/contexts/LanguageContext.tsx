@@ -11,6 +11,7 @@ type LanguageContextValue = {
   formatNumber: (value: number, options?: Intl.NumberFormatOptions) => string;
   formatCurrency: (value: number) => string;
   formatTime: (value: Date | string | number) => string;
+  formatSettings: OrganizationFormatSettings;
 };
 
 const LanguageContext = createContext<LanguageContextValue | undefined>(undefined);
@@ -49,6 +50,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     formatNumber: (value, options) => options ? new Intl.NumberFormat(languageLocale[language], options).format(value) : formatOrganizationNumber(value, organizationFormat),
     formatCurrency: value => formatOrganizationCurrency(value, organizationFormat),
     formatTime: value => formatOrganizationTime(value, organizationFormat),
+    formatSettings: organizationFormat,
   }), [language, direction, organizationFormat]);
 
   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
