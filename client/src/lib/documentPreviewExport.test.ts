@@ -9,7 +9,7 @@ describe("تصدير معاينة المستند", () => {
     expect(html).toContain("١٬٢٥٠٫٥٠ د.ج");
   });
 
-  it("يجهز ملف معاينة مسمى قابل للحفظ PDF من المتصفح", () => {
+  it("يجهز ملف معاينة HTML مسمى قابل للطباعة والحفظ PDF من المتصفح", () => {
     const result = createDocumentPreviewDownload({ direction: "rtl", title: "مستند", date: "2026-08-14", documentLabel: "فاتورة", amount: "١٠٠" }, "nawa-document-preview");
     expect(result.filename).toBe("nawa-document-preview.html");
     expect(result.blob.type).toBe("text/html;charset=utf-8");
