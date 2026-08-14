@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   employees,
@@ -195,6 +195,13 @@ export async function listProductsForOrganization(organizationId: number) {
   return db.select().from(products).where(eq(products.organizationId, organizationId)).orderBy(desc(products.updatedAt));
 }
 
+export async function createProductMaster(organizationId: number, values: { sku: string; name: string; nameAr?: string; nameFr?: string; nameEn?: string; barcode?: string; categoryId?: number; brandId?: number; productType: "standard" | "food" | "expiring" | "manufacturable"; baseUnit: string; purchaseUnit: string; salesUnit: string; unitsPerCarton: number; purchasePrice: number; salePrice: number; taxRate: number; minimumStock: number; reorderPoint: number; description?: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const result = await db.insert(products).values({ organizationId, sku: values.sku, name: values.name, nameAr: values.nameAr, nameFr: values.nameFr, nameEn: values.nameEn, barcode: values.barcode, categoryId: values.categoryId, brandId: values.brandId, productType: values.productType, baseUnit: values.baseUnit, unit: values.baseUnit, purchaseUnit: values.purchaseUnit, salesUnit: values.salesUnit, unitsPerCarton: String(values.unitsPerCarton), purchasePrice: String(values.purchasePrice), salePrice: String(values.salePrice), taxRate: String(values.taxRate), minimumStock: String(values.minimumStock), reorderPoint: String(values.reorderPoint), description: values.description, status: "active" });
+  return { id: Number(result[0].insertId) };
+}
+
 export async function recordStockMovement({ organizationId, warehouseId, productId, batchId, movementType, quantity, unit, actorUserId, sourceDocumentType, sourceDocumentId }: { organizationId: number; warehouseId: number; productId: number; batchId?: number; movementType: "purchase_receipt" | "sales_issue" | "sales_return" | "supplier_return" | "transfer_out" | "transfer_in" | "adjustment" | "opening_balance" | "count_adjustment"; quantity: number; unit: string; actorUserId: number; sourceDocumentType?: string; sourceDocumentId?: number }) {
   const db = await getDb();
   if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
@@ -210,6 +217,22 @@ export async function recordStockMovement({ organizationId, warehouseId, product
     }
     return { success: true } as const;
   });
+}
+
+export async function previewFefoAllocation(organizationId: number, warehouseId: number, productId: number, requestedQuantity: number) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  if (requestedQuantity <= 0) throw new Error("الكمية المطلوبة يجب أن تكون أكبر من صفر.");
+  const batches = await db.select().from(productBatches).where(and(eq(productBatches.organizationId, organizationId), eq(productBatches.warehouseId, warehouseId), eq(productBatches.productId, productId), eq(productBatches.status, "active"), sql`(${productBatches.expiryDate} IS NULL OR ${productBatches.expiryDate} > now())`)).orderBy(asc(productBatches.expiryDate));
+  let remaining = requestedQuantity;
+  const allocations = batches.flatMap(batch => {
+    const available = Number(batch.currentQuantity) - Number(batch.reservedQuantity);
+    if (remaining <= 0 || available <= 0) return [];
+    const quantity = Math.min(available, remaining);
+    remaining -= quantity;
+    return [{ batchId: batch.id, lotNumber: batch.lotNumber, expiryDate: batch.expiryDate, quantity }];
+  });
+  return { allocations, remainingQuantity: remaining };
 }
 
 export type OperationalModule = "inventory" | "sales" | "purchases" | "finance" | "hr";

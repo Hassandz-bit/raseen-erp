@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { addOrganizationExchangeRate, createOperationalNotifications, createOperationalRecord, createOrganizationForUser, getDashboardMetrics, getDefaultTenantContext, getFinancialReportSummary, getOrCreateOrganizationSettings, getOrCreateUserPreferences, listNotificationsForOrganization, listOperationalRecords, listOrganizationCurrencies, listOrganizationExchangeRates, listProductsForOrganization, markNotificationRead, recordStockMovement, saveOrganizationCurrency, updateOrganizationSettings, updateUserPreferences, type OperationalModule } from "./db";
+import { addOrganizationExchangeRate, createOperationalNotifications, createOperationalRecord, createOrganizationForUser, createProductMaster, getDashboardMetrics, getDefaultTenantContext, getFinancialReportSummary, getOrCreateOrganizationSettings, getOrCreateUserPreferences, listNotificationsForOrganization, listOperationalRecords, listOrganizationCurrencies, listOrganizationExchangeRates, listProductsForOrganization, markNotificationRead, previewFefoAllocation, recordStockMovement, saveOrganizationCurrency, updateOrganizationSettings, updateUserPreferences, type OperationalModule } from "./db";
 import { currencyCatalog } from "../shared/currencyCatalog";
 import { invokeLLM } from "./_core/llm";
 import { notifyOwner } from "./_core/notification";
@@ -155,6 +155,10 @@ export const erpRouter = router({
       const context = await requireModule(ctx.user.id, "inventory");
       return listProductsForOrganization(context.organization.id);
     }),
+    createProduct: protectedProcedure.input(z.object({ sku: z.string().trim().min(1).max(96), name: z.string().trim().min(2).max(220), nameAr: z.string().trim().max(220).optional(), nameFr: z.string().trim().max(220).optional(), nameEn: z.string().trim().max(220).optional(), barcode: z.string().trim().max(96).optional(), categoryId: z.number().int().positive().optional(), brandId: z.number().int().positive().optional(), productType: z.enum(["standard", "food", "expiring", "manufacturable"]), baseUnit: z.string().trim().min(1).max(32), purchaseUnit: z.string().trim().min(1).max(32), salesUnit: z.string().trim().min(1).max(32), unitsPerCarton: z.number().positive(), purchasePrice: z.number().nonnegative(), salePrice: z.number().nonnegative(), taxRate: z.number().min(0).max(100), minimumStock: z.number().nonnegative(), reorderPoint: z.number().nonnegative(), description: z.string().trim().max(2000).optional() })).mutation(async ({ ctx, input }) => {
+      const context = await requireModule(ctx.user.id, "inventory");
+      return createProductMaster(context.organization.id, input);
+    }),
     recordMovement: protectedProcedure.input(z.object({
       warehouseId: z.number().int().positive(),
       productId: z.number().int().positive(),
@@ -167,6 +171,10 @@ export const erpRouter = router({
     })).mutation(async ({ ctx, input }) => {
       const context = await requireModule(ctx.user.id, "inventory");
       return recordStockMovement({ organizationId: context.organization.id, actorUserId: ctx.user.id, ...input });
+    }),
+    previewFefo: protectedProcedure.input(z.object({ warehouseId: z.number().int().positive(), productId: z.number().int().positive(), quantity: z.number().positive() })).query(async ({ ctx, input }) => {
+      const context = await requireModule(ctx.user.id, "inventory");
+      return previewFefoAllocation(context.organization.id, input.warehouseId, input.productId, input.quantity);
     }),
   }),
 
