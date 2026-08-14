@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canTransitionSalesDocument, convertUnitQuantity, selectFefoBatches } from "./inventoryPolicy";
+import { allocateSalesInvoiceLine, canTransitionSalesDocument, convertUnitQuantity, selectFefoBatches } from "./inventoryPolicy";
 
 describe("inventory policy", () => {
   it("allocates FEFO while blocking expired and quarantined batches", () => {
@@ -17,7 +17,10 @@ describe("inventory policy", () => {
   it("converts UOM and guards sales transitions", () => {
     expect(convertUnitQuantity(3, 12)).toBe(36);
     expect(() => convertUnitQuantity(3, 0)).toThrow();
-    expect(canTransitionSalesDocument("draft", "confirmed")).toBe(true);
+    expect(canTransitionSalesDocument("draft", "issued")).toBe(true);
+    expect(canTransitionSalesDocument("issued", "paid")).toBe(true);
+    expect(canTransitionSalesDocument("overdue", "partial")).toBe(true);
+    expect(canTransitionSalesDocument("draft", "paid")).toBe(false);
     expect(canTransitionSalesDocument("paid", "cancelled")).toBe(false);
   });
 
@@ -28,5 +31,12 @@ describe("inventory policy", () => {
     ], 5, new Date("2026-08-14"));
     expect(result.allocations).toEqual([{ batchId: 1, quantity: 2 }]);
     expect(result.remainingQuantity).toBe(3);
+  });
+
+  it("rejects invoice issuance when an expired batch is the only remaining coverage", () => {
+    expect(() => allocateSalesInvoiceLine([
+      { id: 11, availableQuantity: 2, expiryDate: new Date("2026-08-20"), status: "active" },
+      { id: 12, availableQuantity: 20, expiryDate: new Date("2026-08-01"), status: "active" },
+    ], 5, new Date("2026-08-14"))).toThrow("لا توجد كميات صالحة كافية");
   });
 });

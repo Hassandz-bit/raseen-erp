@@ -3,12 +3,16 @@ import { canTransitionPurchaseDocument, canTransitionStockCount } from "./commer
 
 describe("commerce document transitions", () => {
   it("guards purchasing and receiving transitions", () => {
-    expect(canTransitionPurchaseDocument("draft", "approved")).toBe(true);
-    expect(canTransitionPurchaseDocument("received", "ordered")).toBe(false);
+    expect(canTransitionPurchaseDocument("draft", "sent")).toBe(true);
+    expect(canTransitionPurchaseDocument("sent", "partial")).toBe(true);
+    expect(canTransitionPurchaseDocument("partial", "received")).toBe(true);
+    expect(canTransitionPurchaseDocument("draft", "received")).toBe(false);
+    expect(canTransitionPurchaseDocument("received", "sent")).toBe(false);
   });
 
   it("allows stock counts only through controlled review and posting", () => {
-    expect(canTransitionStockCount("counting", "review")).toBe(true);
-    expect(canTransitionStockCount("draft", "posted")).toBe(false);
+    expect(canTransitionStockCount("in_progress", "review")).toBe(true);
+    expect(canTransitionStockCount("review", "approved")).toBe(true);
+    expect(canTransitionStockCount("draft", "approved")).toBe(false);
   });
 });

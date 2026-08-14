@@ -1,17 +1,16 @@
 const purchaseTransitions = {
-  draft: ["approved", "cancelled"],
-  approved: ["ordered", "cancelled"],
-  ordered: ["partial_received", "received", "cancelled"],
-  partial_received: ["received", "cancelled"],
+  draft: ["sent", "cancelled"],
+  sent: ["partial", "received", "cancelled"],
+  partial: ["received", "cancelled"],
   received: [],
   cancelled: [],
 } as const;
 
 const stockCountTransitions = {
-  draft: ["counting", "cancelled"],
-  counting: ["review", "cancelled"],
-  review: ["posted", "cancelled"],
-  posted: [],
+  draft: ["in_progress", "cancelled"],
+  in_progress: ["review", "cancelled"],
+  review: ["approved", "cancelled"],
+  approved: [],
   cancelled: [],
 } as const;
 

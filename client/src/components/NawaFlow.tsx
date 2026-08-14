@@ -5,10 +5,12 @@ import { getFlowNodeStatus, type FlowNodeConfig, type FlowNodeId, nawaFlowEdges,
 import { useTheme } from "@/contexts/ThemeContext";
 import { ArrowLeft, ArrowRight, Check, ChevronLeft, ChevronRight, LockKeyhole, Route, X } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useLocation } from "wouter";
 
 type Subscription = { key: string; status: string };
 export default function NawaFlow({ modules, restrictedNodeIds = [], onOpenClassic }: { modules: Subscription[]; restrictedNodeIds?: FlowNodeId[]; onOpenClassic: () => void }) {
   const { direction, t } = useLanguage();
+  const [, setLocation] = useLocation();
   useTheme();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [internalOpen, setInternalOpen] = useState(false);
@@ -29,7 +31,7 @@ export default function NawaFlow({ modules, restrictedNodeIds = [], onOpenClassi
     return `M ${sx} ${source.position.y} C ${control} ${source.position.y}, ${control} ${target.position.y}, ${tx} ${target.position.y}`;
   };
 
-  if (internalOpen) return <CommerceInternalFlow onBack={() => setInternalOpen(false)} />;
+  if (internalOpen) return <CommerceInternalFlow onBack={() => setInternalOpen(false)} onOpenCommerce={() => setLocation("/commerce")} />;
 
   return (
     <section className="space-y-5" dir={direction} aria-label={t("businessFlowMap")}>

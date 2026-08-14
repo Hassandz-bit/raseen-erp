@@ -14,16 +14,23 @@ export function selectFefoBatches(batches: BatchCandidate[], requestedQuantity: 
   return { allocations, remainingQuantity: remaining };
 }
 
+export function allocateSalesInvoiceLine(batches: BatchCandidate[], requestedQuantity: number, now = new Date()) {
+  if (requestedQuantity <= 0) throw new Error("كمية سطر الفاتورة يجب أن تكون أكبر من صفر.");
+  const allocation = selectFefoBatches(batches, requestedQuantity, now);
+  if (allocation.remainingQuantity > 0) throw new Error("لا توجد كميات صالحة كافية لإصدار الفاتورة وفق FEFO.");
+  return allocation.allocations;
+}
+
 export function convertUnitQuantity(quantity: number, factor: number) {
   if (factor <= 0) throw new Error("عامل التحويل يجب أن يكون أكبر من صفر.");
   return quantity * factor;
 }
 
 const transitions = {
-  draft: ["confirmed", "cancelled"],
-  confirmed: ["issued", "cancelled"],
-  issued: ["partial", "paid", "returned"],
-  partial: ["paid", "returned"],
+  draft: ["issued", "cancelled"],
+  issued: ["partial", "paid", "overdue", "returned"],
+  partial: ["paid", "overdue", "returned"],
+  overdue: ["partial", "paid", "returned"],
   paid: ["returned"],
   returned: [],
   cancelled: [],
