@@ -20,4 +20,13 @@ describe("inventory policy", () => {
     expect(canTransitionSalesDocument("draft", "confirmed")).toBe(true);
     expect(canTransitionSalesDocument("paid", "cancelled")).toBe(false);
   });
+
+  it("reports a shortage when active non-expired batches cannot satisfy issuance", () => {
+    const result = selectFefoBatches([
+      { id: 1, availableQuantity: 2, expiryDate: new Date("2026-08-20"), status: "active" },
+      { id: 2, availableQuantity: 12, expiryDate: new Date("2026-08-01"), status: "active" },
+    ], 5, new Date("2026-08-14"));
+    expect(result.allocations).toEqual([{ batchId: 1, quantity: 2 }]);
+    expect(result.remainingQuantity).toBe(3);
+  });
 });

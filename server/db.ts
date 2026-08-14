@@ -235,6 +235,15 @@ export async function previewFefoAllocation(organizationId: number, warehouseId:
   return { allocations, remainingQuantity: remaining };
 }
 
+export async function issueStockByFefo({ organizationId, warehouseId, productId, quantity, unit, actorUserId, sourceDocumentType, sourceDocumentId }: { organizationId: number; warehouseId: number; productId: number; quantity: number; unit: string; actorUserId: number; sourceDocumentType?: string; sourceDocumentId?: number }) {
+  const allocation = await previewFefoAllocation(organizationId, warehouseId, productId, quantity);
+  if (allocation.remainingQuantity > 0) throw new Error("لا توجد كميات صالحة كافية لتغطية الصرف وفق FEFO.");
+  for (const item of allocation.allocations) {
+    await recordStockMovement({ organizationId, warehouseId, productId, batchId: item.batchId, movementType: "sales_issue", quantity: -item.quantity, unit, actorUserId, sourceDocumentType, sourceDocumentId });
+  }
+  return allocation;
+}
+
 export type OperationalModule = "inventory" | "sales" | "purchases" | "finance" | "hr";
 
 export type OperationalRecord = {
