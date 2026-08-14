@@ -32,6 +32,15 @@ describe("i18n foundation", () => {
     });
   });
 
+  it("يوفر مفردات مؤشرات لوحة التحكم المالية بكل لغة", () => {
+    (["ar", "fr", "en"] as const).forEach(language => {
+      expect(translations[language].totalSalesMetric).toBeTruthy();
+      expect(translations[language].netRevenueMetric).toBeTruthy();
+      expect(translations[language].inventoryValueMetric).toBeTruthy();
+      expect(translations[language].dueInvoicesMetric).toBeTruthy();
+    });
+  });
+
   it("يوفر مفردات التاريخ والوقت والفواصل الرقمية بكل لغة", () => {
     (["ar", "fr", "en"] as const).forEach(language => {
       expect(translations[language].timeFormat).toBeTruthy();
