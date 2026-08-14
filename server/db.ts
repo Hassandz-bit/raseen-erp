@@ -145,8 +145,13 @@ export async function listOrganizationExchangeRates(organizationId: number, filt
 export async function addOrganizationExchangeRate(organizationId: number, userId: number, values: { baseCurrencyCode: string; quoteCurrencyCode: string; rate: number; effectiveAt: Date; source?: string }) {
   const db = await getDb();
   if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
-  if (values.baseCurrencyCode === values.quoteCurrencyCode) throw new Error("يجب أن تختلف عملة الأساس عن عملة الاقتباس.");
-  const result = await db.insert(organizationExchangeRates).values({ organizationId, baseCurrencyCode: values.baseCurrencyCode, quoteCurrencyCode: values.quoteCurrencyCode, rate: String(values.rate), effectiveAt: values.effectiveAt, source: values.source?.trim() || "manual", createdByUserId: userId });
+  const [organization] = await db.select({ baseCurrency: organizations.baseCurrency }).from(organizations).where(eq(organizations.id, organizationId)).limit(1);
+  if (!organization) throw new Error("المؤسسة غير متاحة ضمن السياق الحالي.");
+  const baseCurrencyCode = values.baseCurrencyCode.trim().toUpperCase();
+  const quoteCurrencyCode = values.quoteCurrencyCode.trim().toUpperCase();
+  if (baseCurrencyCode !== organization.baseCurrency.toUpperCase()) throw new Error("يجب أن تطابق عملة الأساس العملة الأساسية للمؤسسة.");
+  if (baseCurrencyCode === quoteCurrencyCode) throw new Error("يجب أن تختلف عملة الأساس عن عملة الاقتباس.");
+  const result = await db.insert(organizationExchangeRates).values({ organizationId, baseCurrencyCode, quoteCurrencyCode, rate: String(values.rate), effectiveAt: values.effectiveAt, source: values.source?.trim() || "manual", createdByUserId: userId });
   return { id: Number(result[0].insertId) };
 }
 

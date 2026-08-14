@@ -28,6 +28,7 @@ describe("عزل سجل أسعار الصرف", () => {
     organizationIds = [firstOrganizationId, secondOrganizationId];
     await addOrganizationExchangeRate(firstOrganizationId, 1, { baseCurrencyCode: "DZD", quoteCurrencyCode: "EUR", rate: 0.0062, effectiveAt: new Date("2026-03-15T00:00:00Z") });
     await addOrganizationExchangeRate(secondOrganizationId, 1, { baseCurrencyCode: "DZD", quoteCurrencyCode: "EUR", rate: 0.0065, effectiveAt: new Date("2026-03-15T00:00:00Z") });
+    await expect(addOrganizationExchangeRate(firstOrganizationId, 1, { baseCurrencyCode: "EUR", quoteCurrencyCode: "DZD", rate: 160, effectiveAt: new Date("2026-03-16T00:00:00Z") })).rejects.toThrow("يجب أن تطابق عملة الأساس العملة الأساسية للمؤسسة");
 
     const firstRows = await listOrganizationExchangeRates(firstOrganizationId, { currencyCode: "EUR", startDate: new Date("2026-03-01T00:00:00Z"), endDate: new Date("2026-03-31T23:59:59Z") });
     const secondRows = await listOrganizationExchangeRates(secondOrganizationId, { currencyCode: "EUR" });
