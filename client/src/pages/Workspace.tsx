@@ -83,10 +83,10 @@ function OnboardingPanel({ onComplete }: { onComplete: () => void }) {
   const [name, setName] = useState("");
   const createOrganization = trpc.erp.onboarding.createOrganization.useMutation({
     onSuccess: () => {
-      toast.success("تم إعداد مؤسستك وتفعيل الوحدات الأساسية.");
+      toast.success(t("saved"));
       onComplete();
     },
-    onError: error => toast.error(error.message || "تعذر إعداد المؤسسة الآن."),
+    onError: error => toast.error(error.message || t("error")),
   });
 
   return (
