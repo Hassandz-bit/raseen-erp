@@ -118,10 +118,14 @@ export async function saveOrganizationCurrency(organizationId: number, values: {
   return listOrganizationCurrencies(organizationId);
 }
 
-export async function listOrganizationExchangeRates(organizationId: number) {
+export async function listOrganizationExchangeRates(organizationId: number, filters?: { currencyCode?: string; startDate?: Date; endDate?: Date }) {
   const db = await getDb();
   if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
-  return db.select().from(organizationExchangeRates).where(eq(organizationExchangeRates.organizationId, organizationId)).orderBy(desc(organizationExchangeRates.effectiveAt), desc(organizationExchangeRates.id)).limit(200);
+  const conditions = [eq(organizationExchangeRates.organizationId, organizationId)];
+  if (filters?.currencyCode) conditions.push(sql`(${organizationExchangeRates.baseCurrencyCode} = ${filters.currencyCode} OR ${organizationExchangeRates.quoteCurrencyCode} = ${filters.currencyCode})`);
+  if (filters?.startDate) conditions.push(sql`${organizationExchangeRates.effectiveAt} >= ${filters.startDate}`);
+  if (filters?.endDate) conditions.push(sql`${organizationExchangeRates.effectiveAt} <= ${filters.endDate}`);
+  return db.select().from(organizationExchangeRates).where(and(...conditions)).orderBy(desc(organizationExchangeRates.effectiveAt), desc(organizationExchangeRates.id)).limit(200);
 }
 
 export async function addOrganizationExchangeRate(organizationId: number, userId: number, values: { baseCurrencyCode: string; quoteCurrencyCode: string; rate: number; effectiveAt: Date; source?: string }) {

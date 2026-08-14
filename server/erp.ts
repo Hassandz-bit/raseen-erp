@@ -6,6 +6,7 @@ import { invokeLLM } from "./_core/llm";
 import { notifyOwner } from "./_core/notification";
 import { protectedProcedure, router } from "./_core/trpc";
 import { buildOwnerAlertReasons, canAccessTenantModule, hasActiveMembership } from "./tenantPolicy";
+import { hasValidExchangeRateDateRange, normalizeExchangeRateFilters } from "./exchangeRateFilters";
 
 type ModuleKey = "inventory" | "sales" | "purchases" | "finance" | "hr" | "reports" | "ai_assistant";
 const operationalModuleKeys = ["inventory", "sales", "purchases", "finance", "hr"] as const;
@@ -126,9 +127,11 @@ export const erpRouter = router({
       const context = await requireOrganizationOwner(ctx.user.id);
       return saveOrganizationCurrency(context.organization.id, input);
     }),
-    exchangeRates: protectedProcedure.query(async ({ ctx }) => {
+    exchangeRates: protectedProcedure.input(z.object({ currencyCode: z.string().length(3).optional(), startDate: z.coerce.date().optional(), endDate: z.coerce.date().optional() }).optional()).query(async ({ ctx, input }) => {
       const context = await getTenantContext(ctx.user.id);
-      return listOrganizationExchangeRates(context.organization.id);
+      const filters = normalizeExchangeRateFilters(input);
+      if (!hasValidExchangeRateDateRange(filters)) throw new TRPCError({ code: "BAD_REQUEST", message: "يجب أن يسبق تاريخ البداية تاريخ النهاية." });
+      return listOrganizationExchangeRates(context.organization.id, filters);
     }),
     addExchangeRate: protectedProcedure.input(z.object({
       baseCurrencyCode: z.string().length(3),
