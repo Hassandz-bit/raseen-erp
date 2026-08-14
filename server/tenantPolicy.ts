@@ -19,6 +19,10 @@ export function canAccessTenantModule({
   return hasActiveMembership(membershipStatus) && hasActiveModule(moduleStatus);
 }
 
+export function isOrganizationOwner(roleKey: string | undefined) {
+  return roleKey === "owner";
+}
+
 export type OperationalMetrics = {
   lowStockProducts: number;
   overdueInvoices: number;

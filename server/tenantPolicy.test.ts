@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildOwnerAlertReasons, canAccessTenantModule, hasActiveMembership, hasActiveModule } from "./tenantPolicy";
+import { buildOwnerAlertReasons, canAccessTenantModule, hasActiveMembership, hasActiveModule, isOrganizationOwner } from "./tenantPolicy";
 
 describe("tenantPolicy", () => {
   it("يسمح بالوحدة فقط عند وجود عضوية واشتراك نشطين", () => {
@@ -13,6 +13,12 @@ describe("tenantPolicy", () => {
     expect(hasActiveMembership("invited")).toBe(false);
     expect(hasActiveMembership(undefined)).toBe(false);
     expect(hasActiveModule(undefined)).toBe(false);
+  });
+
+  it("يقصر إجراءات مالك المؤسسة على الدور owner فقط", () => {
+    expect(isOrganizationOwner("owner")).toBe(true);
+    expect(isOrganizationOwner("member")).toBe(false);
+    expect(isOrganizationOwner(undefined)).toBe(false);
   });
 
   it("يبني تنبيه المالك من حالات التشغيل الحرجة فقط", () => {

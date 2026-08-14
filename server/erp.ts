@@ -5,7 +5,7 @@ import { currencyCatalog } from "../shared/currencyCatalog";
 import { invokeLLM } from "./_core/llm";
 import { notifyOwner } from "./_core/notification";
 import { protectedProcedure, router } from "./_core/trpc";
-import { buildOwnerAlertReasons, canAccessTenantModule, hasActiveMembership } from "./tenantPolicy";
+import { buildOwnerAlertReasons, canAccessTenantModule, hasActiveMembership, isOrganizationOwner } from "./tenantPolicy";
 import { hasValidExchangeRateDateRange, normalizeExchangeRateFilters } from "./exchangeRateFilters";
 import { isValidTextBarcode } from "./barcodePolicy";
 
@@ -34,7 +34,7 @@ async function requireModule(userId: number, moduleKey: ModuleKey) {
 
 async function requireOrganizationOwner(userId: number) {
   const context = await getTenantContext(userId);
-  if (context.membership.roleKey !== "owner") {
+  if (!isOrganizationOwner(context.membership.roleKey)) {
     throw new TRPCError({ code: "FORBIDDEN", message: "يلزم دور مالك المؤسسة لتعديل هذه الإعدادات." });
   }
   return context;
