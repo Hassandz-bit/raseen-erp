@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { addOrganizationExchangeRate, createOperationalNotifications, createOperationalRecord, createOrganizationForUser, createProductMaster, getDashboardMetrics, getDefaultTenantContext, getFinancialReportSummary, getOrCreateOrganizationSettings, getOrCreateUserPreferences, issueStockByFefo, listNotificationsForOrganization, listOperationalRecords, listOrganizationCurrencies, listOrganizationExchangeRates, listProductsForOrganization, markNotificationRead, previewFefoAllocation, recordStockMovement, saveOrganizationCurrency, updateOrganizationSettings, updateUserPreferences, type OperationalModule } from "./db";
+import { addOrganizationExchangeRate, createOperationalNotifications, createOperationalRecord, createOrganizationForUser, createProductMaster, getDashboardMetrics, getDefaultTenantContext, getFinancialReportSummary, getOrCreateOrganizationSettings, getOrCreateUserPreferences, issueStockByFefo, listNotificationsForOrganization, listOperationalRecords, listOrganizationCurrencies, listOrganizationExchangeRates, listProductBatchesForOrganization, listProductsForOrganization, markNotificationRead, previewFefoAllocation, recordStockMovement, saveOrganizationCurrency, updateOrganizationSettings, updateUserPreferences, type OperationalModule } from "./db";
 import { currencyCatalog } from "../shared/currencyCatalog";
 import { invokeLLM } from "./_core/llm";
 import { notifyOwner } from "./_core/notification";
@@ -175,6 +175,10 @@ export const erpRouter = router({
     previewFefo: protectedProcedure.input(z.object({ warehouseId: z.number().int().positive(), productId: z.number().int().positive(), quantity: z.number().positive() })).query(async ({ ctx, input }) => {
       const context = await requireModule(ctx.user.id, "inventory");
       return previewFefoAllocation(context.organization.id, input.warehouseId, input.productId, input.quantity);
+    }),
+    listBatches: protectedProcedure.input(z.object({ productId: z.number().int().positive().optional(), warehouseId: z.number().int().positive().optional(), status: z.enum(["active", "blocked", "quarantined", "expired"]).optional() }).optional()).query(async ({ ctx, input }) => {
+      const context = await requireModule(ctx.user.id, "inventory");
+      return listProductBatchesForOrganization(context.organization.id, input);
     }),
     issueFefo: protectedProcedure.input(z.object({ warehouseId: z.number().int().positive(), productId: z.number().int().positive(), quantity: z.number().positive(), unit: z.string().trim().min(1).max(32), sourceDocumentType: z.string().trim().max(64).optional(), sourceDocumentId: z.number().int().positive().optional() })).mutation(async ({ ctx, input }) => {
       const context = await requireModule(ctx.user.id, "inventory");

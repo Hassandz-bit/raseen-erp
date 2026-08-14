@@ -235,6 +235,16 @@ export async function previewFefoAllocation(organizationId: number, warehouseId:
   return { allocations, remainingQuantity: remaining };
 }
 
+export async function listProductBatchesForOrganization(organizationId: number, filters?: { productId?: number; warehouseId?: number; status?: "active" | "blocked" | "quarantined" | "expired" }) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const conditions = [eq(productBatches.organizationId, organizationId)];
+  if (filters?.productId) conditions.push(eq(productBatches.productId, filters.productId));
+  if (filters?.warehouseId) conditions.push(eq(productBatches.warehouseId, filters.warehouseId));
+  if (filters?.status) conditions.push(eq(productBatches.status, filters.status));
+  return db.select().from(productBatches).where(and(...conditions)).orderBy(asc(productBatches.expiryDate), desc(productBatches.createdAt)).limit(200);
+}
+
 export async function issueStockByFefo({ organizationId, warehouseId, productId, quantity, unit, actorUserId, sourceDocumentType, sourceDocumentId }: { organizationId: number; warehouseId: number; productId: number; quantity: number; unit: string; actorUserId: number; sourceDocumentType?: string; sourceDocumentId?: number }) {
   const allocation = await previewFefoAllocation(organizationId, warehouseId, productId, quantity);
   if (allocation.remainingQuantity > 0) throw new Error("لا توجد كميات صالحة كافية لتغطية الصرف وفق FEFO.");
