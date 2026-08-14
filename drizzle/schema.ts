@@ -33,7 +33,8 @@ export const userPreferences = mysqlTable(
     sidebarMode: mysqlEnum("sidebarMode", ["expanded", "compact", "collapsed"]).default("expanded").notNull(),
     density: mysqlEnum("density", ["comfortable", "compact"]).default("comfortable").notNull(),
     fontFamily: varchar("fontFamily", { length: 64 }).default("ibm-plex").notNull(),
-    fontScale: mysqlEnum("fontScale", ["small", "normal", "large"]).default("normal").notNull(),
+    fontScale: mysqlEnum("fontScale", ["small", "normal", "large", "extra_large"]).default("normal").notNull(),
+    numeralStyle: mysqlEnum("numeralStyle", ["western", "arabic_indic"]).default("western").notNull(),
     accentColor: varchar("accentColor", { length: 16 }).default("gold").notNull(),
     radiusPreset: mysqlEnum("radiusPreset", ["soft", "rounded", "sharp"]).default("rounded").notNull(),
     moduleViewMode: mysqlEnum("moduleViewMode", ["classic", "nawa_flow"]).default("classic").notNull(),
@@ -69,11 +70,44 @@ export const organizationSettings = mysqlTable(
     firstDayOfWeek: mysqlEnum("firstDayOfWeek", ["monday", "sunday", "saturday"]).default("monday").notNull(),
     decimalSeparator: mysqlEnum("decimalSeparator", ["dot", "comma"]).default("dot").notNull(),
     thousandsSeparator: mysqlEnum("thousandsSeparator", ["comma", "dot", "space"]).default("comma").notNull(),
-    documentSettings: json("documentSettings").$type<{ paperSize: "A4" | "A5" | "thermal"; logoUrl?: string; address?: string; phone?: string; legalInfo?: string; headerText?: string; footerText?: string; showSignature?: boolean }>().notNull(),
+    documentSettings: json("documentSettings").$type<{ paperSize: "A4" | "A5" | "thermal"; logoUrl?: string; address?: string; phone?: string; legalInfo?: string; headerText?: string; footerText?: string; showSignature?: boolean; fontFamily?: "ibm-plex" | "tajawal" | "noto-arabic" | "inter" | "system"; fontSize?: "small" | "normal" | "large" }>().notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },
   table => [uniqueIndex("organization_settings_organization_unique").on(table.organizationId)],
+);
+
+export const organizationCurrencies = mysqlTable(
+  "organization_currencies",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    organizationId: int("organizationId").notNull(),
+    currencyCode: varchar("currencyCode", { length: 8 }).notNull(),
+    symbol: varchar("symbol", { length: 16 }).notNull(),
+    decimalPlaces: int("decimalPlaces").default(2).notNull(),
+    displayStyle: mysqlEnum("displayStyle", ["symbol", "code", "symbol_and_code"]).default("symbol").notNull(),
+    isBase: mysqlEnum("isBase", ["yes", "no"]).default("no").notNull(),
+    status: mysqlEnum("status", ["active", "inactive"]).default("active").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [uniqueIndex("organization_currency_code_unique").on(table.organizationId, table.currencyCode), index("organization_currency_active_idx").on(table.organizationId, table.status)],
+);
+
+export const organizationExchangeRates = mysqlTable(
+  "organization_exchange_rates",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    organizationId: int("organizationId").notNull(),
+    baseCurrencyCode: varchar("baseCurrencyCode", { length: 8 }).notNull(),
+    quoteCurrencyCode: varchar("quoteCurrencyCode", { length: 8 }).notNull(),
+    rate: decimal("rate", { precision: 18, scale: 8 }).notNull(),
+    effectiveAt: timestamp("effectiveAt").notNull(),
+    source: varchar("source", { length: 64 }).default("manual").notNull(),
+    createdByUserId: int("createdByUserId"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => [index("exchange_rate_organization_pair_date_idx").on(table.organizationId, table.baseCurrencyCode, table.quoteCurrencyCode, table.effectiveAt)],
 );
 
 export const organizationMemberships = mysqlTable(

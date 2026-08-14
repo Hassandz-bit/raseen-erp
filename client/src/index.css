@@ -91,6 +91,8 @@ body {
 :root[data-font-scale="small"] { font-size: 14px; }
 :root[data-font-scale="normal"] { font-size: 16px; }
 :root[data-font-scale="large"] { font-size: 18px; }
+:root[data-font-scale="extra_large"] { font-size: 19px; }
+:root[data-numeral-style="arabic_indic"] { font-variant-numeric: normal; }
 :root[data-radius="soft"] { --radius: 1.35rem; }
 :root[data-radius="sharp"] { --radius: .45rem; }
 :root[data-accent="blue"] { --primary: oklch(0.72 0.12 245); --primary-foreground: oklch(0.18 0.02 245); --ring: oklch(0.72 0.12 245); }

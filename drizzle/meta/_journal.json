@@ -43,6 +43,20 @@
       "when": 1786724519224,
       "tag": "0005_panoramic_tinkerer",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1786726753713,
+      "tag": "0006_first_leech",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1786727349639,
+      "tag": "0007_soft_blockbuster",
+      "breakpoints": true
     }
   ]
 }

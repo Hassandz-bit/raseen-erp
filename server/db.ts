@@ -7,6 +7,7 @@ import {
   inventoryBalances,
   notifications,
   organizationMemberships,
+  organizationCurrencies,
   organizationModules,
   organizationRoles,
   organizationSettings,
@@ -17,6 +18,7 @@ import {
   userPreferences,
   users,
 } from "../drizzle/schema";
+import { getCurrencyCatalogEntry } from "../shared/currencyCatalog";
 import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -93,6 +95,26 @@ export async function updateOrganizationSettings(organizationId: number, values:
   if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
   await db.insert(organizationSettings).values({ organizationId, documentSettings: defaultDocumentSettings, ...values }).onDuplicateKeyUpdate({ set: values });
   return getOrCreateOrganizationSettings(organizationId);
+}
+
+export async function listOrganizationCurrencies(organizationId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const settings = await getOrCreateOrganizationSettings(organizationId);
+  const base = getCurrencyCatalogEntry(settings.currencyCode);
+  if (base) await db.insert(organizationCurrencies).values({ organizationId, currencyCode: base.code, symbol: base.symbol, decimalPlaces: base.decimalPlaces, isBase: "yes", status: "active" }).onDuplicateKeyUpdate({ set: { isBase: "yes", status: "active" } });
+  return db.select().from(organizationCurrencies).where(eq(organizationCurrencies.organizationId, organizationId)).orderBy(desc(organizationCurrencies.isBase), organizationCurrencies.currencyCode);
+}
+
+export async function saveOrganizationCurrency(organizationId: number, values: { currencyCode: string; symbol: string; decimalPlaces: number; displayStyle: "symbol" | "code" | "symbol_and_code"; status: "active" | "inactive"; isBase?: "yes" | "no" }) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  if (values.isBase === "yes") {
+    await db.update(organizationCurrencies).set({ isBase: "no" }).where(eq(organizationCurrencies.organizationId, organizationId));
+    await updateOrganizationSettings(organizationId, { currencyCode: values.currencyCode, decimalPlaces: values.decimalPlaces });
+  }
+  await db.insert(organizationCurrencies).values({ organizationId, ...values, isBase: values.isBase ?? "no" }).onDuplicateKeyUpdate({ set: { symbol: values.symbol, decimalPlaces: values.decimalPlaces, displayStyle: values.displayStyle, status: values.status, isBase: values.isBase ?? "no" } });
+  return listOrganizationCurrencies(organizationId);
 }
 
 export async function createOrganizationForUser({ userId, name }: { userId: number; name: string }) {

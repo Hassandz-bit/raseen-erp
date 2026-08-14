@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatOrganizationCurrency, formatOrganizationDate, formatOrganizationNumber } from "./formatting";
+import { applyNumeralStyle, formatOrganizationCurrency, formatOrganizationDate, formatOrganizationNumber } from "./formatting";
 
 describe("organization formatting", () => {
   it("يفصل تنسيق الرقم عن لغة الواجهة", () => {
@@ -9,5 +9,9 @@ describe("organization formatting", () => {
   it("يطابق موضع رمز العملة وإعداد التاريخ المؤسسي", () => {
     expect(formatOrganizationCurrency(42, { currencyCode: "EUR", currencySymbolPosition: "before", decimalPlaces: 2, decimalSeparator: "dot", thousandsSeparator: "comma" })).toBe("€ 42.00");
     expect(formatOrganizationDate("2026-08-14T12:00:00Z", { dateFormat: "YYYY-MM-DD", timeZone: "UTC" })).toBe("2026-08-14");
+  });
+  it("يفصل شكل الأرقام العربي الهندي عن فواصل الرقم ومكان رمز العملة", () => {
+    expect(applyNumeralStyle("1,250.50", "arabic_indic")).toBe("١٬٢٥٠٫٥٠");
+    expect(formatOrganizationCurrency(1250.5, { currencyCode: "AED", currencySymbolPosition: "after", decimalPlaces: 2, decimalSeparator: "dot", thousandsSeparator: "comma", numeralStyle: "arabic_indic" })).toBe("١٬٢٥٠٫٥٠ د.إ");
   });
 });

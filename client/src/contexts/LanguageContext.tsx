@@ -16,8 +16,8 @@ type LanguageContextValue = {
 const LanguageContext = createContext<LanguageContextValue | undefined>(undefined);
 const languageLocale: Record<AppLanguage, string> = { ar: "ar-DZ", fr: "fr-FR", en: "en-US" };
 const isSupportedLanguage = (value: string | null): value is AppLanguage => value === "ar" || value === "fr" || value === "en";
-const defaultOrganizationFormat: OrganizationFormatSettings = { currencyCode: "DZD", currencySymbolPosition: "after", decimalPlaces: 2, dateFormat: "DD/MM/YYYY", timeFormat: "24h", timeZone: "Africa/Algiers", decimalSeparator: "dot", thousandsSeparator: "comma" };
-function getOrganizationFormat() { try { return { ...defaultOrganizationFormat, ...(JSON.parse(localStorage.getItem("nawa-organization-format") || "{}") as Partial<OrganizationFormatSettings>) }; } catch { return defaultOrganizationFormat; } }
+const defaultOrganizationFormat: OrganizationFormatSettings = { currencyCode: "DZD", currencySymbolPosition: "after", decimalPlaces: 2, dateFormat: "DD/MM/YYYY", timeFormat: "24h", timeZone: "Africa/Algiers", decimalSeparator: "dot", thousandsSeparator: "comma", numeralStyle: "western" };
+function getOrganizationFormat() { try { const organization = JSON.parse(localStorage.getItem("nawa-organization-format") || "{}") as Partial<OrganizationFormatSettings>; const appearance = JSON.parse(localStorage.getItem("nawa-appearance") || "{}") as { numeralStyle?: OrganizationFormatSettings["numeralStyle"] }; return { ...defaultOrganizationFormat, ...organization, numeralStyle: appearance.numeralStyle ?? organization.numeralStyle ?? "western" }; } catch { return defaultOrganizationFormat; } }
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [language, setLanguageState] = useState<AppLanguage>(() => {
@@ -36,7 +36,8 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const sync = () => setOrganizationFormat(getOrganizationFormat());
     window.addEventListener("nawa-organization-format", sync);
-    return () => window.removeEventListener("nawa-organization-format", sync);
+    window.addEventListener("nawa-appearance", sync);
+    return () => { window.removeEventListener("nawa-organization-format", sync); window.removeEventListener("nawa-appearance", sync); };
   }, []);
 
   const value = useMemo<LanguageContextValue>(() => ({

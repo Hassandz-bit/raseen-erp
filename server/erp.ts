@@ -1,6 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { createOperationalNotifications, createOperationalRecord, createOrganizationForUser, getDashboardMetrics, getDefaultTenantContext, getFinancialReportSummary, getOrCreateOrganizationSettings, getOrCreateUserPreferences, listNotificationsForOrganization, listOperationalRecords, listProductsForOrganization, markNotificationRead, updateOrganizationSettings, updateUserPreferences, type OperationalModule } from "./db";
+import { createOperationalNotifications, createOperationalRecord, createOrganizationForUser, getDashboardMetrics, getDefaultTenantContext, getFinancialReportSummary, getOrCreateOrganizationSettings, getOrCreateUserPreferences, listNotificationsForOrganization, listOperationalRecords, listOrganizationCurrencies, listProductsForOrganization, markNotificationRead, saveOrganizationCurrency, updateOrganizationSettings, updateUserPreferences, type OperationalModule } from "./db";
+import { currencyCatalog } from "../shared/currencyCatalog";
 import { invokeLLM } from "./_core/llm";
 import { notifyOwner } from "./_core/notification";
 import { protectedProcedure, router } from "./_core/trpc";
@@ -75,7 +76,8 @@ export const erpRouter = router({
       sidebarMode: z.enum(["expanded", "compact", "collapsed"]).optional(),
       density: z.enum(["comfortable", "compact"]).optional(),
       fontFamily: z.enum(["ibm-plex", "tajawal", "noto-arabic", "inter", "system"]).optional(),
-      fontScale: z.enum(["small", "normal", "large"]).optional(),
+      fontScale: z.enum(["small", "normal", "large", "extra_large"]).optional(),
+      numeralStyle: z.enum(["western", "arabic_indic"]).optional(),
       accentColor: z.enum(["gold", "blue", "emerald", "violet"]).optional(),
       radiusPreset: z.enum(["soft", "rounded", "sharp"]).optional(),
       moduleViewMode: z.enum(["classic", "nawa_flow"]).optional(),
@@ -107,6 +109,22 @@ export const erpRouter = router({
     })).mutation(async ({ ctx, input }) => {
       const context = await requireOrganizationOwner(ctx.user.id);
       return updateOrganizationSettings(context.organization.id, input);
+    }),
+    currencyCatalog: protectedProcedure.query(() => currencyCatalog),
+    currencies: protectedProcedure.query(async ({ ctx }) => {
+      const context = await getTenantContext(ctx.user.id);
+      return listOrganizationCurrencies(context.organization.id);
+    }),
+    saveCurrency: protectedProcedure.input(z.object({
+      currencyCode: z.string().length(3),
+      symbol: z.string().min(1).max(16),
+      decimalPlaces: z.number().int().min(0).max(4),
+      displayStyle: z.enum(["symbol", "code", "symbol_and_code"]),
+      status: z.enum(["active", "inactive"]),
+      isBase: z.enum(["yes", "no"]).optional(),
+    })).mutation(async ({ ctx, input }) => {
+      const context = await requireOrganizationOwner(ctx.user.id);
+      return saveOrganizationCurrency(context.organization.id, input);
     }),
   }),
 
