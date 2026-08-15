@@ -34,7 +34,7 @@ async function requireModule(userId: number, moduleKey: ModuleKey) {
   return context;
 }
 
-async function requireOrganizationOwner(userId: number) {
+export async function requireOrganizationOwner(userId: number) {
   const context = await getTenantContext(userId);
   if (!isOrganizationOwner(context.membership.roleKey)) {
     throw new TRPCError({ code: "FORBIDDEN", message: "يلزم دور مالك المؤسسة لتعديل هذه الإعدادات." });
