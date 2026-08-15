@@ -2,17 +2,17 @@ import { AIChatBox, type Message } from "@/components/AIChatBox";
 import DashboardLayout from "@/components/DashboardLayout";
 import { FinancialSummaryCards } from "@/components/FinancialSummaryCards";
 import NawaFlow from "@/components/NawaFlow";
+import { WorkspaceState } from "@/components/WorkspaceState";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Spinner } from "@/components/ui/spinner";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { workspaceAssistantCopy } from "@/i18n/translations";
 import { useTheme } from "@/contexts/ThemeContext";
 import { buildWorkspaceSummaryCsv } from "@/lib/workspaceSummaryExport";
 import { trpc } from "@/lib/trpc";
 import { Bell, BellRing, Bot, Building2, Check, FileDown, Loader2, LockKeyhole, ShieldCheck, Sparkles } from "lucide-react";
-import { useState } from "react";
+import React, { useState } from "react";
 import { toast } from "sonner";
 
 const operationalModules = [
@@ -23,10 +23,6 @@ const operationalModules = [
   { key: "hr", label: "الموارد البشرية", action: "إضافة موظف" },
 ] as const;
 type OperationalModuleKey = (typeof operationalModules)[number]["key"];
-
-function WorkspaceState({ label }: { label: string }) {
-  return <div className="grid min-h-24 place-items-center py-8 text-center text-sm text-muted-foreground"><div className="flex flex-col items-center gap-3"><Spinner className="h-5 w-5 text-primary" /><p>{label}</p></div></div>;
-}
 
 function OperationsPanel() {
   const { direction, t, formatCurrency } = useLanguage();
@@ -70,7 +66,7 @@ function InsightsPanel({ modules }: { modules: { key: string; status: string }[]
     link.click();
     URL.revokeObjectURL(url);
   };
-  if (!commerce.data || !notifications.data) return <section className="grid gap-5 xl:grid-cols-4" dir={direction}><article className="surface col-span-full rounded-3xl border"><WorkspaceState label={t("loading")} /></article></section>;
+  if (!commerce.data || !notifications.data) return <section className="grid gap-5 xl:grid-cols-4" dir={direction}><article className="surface col-span-full rounded-3xl border"><WorkspaceState label={t("loading")} loading /></article></section>;
   return <section className="grid gap-5 xl:grid-cols-4" dir={direction}><article className="surface rounded-3xl border p-5"><div className="flex items-center justify-between"><div><p className="text-sm font-semibold text-white">{t("financialSummary")}</p><p className="mt-1 text-xs text-muted-foreground">{t("currentMonth")}</p></div><button onClick={exportReport} disabled={!report.data} className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary" aria-label={t("exportCsv")}><FileDown className="h-4 w-4" /></button></div>{report.isLoading ? <Loader2 className="mx-auto my-12 h-5 w-5 animate-spin text-primary" /> : report.data ? <FinancialSummaryCards values={report.data} /> : <p className="py-10 text-center text-xs text-muted-foreground">{t("reportLoadError")}</p>}</article><article className="surface rounded-3xl border p-5"><p className="text-sm font-semibold text-white">{t("commerceSnapshot")}</p>{commerce.isLoading ? <Loader2 className="mx-auto my-12 h-5 w-5 animate-spin text-primary" /> : commerce.data ? <div className="mt-5 grid grid-cols-2 gap-3"><div className="rounded-2xl bg-sky-400/8 p-3"><p className="text-[11px] text-muted-foreground">{t("openInvoices")}</p><p className="mt-1 text-lg font-bold text-sky-300">{formatNumber(commerce.data.openInvoices)}</p></div><div className="rounded-2xl bg-amber-400/8 p-3"><p className="text-[11px] text-muted-foreground">{t("lowStockProducts")}</p><p className="mt-1 text-lg font-bold text-amber-300">{formatNumber(commerce.data.lowStockProducts)}</p></div><div className="col-span-2 rounded-2xl bg-primary/8 p-3"><p className="text-[11px] text-muted-foreground">{t("issuedValue")}</p><p className="mt-1 text-sm font-bold text-primary">{formatCurrency(commerce.data.issuedValue)}</p></div></div> : <p className="py-10 text-center text-xs text-muted-foreground">{t("empty")}</p>}</article><article className="surface rounded-3xl border p-5"><p className="text-sm font-semibold text-white">{t("notificationCenter")}</p><div className="thin-scrollbar mt-4 max-h-48 space-y-2 overflow-y-auto">{notifications.data?.length ? notifications.data.map(item => <button key={item.id} onClick={() => item.isRead === "no" && markRead.mutate({ notificationId: item.id })} className="w-full rounded-xl border border-white/[.06] bg-white/[.025] p-3 text-start"><p className="text-xs font-semibold text-white">{item.title}</p><p className="mt-1 text-[11px] text-muted-foreground">{item.content}</p></button>) : <p className="py-10 text-center text-xs text-muted-foreground">{t("noNotifications")}</p>}</div></article><article className="surface rounded-3xl border p-5"><p className="text-sm font-semibold text-white">{t("subscriptionModules")}</p><p className="mt-1 text-xs text-muted-foreground">{t("organizationAccessStatus")}</p><div className="mt-4 space-y-2">{modules.map(module => <div key={module.key} className="flex items-center justify-between rounded-xl bg-white/[.025] px-3 py-2.5"><span className="text-xs text-slate-200">{t(module.key as never)}</span><span className="text-[11px] font-semibold text-primary">{module.status === "active" ? t("enabled") : t("locked")}</span></div>)}</div></article></section>;
 }
 
