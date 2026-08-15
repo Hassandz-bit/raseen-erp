@@ -1,3 +1,4 @@
+import React from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 export type FinancialSummaryValues = { totalIncome: number; totalExpenses: number; netProfit: number };
