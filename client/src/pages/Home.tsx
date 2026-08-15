@@ -167,8 +167,8 @@ function DashboardContent({ onOpenModule }: { onOpenModule: (key: SectionKey) =>
       <section className="grid gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(310px,0.9fr)]">
         <article className="surface grid-line rounded-3xl border p-5 md:p-6">
           <div className="flex items-start justify-between gap-4">
-            <div><p className="text-sm font-semibold text-white">اتجاه المبيعات</p><p className="mt-1 text-xs text-muted-foreground">تحديث أسبوعي — <span className="text-primary">عرض معاينة للواجهة</span></p></div>
-            <button onClick={() => toast.info("يمكن تعديل الفترة من واجهة التقارير.")} className="flex items-center gap-1 rounded-xl border border-white/8 bg-white/[.03] px-3 py-2 text-xs text-slate-300 hover:bg-white/[.07]">هذا العام<ChevronDown className="h-3.5 w-3.5" /></button>
+            <div><p className="text-sm font-semibold text-white">{dashboardHero.salesTrend}</p><p className="mt-1 text-xs text-muted-foreground">{dashboardHero.weeklyUpdate} — <span className="text-primary">{dashboardHero.interfacePreview}</span></p></div>
+            <button onClick={() => toast.info(dashboardHero.periodHint)} className="flex items-center gap-1 rounded-xl border border-white/8 bg-white/[.03] px-3 py-2 text-xs text-slate-300 hover:bg-white/[.07]">{dashboardHero.currentYear}<ChevronDown className="h-3.5 w-3.5" /></button>
           </div>
           <div className="mt-4 h-[280px]" dir="ltr">
             <ResponsiveContainer width="100%" height="100%">

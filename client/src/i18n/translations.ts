@@ -19,9 +19,9 @@ export const workspaceAssistantCopy = {
 } as const;
 
 export const dashboardHeroCopy = {
-  ar: { welcome: "مرحباً بك، فريق النواة", title: "نبض مؤسستك في مكان واحد", description: "راقب الأداء، عالج التنبيهات، وانتقل مباشرة إلى ما يحتاج قرارك اليوم." },
-  fr: { welcome: "Bienvenue, équipe Nawa", title: "Le pouls de votre organisation en un seul endroit", description: "Suivez la performance, traitez les alertes et accédez directement aux décisions prioritaires." },
-  en: { welcome: "Welcome, Nawa team", title: "Your organization’s pulse in one place", description: "Monitor performance, resolve alerts, and go directly to today’s priority decisions." },
+  ar: { welcome: "مرحباً بك، فريق النواة", title: "نبض مؤسستك في مكان واحد", description: "راقب الأداء، عالج التنبيهات، وانتقل مباشرة إلى ما يحتاج قرارك اليوم.", salesTrend: "اتجاه المبيعات", weeklyUpdate: "تحديث أسبوعي", interfacePreview: "عرض معاينة للواجهة", currentYear: "هذا العام", periodHint: "يمكن تعديل الفترة من واجهة التقارير." },
+  fr: { welcome: "Bienvenue, équipe Nawa", title: "Le pouls de votre organisation en un seul endroit", description: "Suivez la performance, traitez les alertes et accédez directement aux décisions prioritaires.", salesTrend: "Tendance des ventes", weeklyUpdate: "Mise à jour hebdomadaire", interfacePreview: "Aperçu de l’interface", currentYear: "Cette année", periodHint: "La période peut être modifiée depuis les rapports." },
+  en: { welcome: "Welcome, Nawa team", title: "Your organization’s pulse in one place", description: "Monitor performance, resolve alerts, and go directly to today’s priority decisions.", salesTrend: "Sales trend", weeklyUpdate: "Weekly update", interfacePreview: "Interface preview", currentYear: "This year", periodHint: "You can change the period from the reports interface." },
 } as const;
 
 const messages = {
