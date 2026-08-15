@@ -76,10 +76,10 @@ const products = [
 ];
 
 const invoices = [
-  { no: "INV-24081", customer: "أسواق الندى", value: "18,450 ر.س", status: "مدفوعة", tone: "green" },
-  { no: "INV-24080", customer: "شركة الاتجاه", value: "12,880 ر.س", status: "قيد التحصيل", tone: "amber" },
-  { no: "INV-24079", customer: "مؤسسة الربيع", value: "8,720 ر.س", status: "مستحقة", tone: "red" },
-  { no: "INV-24078", customer: "متاجر أجيال", value: "21,340 ر.س", status: "مدفوعة", tone: "green" },
+  { no: "INV-24081", customer: "أسواق الندى", value: 18450, status: "مدفوعة", tone: "green" },
+  { no: "INV-24080", customer: "شركة الاتجاه", value: 12880, status: "قيد التحصيل", tone: "amber" },
+  { no: "INV-24079", customer: "مؤسسة الربيع", value: 8720, status: "مستحقة", tone: "red" },
+  { no: "INV-24078", customer: "متاجر أجيال", value: 21340, status: "مدفوعة", tone: "green" },
 ];
 
 const sectionCopy: Record<Exclude<SectionKey, "dashboard">, { eyebrow: string; title: string; detail: string; icon: typeof Package; stat: string; action: string }> = {
@@ -196,7 +196,7 @@ function DashboardContent({ onOpenModule }: { onOpenModule: (key: SectionKey) =>
       <section className="grid gap-5 xl:grid-cols-[minmax(0,1.4fr)_minmax(300px,0.85fr)]">
         <article className="surface overflow-hidden rounded-3xl border">
           <div className="flex items-center justify-between border-b border-white/8 px-5 py-5"><div><p className="text-sm font-semibold text-white">الفواتير الأخيرة</p><p className="mt-1 text-xs text-muted-foreground">آخر الحركة التجارية المسجلة</p></div><button onClick={() => onOpenModule("sales")} className="flex items-center gap-1 text-xs font-semibold text-primary hover:text-[#f4d58e]">عرض الكل<ChevronLeft className="h-3.5 w-3.5" /></button></div>
-          <div className="thin-scrollbar overflow-x-auto"><table className="w-full min-w-[620px] text-right"><thead className="bg-white/[.025] text-[11px] text-muted-foreground"><tr><th className="px-5 py-3 font-medium">رقم الفاتورة</th><th className="px-5 py-3 font-medium">العميل</th><th className="px-5 py-3 font-medium">القيمة</th><th className="px-5 py-3 font-medium">الحالة</th><th className="px-5 py-3" /></tr></thead><tbody>{invoices.map(invoice => <tr key={invoice.no} className="border-t border-white/[.055] transition-colors hover:bg-white/[.025]"><td className="latin px-5 py-4 text-xs font-semibold text-slate-200">{invoice.no}</td><td className="px-5 py-4 text-sm text-white">{invoice.customer}</td><td className="px-5 py-4 text-sm text-slate-300">{invoice.value}</td><td className="px-5 py-4"><StatusPill tone={invoice.tone}>{invoice.status}</StatusPill></td><td className="px-5 py-4"><button className="text-muted-foreground hover:text-white" aria-label="خيارات الفاتورة"><MoreHorizontal className="h-4 w-4" /></button></td></tr>)}</tbody></table></div>
+          <div className="thin-scrollbar overflow-x-auto"><table className="w-full min-w-[620px] text-right"><thead className="bg-white/[.025] text-[11px] text-muted-foreground"><tr><th className="px-5 py-3 font-medium">رقم الفاتورة</th><th className="px-5 py-3 font-medium">العميل</th><th className="px-5 py-3 font-medium">القيمة</th><th className="px-5 py-3 font-medium">الحالة</th><th className="px-5 py-3" /></tr></thead><tbody>{invoices.map(invoice => <tr key={invoice.no} className="border-t border-white/[.055] transition-colors hover:bg-white/[.025]"><td className="latin px-5 py-4 text-xs font-semibold text-slate-200">{invoice.no}</td><td className="px-5 py-4 text-sm text-white">{invoice.customer}</td><td className="px-5 py-4 text-sm text-slate-300">{formatCurrency(invoice.value)}</td><td className="px-5 py-4"><StatusPill tone={invoice.tone}>{invoice.status}</StatusPill></td><td className="px-5 py-4"><button className="text-muted-foreground hover:text-white" aria-label="خيارات الفاتورة"><MoreHorizontal className="h-4 w-4" /></button></td></tr>)}</tbody></table></div>
         </article>
 
         <article className="surface rounded-3xl border p-5">
