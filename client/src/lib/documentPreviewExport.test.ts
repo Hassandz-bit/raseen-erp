@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildDocumentPreviewHtml, createDocumentPreviewDownload } from "./documentPreviewExport";
+import { buildDocumentPreviewFilename, buildDocumentPreviewHtml, createDocumentPreviewDownload } from "./documentPreviewExport";
 
 describe("تصدير معاينة المستند", () => {
   it("يحافظ على العربية ويؤمّن النص قبل عرضه في وثيقة قابلة للطباعة", () => {
@@ -13,5 +13,9 @@ describe("تصدير معاينة المستند", () => {
     const result = createDocumentPreviewDownload({ direction: "rtl", title: "مستند", date: "2026-08-14", documentLabel: "فاتورة", amount: "١٠٠" }, "nawa-document-preview");
     expect(result.filename).toBe("nawa-document-preview.html");
     expect(result.blob.type).toBe("text/html;charset=utf-8");
+  });
+
+  it("ينشئ اسماً ثابتاً ومترجماً لغةً لملف التنزيل المباشر", () => {
+    expect(buildDocumentPreviewFilename("ar", new Date("2026-08-16T12:00:00.000Z"))).toBe("nawa-ar-2026-08-16.html");
   });
 });

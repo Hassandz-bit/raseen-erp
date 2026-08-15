@@ -6,6 +6,12 @@ export const glossary = {
   en: { inventory: "Inventory", sales: "Sales", purchases: "Purchases", finance: "Finance & accounting", hr: "Human resources", modules: "Modules", settings: "Settings", subscriptions: "Subscriptions" },
 } as const;
 
+export const documentPreviewActionLabels = {
+  ar: { download: "تنزيل ملف HTML", print: "طباعة أو حفظ PDF" },
+  fr: { download: "Télécharger le fichier HTML", print: "Imprimer ou enregistrer en PDF" },
+  en: { download: "Download HTML file", print: "Print or save as PDF" },
+} as const;
+
 const messages = {
   ar: {
     monday: "الاثنين", sunday: "الأحد", saturday: "السبت", space: "مسافة", barcode: "الباركود",

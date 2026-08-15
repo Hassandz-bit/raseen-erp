@@ -19,3 +19,7 @@ export function createDocumentPreviewDownload(data: DocumentPreviewExportData, f
   const blob = new Blob([buildDocumentPreviewHtml(data)], { type: "text/html;charset=utf-8" });
   return { blob, filename: filename.endsWith(".html") ? filename : `${filename}.html` };
 }
+
+export function buildDocumentPreviewFilename(language: string, date: Date) {
+  return `nawa-${language}-${date.toISOString().slice(0, 10)}.html`;
+}
