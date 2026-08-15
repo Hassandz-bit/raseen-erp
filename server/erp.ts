@@ -9,6 +9,7 @@ import { protectedProcedure, router } from "./_core/trpc";
 import { buildOwnerAlertReasons, canAccessTenantModule, hasActiveMembership, isOrganizationOwner } from "./tenantPolicy";
 import { hasValidExchangeRateDateRange, normalizeExchangeRateFilters } from "./exchangeRateFilters";
 import { isValidTextBarcode } from "./barcodePolicy";
+import { classifyBranchPersistenceError } from "./branchPolicy";
 
 type ModuleKey = "inventory" | "sales" | "purchases" | "finance" | "hr" | "reports" | "ai_assistant";
 const operationalModuleKeys = ["inventory", "sales", "purchases", "finance", "hr"] as const;
@@ -154,8 +155,7 @@ export const erpRouter = router({
       try {
         return await createBranchForOrganization(context.organization.id, input);
       } catch (error) {
-        const code = typeof error === "object" && error && "code" in error ? (error as { code?: string }).code : undefined;
-        if (code === "ER_DUP_ENTRY") throw new TRPCError({ code: "CONFLICT", message: "BRANCH_CODE_CONFLICT" });
+        if (classifyBranchPersistenceError(error) === "conflict") throw new TRPCError({ code: "CONFLICT", message: "BRANCH_CODE_CONFLICT" });
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "BRANCH_SAVE_FAILED" });
       }
     }),
