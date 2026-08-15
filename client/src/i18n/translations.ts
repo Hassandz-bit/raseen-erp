@@ -18,6 +18,12 @@ export const workspaceAssistantCopy = {
   en: { assistantDescription: "Ask about your organization’s indicators or request an operational summary. Every request passes membership and module guards before any summary is accessed.", enabledModules: "enabled modules", chatEmpty: "How can I help you manage your organization today?", chatPlaceholder: "Enter your operational question here…", promptMetrics: "Which indicators deserve priority review?", promptCommerce: "Summarize the state of invoices and inventory.", promptRecommendation: "What is the next operational recommendation?", scopeDescription: "The assistant receives a summary for the current organization only. It has no independent access to other organizations and does not modify operational records.", practicalSuggestion: "Practical suggestion", practicalSuggestionDetail: "Start by reviewing critical alerts, then due invoices.", practicalSuggestionNote: "Recommendations use only the data, subscription, and permissions available to you.", evaluateDescription: "Checks current-organization indicators and informs the platform owner when a critical condition exists." },
 } as const;
 
+export const dashboardHeroCopy = {
+  ar: { welcome: "مرحباً بك، فريق النواة", title: "نبض مؤسستك في مكان واحد", description: "راقب الأداء، عالج التنبيهات، وانتقل مباشرة إلى ما يحتاج قرارك اليوم." },
+  fr: { welcome: "Bienvenue, équipe Nawa", title: "Le pouls de votre organisation en un seul endroit", description: "Suivez la performance, traitez les alertes et accédez directement aux décisions prioritaires." },
+  en: { welcome: "Welcome, Nawa team", title: "Your organization’s pulse in one place", description: "Monitor performance, resolve alerts, and go directly to today’s priority decisions." },
+} as const;
+
 const messages = {
   ar: {
     monday: "الاثنين", sunday: "الأحد", saturday: "السبت", space: "مسافة", barcode: "الباركود",

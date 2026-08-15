@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { documentPreviewActionLabels, getDirection, glossary, translations, workspaceAssistantCopy } from "./translations";
+import { dashboardHeroCopy, documentPreviewActionLabels, getDirection, glossary, translations, workspaceAssistantCopy } from "./translations";
 
 describe("i18n foundation", () => {
   it("يعرض اتجاه RTL للعربية وLTR للفرنسية والإنجليزية", () => {
@@ -56,6 +56,14 @@ describe("i18n foundation", () => {
       expect(workspaceAssistantCopy[language].evaluateDescription).toBeTruthy();
       expect(documentPreviewActionLabels[language].download).toBeTruthy();
       expect(documentPreviewActionLabels[language].print).toBeTruthy();
+    });
+  });
+
+  it("يوفر مفردات ترحيب لوحة التحكم بكل لغة", () => {
+    (["ar", "fr", "en"] as const).forEach(language => {
+      expect(dashboardHeroCopy[language].welcome).toBeTruthy();
+      expect(dashboardHeroCopy[language].title).toBeTruthy();
+      expect(dashboardHeroCopy[language].description).toBeTruthy();
     });
   });
 });

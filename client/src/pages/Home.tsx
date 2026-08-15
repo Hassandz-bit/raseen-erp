@@ -2,6 +2,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { dashboardHeroCopy } from "@/i18n/translations";
 import { cn } from "@/lib/utils";
 import {
   ArrowUpLeft,
@@ -140,14 +141,15 @@ function MetricCard({ label, value, trend, icon: Icon, tone }: { label: string; 
 }
 
 function DashboardContent({ onOpenModule }: { onOpenModule: (key: SectionKey) => void }) {
-  const { t, formatCurrency } = useLanguage();
+  const { language, t, formatCurrency } = useLanguage();
+  const dashboardHero = dashboardHeroCopy[language];
   return (
     <div className="enter space-y-6">
       <section className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
         <div>
-          <div className="flex items-center gap-2 text-sm text-primary"><Sparkles className="h-4 w-4" />مرحباً بك، فريق النواة</div>
-          <h1 className="mt-2 text-2xl font-bold tracking-tight text-white md:text-3xl">نبض مؤسستك في مكان واحد</h1>
-          <p className="mt-2 max-w-xl text-sm leading-7 text-muted-foreground">راقب الأداء، عالج التنبيهات، وانتقل مباشرة إلى ما يحتاج قرارك اليوم.</p>
+          <div className="flex items-center gap-2 text-sm text-primary"><Sparkles className="h-4 w-4" />{dashboardHero.welcome}</div>
+          <h1 className="mt-2 text-2xl font-bold tracking-tight text-white md:text-3xl">{dashboardHero.title}</h1>
+          <p className="mt-2 max-w-xl text-sm leading-7 text-muted-foreground">{dashboardHero.description}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button onClick={() => toast.success(t("saved"))} className="gap-2 rounded-xl bg-primary px-4 text-primary-foreground hover:bg-primary/90"><Plus className="h-4 w-4" />{t("createInvoice")}</Button>
