@@ -137,6 +137,7 @@ function DashboardContent({ onOpenModule }: { onOpenModule: (key: SectionKey) =>
   const dashboardHero = dashboardHeroCopy[language];
   const salesChartData = salesData.map(point => ({ ...point, month: new Intl.DateTimeFormat(language === "ar" ? "ar-DZ" : language === "fr" ? "fr-FR" : "en-US", { month: "short" }).format(new Date(2026, point.monthIndex, 1)) }));
   const inventoryChartData = inventoryData.map(point => ({ ...point, label: t(point.labelKey as never) }));
+  const inventoryLabelWidth = language === "ar" ? 55 : 96;
   return (
     <div className="enter space-y-6">
       <section className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
@@ -181,7 +182,7 @@ function DashboardContent({ onOpenModule }: { onOpenModule: (key: SectionKey) =>
         <article className="surface rounded-3xl border p-5 md:p-6">
           <div className="flex items-center justify-between"><div><p className="text-sm font-semibold text-white">{t("inventoryHealth")}</p><p className="mt-1 text-xs text-muted-foreground">{t("inventoryDistribution")}</p></div><button onClick={() => onOpenModule("inventory")} className="text-xs text-primary hover:text-[#f1d391]">{t("details")}</button></div>
           <div className="mt-5 h-[180px]" dir="ltr">
-            <ResponsiveContainer width="100%" height="100%"><BarChart data={inventoryChartData} layout="vertical" margin={{ left: -22, right: 18 }}><XAxis type="number" hide /><YAxis type="category" dataKey="label" width={55} tick={{ fill: "#a7afbe", fontSize: 11 }} axisLine={false} tickLine={false} /><Tooltip cursor={{ fill: "#ffffff09" }} contentStyle={{ background: "#171c27", border: "1px solid #394153", borderRadius: 12 }} /><Bar dataKey="value" radius={[0, 8, 8, 0]} barSize={16}>{inventoryChartData.map(item => <Cell key={item.labelKey} fill={item.color} />)}</Bar></BarChart></ResponsiveContainer>
+            <ResponsiveContainer width="100%" height="100%"><BarChart data={inventoryChartData} layout="vertical" margin={{ left: language === "ar" ? -22 : 0, right: 18 }}><XAxis type="number" hide /><YAxis type="category" dataKey="label" width={inventoryLabelWidth} tick={{ fill: "#a7afbe", fontSize: 11 }} axisLine={false} tickLine={false} /><Tooltip cursor={{ fill: "#ffffff09" }} contentStyle={{ background: "#171c27", border: "1px solid #394153", borderRadius: 12 }} /><Bar dataKey="value" radius={[0, 8, 8, 0]} barSize={16}>{inventoryChartData.map(item => <Cell key={item.labelKey} fill={item.color} />)}</Bar></BarChart></ResponsiveContainer>
           </div>
           <div className="mt-4 grid grid-cols-2 gap-2 border-t border-white/8 pt-4"><div className="rounded-2xl bg-white/[.035] p-3"><p className="text-[11px] text-muted-foreground">{t("lowStockProducts")}</p><p className="latin mt-1 text-lg font-bold text-[#f2a46c]">14</p></div><div className="rounded-2xl bg-white/[.035] p-3"><p className="text-[11px] text-muted-foreground">{t("todayMovements")}</p><p className="latin mt-1 text-lg font-bold text-white">218</p></div></div>
         </article>
