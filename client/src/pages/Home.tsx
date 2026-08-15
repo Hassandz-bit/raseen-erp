@@ -51,14 +51,8 @@ const navItems: { key: SectionKey; label: string; icon: typeof Grid2X2; module?:
 ];
 
 const salesData = [
-  { month: "يناير", value: 84 },
-  { month: "فبراير", value: 98 },
-  { month: "مارس", value: 88 },
-  { month: "أبريل", value: 116 },
-  { month: "مايو", value: 128 },
-  { month: "يونيو", value: 154 },
-  { month: "يوليو", value: 143 },
-  { month: "أغسطس", value: 172 },
+  { monthIndex: 0, value: 84 }, { monthIndex: 1, value: 98 }, { monthIndex: 2, value: 88 }, { monthIndex: 3, value: 116 },
+  { monthIndex: 4, value: 128 }, { monthIndex: 5, value: 154 }, { monthIndex: 6, value: 143 }, { monthIndex: 7, value: 172 },
 ];
 
 const inventoryData = [
@@ -143,6 +137,7 @@ function MetricCard({ label, value, trend, icon: Icon, tone }: { label: string; 
 function DashboardContent({ onOpenModule }: { onOpenModule: (key: SectionKey) => void }) {
   const { language, t, formatCurrency } = useLanguage();
   const dashboardHero = dashboardHeroCopy[language];
+  const salesChartData = salesData.map(point => ({ ...point, month: new Intl.DateTimeFormat(language === "ar" ? "ar-DZ" : language === "fr" ? "fr-FR" : "en-US", { month: "short" }).format(new Date(2026, point.monthIndex, 1)) }));
   return (
     <div className="enter space-y-6">
       <section className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
@@ -172,12 +167,12 @@ function DashboardContent({ onOpenModule }: { onOpenModule: (key: SectionKey) =>
           </div>
           <div className="mt-4 h-[280px]" dir="ltr">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={salesData} margin={{ top: 12, right: 10, left: -20, bottom: 0 }}>
+              <AreaChart data={salesChartData} margin={{ top: 12, right: 10, left: -20, bottom: 0 }}>
                 <defs><linearGradient id="nawaSales" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#d9b46b" stopOpacity={0.38} /><stop offset="95%" stopColor="#d9b46b" stopOpacity={0} /></linearGradient></defs>
                 <CartesianGrid vertical={false} stroke="#ffffff" strokeOpacity={0.06} strokeDasharray="3 3" />
                 <XAxis dataKey="month" tick={{ fill: "#8d96a8", fontSize: 11 }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fill: "#8d96a8", fontSize: 11 }} axisLine={false} tickLine={false} />
-                <Tooltip cursor={{ stroke: "#d9b46b", strokeOpacity: 0.28 }} contentStyle={{ background: "#171c27", border: "1px solid #394153", borderRadius: 14, color: "#f7f1e7", direction: "rtl" }} formatter={(value: number) => [formatCurrency(value * 1000), t("totalSalesMetric")]} />
+                <Tooltip cursor={{ stroke: "#d9b46b", strokeOpacity: 0.28 }} contentStyle={{ background: "#171c27", border: "1px solid #394153", borderRadius: 14, color: "#f7f1e7", direction: language === "ar" ? "rtl" : "ltr" }} formatter={(value: number) => [formatCurrency(value * 1000), t("totalSalesMetric")]} />
                 <Area type="monotone" dataKey="value" stroke="#d9b46b" strokeWidth={3} fill="url(#nawaSales)" activeDot={{ r: 5, fill: "#f4db9d", stroke: "#18202c", strokeWidth: 3 }} />
               </AreaChart>
             </ResponsiveContainer>
