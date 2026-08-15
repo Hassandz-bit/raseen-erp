@@ -66,4 +66,13 @@ describe("i18n foundation", () => {
       expect(dashboardHeroCopy[language].description).toBeTruthy();
     });
   });
+
+  it("يوفر مفردات إدارة الفروع ورسائل الحفظ بكل لغة", () => {
+    (["ar", "fr", "en"] as const).forEach(language => {
+      expect(translations[language].branchCode).toBeTruthy();
+      expect(translations[language].branchName).toBeTruthy();
+      expect(translations[language].branchCodeConflict).toBeTruthy();
+      expect(translations[language].branchSaveError).toBeTruthy();
+    });
+  });
 });
