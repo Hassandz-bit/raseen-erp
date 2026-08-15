@@ -75,4 +75,11 @@ describe("i18n foundation", () => {
       expect(translations[language].branchSaveError).toBeTruthy();
     });
   });
+
+  it("يوفر مفردات إجراءات المالية والموارد البشرية بكل لغة", () => {
+    (["ar", "fr", "en"] as const).forEach(language => {
+      expect(translations[language].createTransaction).toBeTruthy();
+      expect(translations[language].addEmployee).toBeTruthy();
+    });
+  });
 });
