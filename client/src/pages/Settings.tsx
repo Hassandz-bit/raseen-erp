@@ -10,7 +10,7 @@ import { formatOrganizationCurrency, formatOrganizationDate } from "@/lib/format
 import { buildDocumentPreviewFilename, buildDocumentPreviewHtml, createDocumentPreviewDownload } from "@/lib/documentPreviewExport";
 import { trpc } from "@/lib/trpc";
 import { Building2, CalendarDays, ChevronLeft, Languages, Loader2, Palette, Printer, RefreshCw, Route, Settings2, Type, WalletCards } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 const sections = [
