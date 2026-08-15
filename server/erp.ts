@@ -1,6 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { addOrganizationExchangeRate, adjustProductBatchQuantity, approveInventoryCount, approveStockTransfer, createBusinessParty, createInventoryCount, createOperationalNotifications, createOperationalRecord, createOrganizationForUser, createProductBatch, createProductMaster, createPurchaseOrder, createSalesInvoice, createStockTransfer, createWarehouseForOrganization, dispatchStockTransfer, getCommerceReportSummary, getDashboardMetrics, getDefaultTenantContext, getFinancialReportSummary, getOrCreateOrganizationSettings, getOrCreateUserPreferences, issueSalesInvoiceWithFefo, issueStockByFefo, listInventoryCountsForOrganization, listNotificationsForOrganization, listOperationalRecords, listOrganizationCurrencies, listOrganizationExchangeRates, listProductBatchesForOrganization, listProductsForOrganization, listPurchaseOrdersForOrganization, listSalesInvoicesForOrganization, listStockMovementsForOrganization, listStockTransfersForOrganization, listWarehousesForOrganization, markNotificationRead, previewFefoAllocation, receivePurchaseOrder, receiveStockTransfer, recordSalesInvoicePayment, recordStockMovement, saveOrganizationCurrency, sendPurchaseOrder, startInventoryCount, submitInventoryCount, updateOrganizationSettings, updateProductBatchStatus, updateUserPreferences, type OperationalModule } from "./db";
+import { createBranchForOrganization, listBranchesForOrganization } from "./db";
 import { currencyCatalog } from "../shared/currencyCatalog";
 import { invokeLLM } from "./_core/llm";
 import { notifyOwner } from "./_core/notification";
@@ -143,6 +144,20 @@ export const erpRouter = router({
     })).mutation(async ({ ctx, input }) => {
       const context = await requireOrganizationOwner(ctx.user.id);
       return addOrganizationExchangeRate(context.organization.id, ctx.user.id, input);
+    }),
+    branches: protectedProcedure.query(async ({ ctx }) => {
+      const context = await requireOrganizationOwner(ctx.user.id);
+      return listBranchesForOrganization(context.organization.id);
+    }),
+    createBranch: protectedProcedure.input(z.object({ code: z.string().trim().min(1).max(48), name: z.string().trim().min(2).max(160) })).mutation(async ({ ctx, input }) => {
+      const context = await requireOrganizationOwner(ctx.user.id);
+      try {
+        return await createBranchForOrganization(context.organization.id, input);
+      } catch (error) {
+        const code = typeof error === "object" && error && "code" in error ? (error as { code?: string }).code : undefined;
+        if (code === "ER_DUP_ENTRY") throw new TRPCError({ code: "CONFLICT", message: "BRANCH_CODE_CONFLICT" });
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "BRANCH_SAVE_FAILED" });
+      }
     }),
   }),
 

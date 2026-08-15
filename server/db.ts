@@ -2,6 +2,7 @@ import { and, asc, count, desc, eq, gte, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   auditLogs,
+  branches,
   employees,
   businessParties,
   financialTransactions,
@@ -232,6 +233,19 @@ export async function listWarehousesForOrganization(organizationId: number) {
   const db = await getDb();
   if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
   return db.select().from(warehouses).where(eq(warehouses.organizationId, organizationId)).orderBy(warehouses.name).limit(100);
+}
+
+export async function listBranchesForOrganization(organizationId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  return db.select().from(branches).where(eq(branches.organizationId, organizationId)).orderBy(branches.name).limit(100);
+}
+
+export async function createBranchForOrganization(organizationId: number, input: { code: string; name: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const result = await db.insert(branches).values({ organizationId, code: input.code, name: input.name, status: "active" });
+  return { id: Number(result[0].insertId) };
 }
 
 export async function createWarehouseForOrganization(organizationId: number, input: { code: string; name: string; isMobile?: "yes" | "no" }) {
