@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyNumeralStyle, formatOrganizationCurrency, formatOrganizationDate, formatOrganizationNumber } from "./formatting";
+import { applyNumeralStyle, formatOrganizationCurrency, formatOrganizationDate, formatOrganizationNumber, formatOrganizationTime } from "./formatting";
 import { getCurrencyCatalogEntry } from "../../../shared/currencyCatalog";
 
 describe("organization formatting", () => {
@@ -10,6 +10,14 @@ describe("organization formatting", () => {
   it("يطابق موضع رمز العملة وإعداد التاريخ المؤسسي", () => {
     expect(formatOrganizationCurrency(42, { currencyCode: "EUR", currencySymbolPosition: "before", decimalPlaces: 2, decimalSeparator: "dot", thousandsSeparator: "comma" })).toBe("€ 42.00");
     expect(formatOrganizationDate("2026-08-14T12:00:00Z", { dateFormat: "YYYY-MM-DD", timeZone: "UTC" })).toBe("2026-08-14");
+  });
+  it("يطبق تنسيق تاريخ وفواصل مؤسسة مستقلاً", () => {
+    expect(formatOrganizationDate("2026-08-14T12:00:00Z", { dateFormat: "MM/DD/YYYY", timeZone: "UTC" })).toBe("08/14/2026");
+    expect(formatOrganizationNumber(98765.4, { decimalPlaces: 2, decimalSeparator: "comma", thousandsSeparator: "dot" })).toBe("98.765,40");
+  });
+  it("يحترم صيغة الوقت والمنطقة الزمنية للمؤسسة", () => {
+    expect(formatOrganizationTime("2026-08-14T12:30:00Z", { timeFormat: "24h", timeZone: "UTC" })).toMatch(/12:30/);
+    expect(formatOrganizationTime("2026-08-14T12:30:00Z", { timeFormat: "12h", timeZone: "UTC" })).toMatch(/12:30/i);
   });
   it("يفصل شكل الأرقام العربي الهندي عن فواصل الرقم ومكان رمز العملة", () => {
     expect(applyNumeralStyle("1,250.50", "arabic_indic")).toBe("١٬٢٥٠٫٥٠");
