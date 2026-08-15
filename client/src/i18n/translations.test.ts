@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getDirection, glossary, translations } from "./translations";
+import { documentPreviewActionLabels, getDirection, glossary, translations, workspaceAssistantCopy } from "./translations";
 
 describe("i18n foundation", () => {
   it("يعرض اتجاه RTL للعربية وLTR للفرنسية والإنجليزية", () => {
@@ -47,6 +47,15 @@ describe("i18n foundation", () => {
       expect(translations[language].firstDay).toBeTruthy();
       expect(translations[language].decimalSeparator).toBeTruthy();
       expect(translations[language].thousandsSeparator).toBeTruthy();
+    });
+  });
+
+  it("يوفر مفردات مساعد مساحة العمل وإجراءات المعاينة الدقيقة بكل لغة", () => {
+    (["ar", "fr", "en"] as const).forEach(language => {
+      expect(workspaceAssistantCopy[language].assistantDescription).toBeTruthy();
+      expect(workspaceAssistantCopy[language].evaluateDescription).toBeTruthy();
+      expect(documentPreviewActionLabels[language].download).toBeTruthy();
+      expect(documentPreviewActionLabels[language].print).toBeTruthy();
     });
   });
 });
