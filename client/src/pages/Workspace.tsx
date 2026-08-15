@@ -30,7 +30,8 @@ function OperationsPanel() {
   const [title, setTitle] = useState("");
   const [reference, setReference] = useState("");
   const [amount, setAmount] = useState("");
-  const selected = operationalModules.find(item => item.key === module)!;
+  const selectedBase = operationalModules.find(item => item.key === module)!;
+  const selected = { ...selectedBase, action: t({ inventory: "createProduct", sales: "createInvoice", purchases: "createOrder", finance: "createTransaction", hr: "addEmployee" }[module] as never) };
   const records = trpc.erp.operations.list.useQuery({ module });
   const create = trpc.erp.operations.create.useMutation({
     onSuccess: result => {
