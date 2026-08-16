@@ -102,6 +102,7 @@ describe("تكامل دورة التصنيع", () => {
     expect(restrictedDetails.canViewCosts).toBe(false);
     expect(restrictedDetails.expenses).toHaveLength(0);
     expect("unitCost" in restrictedDetails.outputs[0]!).toBe(false);
+    expect(restrictedDetails.outputs[0]?.batchId).toBe(output.batchId);
     expect(close.status).toBe("closed");
   });
 });
