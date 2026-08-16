@@ -447,7 +447,7 @@ export const erpRouter = router({
     }),
     operationalOptions: protectedProcedure.query(async ({ ctx }) => {
       const context = await requireManufacturingPermission(ctx.user.id, "manufacturing.view");
-      return getManufacturingOperationalOptions(context.organization.id);
+      return getManufacturingOperationalOptions(context.organization.id, context.membership.dataScope);
     }),
     orderDetails: protectedProcedure.input(z.object({ productionOrderId: z.number().int().positive() })).query(async ({ ctx, input }) => {
       const context = await requireManufacturingOrderPermission(ctx.user.id, "manufacturing.view", input.productionOrderId);

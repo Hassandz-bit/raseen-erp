@@ -3,7 +3,7 @@ import { auditLogs, manufacturingBomItems, manufacturingBoms, organizationExchan
 import { manufacturingProductProfiles, productionExpenses, productionLines, productionOutputs, productionQualityChecks } from "../drizzle/manufacturingSchema";
 import { createProductBatch, getDb, previewFefoAllocation, recordStockMovement } from "./db";
 import { calculateUnitProductionCost, canTransitionProductionOrder, type ProductionStatus } from "./manufacturingPolicy";
-import { canAccessManufacturingOrderScope, type ManufacturingDataScope } from "./manufacturingPermissionPolicy";
+import { canAccessManufacturingOrderScope, isManufacturingScopeAllowed, type ManufacturingDataScope } from "./manufacturingPermissionPolicy";
 
 const productionNumber = () => `PO-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 
@@ -220,7 +220,7 @@ export async function getProductionOrderScope(organizationId: number, production
   return order;
 }
 
-export async function getManufacturingOperationalOptions(organizationId: number) {
+export async function getManufacturingOperationalOptions(organizationId: number, scope?: ManufacturingDataScope) {
   const db = await getDb(); if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
   const [productsList, boms, warehousesList, lines] = await Promise.all([
     db.select({ id: products.id, name: products.name, sku: products.sku, baseUnit: products.baseUnit }).from(products).where(and(eq(products.organizationId, organizationId), eq(products.status, "active"))).orderBy(products.name).limit(500),
@@ -228,7 +228,8 @@ export async function getManufacturingOperationalOptions(organizationId: number)
     db.select({ id: warehouses.id, branchId: warehouses.branchId, name: warehouses.name, code: warehouses.code }).from(warehouses).where(and(eq(warehouses.organizationId, organizationId), eq(warehouses.status, "active"))).orderBy(warehouses.name).limit(200),
     db.select({ id: productionLines.id, branchId: productionLines.branchId, name: productionLines.name, code: productionLines.code }).from(productionLines).where(and(eq(productionLines.organizationId, organizationId), eq(productionLines.status, "active"))).orderBy(productionLines.name).limit(200),
   ]);
-  return { products: productsList, boms, warehouses: warehousesList, productionLines: lines };
+  const scopedWarehouses = warehousesList.filter(warehouse => isManufacturingScopeAllowed(scope, "warehouseIds", warehouse.id) && (isManufacturingScopeAllowed(scope, "rawMaterialWarehouseIds", warehouse.id) || isManufacturingScopeAllowed(scope, "finishedGoodsWarehouseIds", warehouse.id)));
+  return { products: productsList, boms, warehouses: scopedWarehouses, productionLines: lines.filter(line => isManufacturingScopeAllowed(scope, "branchIds", line.branchId ?? undefined) && isManufacturingScopeAllowed(scope, "productionLineIds", line.id)) };
 }
 
 export async function getProductionOrderOperationalDetails(organizationId: number, productionOrderId: number, includeCosts: boolean) {

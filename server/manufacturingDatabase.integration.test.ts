@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { auditLogs, inventoryBalances, organizations, productBatches, products, stockMovements, warehouses } from "../drizzle/schema";
 import { manufacturingBomItems, manufacturingBoms, manufacturingProductProfiles, productionMaterialReservations, productionOrders, productionOutputs, productionQualityChecks, productionStages } from "../drizzle/manufacturingSchema";
 import { getDb } from "./db";
-import { closeProductionOrder, createProductionOrder, getProductionTraceability, issueMaterialsForProduction, recordProductionOutput, recordProductionQualityCheck, recordProductionWaste, reserveProductionMaterials, saveManufacturingProductProfile, transitionProductionOrderStatus } from "./manufacturing";
+import { closeProductionOrder, createProductionOrder, getProductionBatchGenealogy, getProductionTraceability, issueMaterialsForProduction, recordProductionOutput, recordProductionQualityCheck, recordProductionWaste, reserveProductionMaterials, saveManufacturingProductProfile, transitionProductionOrderStatus } from "./manufacturing";
 
 let organizationId: number | null = null;
 let auxiliaryOrganizationIds: number[] = [];
@@ -75,6 +75,8 @@ describe("تكامل دورة التصنيع", () => {
     await recordProductionQualityCheck(organizationId, 1, { productionOrderId: order.id, productionOutputId: output.outputId, checkType: "visual", result: "pass", notes: "تم اجتياز الفحص" });
     await recordProductionWaste(organizationId, 1, { productionOrderId: order.id, productionOutputId: output.outputId, defectiveQuantity: 0.25, scrapQuantity: 0.5, reworkQuantity: 0.1, reason: "اختبار تدفق الهدر" });
     const traceability = await getProductionTraceability(organizationId, order.id);
+    const rawGenealogy = await getProductionBatchGenealogy(organizationId, earlierBatchId);
+    const finishedGenealogy = await getProductionBatchGenealogy(organizationId, output.batchId);
     const close = await closeProductionOrder(organizationId, 1, order.id);
 
     const [earlierAfter] = await db.select().from(productBatches).where(and(eq(productBatches.organizationId, organizationId), eq(productBatches.id, earlierBatchId))).limit(1);
@@ -90,6 +92,8 @@ describe("تكامل دورة التصنيع", () => {
     expect(outputAfterWaste?.reworkQuantity).toBe("0.100000");
     expect(traceability.rawMaterials).toHaveLength(2);
     expect(traceability.outputs).toHaveLength(1);
+    expect(rawGenealogy.usedAsRawMaterial[0]?.outputs[0]?.batch?.id).toBe(output.batchId);
+    expect(finishedGenealogy.finishedFrom[0]?.rawMaterials.map(item => item.batch?.id)).toContain(earlierBatchId);
     expect(close.status).toBe("closed");
   });
 });
