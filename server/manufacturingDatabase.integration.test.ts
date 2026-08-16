@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { auditLogs, inventoryBalances, organizations, productBatches, products, stockMovements, warehouses } from "../drizzle/schema";
 import { manufacturingBomItems, manufacturingBoms, productionMaterialReservations, productionOrders, productionOutputs, productionStages } from "../drizzle/manufacturingSchema";
 import { getDb } from "./db";
-import { closeProductionOrder, createProductionOrder, getProductionTraceability, issueMaterialsForProduction, recordProductionOutput, reserveProductionMaterials, transitionProductionOrderStatus } from "./manufacturing";
+import { closeProductionOrder, createProductionOrder, getProductionTraceability, issueMaterialsForProduction, recordProductionOutput, recordProductionWaste, reserveProductionMaterials, transitionProductionOrderStatus } from "./manufacturing";
 
 let organizationId: number | null = null;
 
@@ -61,15 +61,20 @@ describe("تكامل دورة التصنيع", () => {
     expect(stages.map(stage => stage.code)).toEqual(["mixing"]);
     await issueMaterialsForProduction(organizationId, 1, order.id);
     const output = await recordProductionOutput(organizationId, 1, order.id, { lotNumber: `FG-${suffix}`, goodQuantity: 6 });
+    await recordProductionWaste(organizationId, 1, { productionOrderId: order.id, productionOutputId: output.outputId, defectiveQuantity: 0.25, scrapQuantity: 0.5, reworkQuantity: 0.1, reason: "اختبار تدفق الهدر" });
     const traceability = await getProductionTraceability(organizationId, order.id);
     const close = await closeProductionOrder(organizationId, 1, order.id);
 
     const [earlierAfter] = await db.select().from(productBatches).where(and(eq(productBatches.organizationId, organizationId), eq(productBatches.id, earlierBatchId))).limit(1);
     const [laterAfter] = await db.select().from(productBatches).where(and(eq(productBatches.organizationId, organizationId), eq(productBatches.id, laterBatchId))).limit(1);
     const [finishedBatch] = await db.select().from(productBatches).where(and(eq(productBatches.organizationId, organizationId), eq(productBatches.id, output.batchId))).limit(1);
+    const [outputAfterWaste] = await db.select().from(productionOutputs).where(and(eq(productionOutputs.organizationId, organizationId), eq(productionOutputs.id, output.outputId))).limit(1);
     expect(earlierAfter?.currentQuantity).toBe("0.000");
     expect(laterAfter?.currentQuantity).toBe("0.000");
     expect(finishedBatch?.status).toBe("active");
+    expect(outputAfterWaste?.defectiveQuantity).toBe("0.250000");
+    expect(outputAfterWaste?.scrapQuantity).toBe("0.500000");
+    expect(outputAfterWaste?.reworkQuantity).toBe("0.100000");
     expect(traceability.rawMaterials).toHaveLength(2);
     expect(traceability.outputs).toHaveLength(1);
     expect(close.status).toBe("closed");

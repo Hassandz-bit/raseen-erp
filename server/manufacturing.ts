@@ -150,6 +150,21 @@ export async function recordProductionQualityCheck(organizationId: number, actor
   return { productionOutputId: input.productionOutputId, batchId: output.batchId, result: input.result };
 }
 
+export async function recordProductionWaste(organizationId: number, actorUserId: number, input: { productionOrderId: number; productionOutputId: number; defectiveQuantity?: number; reworkQuantity?: number; scrapQuantity?: number; reason?: string }) {
+  const db = await getDb(); if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const defectiveQuantity = input.defectiveQuantity ?? 0;
+  const reworkQuantity = input.reworkQuantity ?? 0;
+  const scrapQuantity = input.scrapQuantity ?? 0;
+  if (![defectiveQuantity, reworkQuantity, scrapQuantity].every(value => Number.isFinite(value) && value >= 0) || defectiveQuantity + reworkQuantity + scrapQuantity <= 0) throw new Error("أدخل كمية موجبة واحدة على الأقل للهدر أو التالف أو إعادة التشغيل.");
+  const [output] = await db.select().from(productionOutputs).where(and(eq(productionOutputs.id, input.productionOutputId), eq(productionOutputs.organizationId, organizationId), eq(productionOutputs.productionOrderId, input.productionOrderId))).limit(1);
+  if (!output) throw new Error("مخرج الإنتاج خارج نطاق أمر الإنتاج أو المؤسسة.");
+  await db.transaction(async tx => {
+    await tx.update(productionOutputs).set({ defectiveQuantity: sql`${productionOutputs.defectiveQuantity} + ${defectiveQuantity}`, reworkQuantity: sql`${productionOutputs.reworkQuantity} + ${reworkQuantity}`, scrapQuantity: sql`${productionOutputs.scrapQuantity} + ${scrapQuantity}` }).where(and(eq(productionOutputs.id, input.productionOutputId), eq(productionOutputs.organizationId, organizationId)));
+    await tx.insert(auditLogs).values({ organizationId, actorUserId, action: "manufacturing.waste_recorded", entityType: "production_output", entityId: String(input.productionOutputId), metadata: { productionOrderId: input.productionOrderId, defectiveQuantity, reworkQuantity, scrapQuantity, reason: input.reason?.trim() } });
+  });
+  return { productionOutputId: input.productionOutputId, defectiveQuantity, reworkQuantity, scrapQuantity };
+}
+
 export async function getProductionTraceability(organizationId: number, productionOrderId: number) {
   const db = await getDb(); if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
   const [order] = await db.select().from(productionOrders).where(and(eq(productionOrders.id, productionOrderId), eq(productionOrders.organizationId, organizationId))).limit(1);
