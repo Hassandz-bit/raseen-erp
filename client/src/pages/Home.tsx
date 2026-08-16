@@ -62,17 +62,17 @@ const inventoryData = [
 ];
 
 const products = [
-  { name: "قهوة عربية محمصة", sku: "NWA-CA-001", stock: 1240, statusKey: "available", tone: "green" },
-  { name: "عبوة مياه 330 مل", sku: "NWA-WT-032", stock: 320, statusKey: "lowStock", tone: "amber" },
-  { name: "سكر أبيض فاخر", sku: "NWA-SG-117", stock: 75, statusKey: "criticalStock", tone: "red" },
-  { name: "كرتون تعبئة متوسط", sku: "NWA-PK-204", stock: 920, statusKey: "available", tone: "green" },
+  { name: "", sku: "NWA-CA-001", stock: 1240, statusKey: "available", tone: "green" },
+  { name: "", sku: "NWA-WT-032", stock: 320, statusKey: "lowStock", tone: "amber" },
+  { name: "", sku: "NWA-SG-117", stock: 75, statusKey: "criticalStock", tone: "red" },
+  { name: "", sku: "NWA-PK-204", stock: 920, statusKey: "available", tone: "green" },
 ];
 
 const invoices = [
-  { no: "INV-24081", customer: "أسواق الندى", value: 18450, statusKey: "paid", tone: "green" },
-  { no: "INV-24080", customer: "شركة الاتجاه", value: 12880, statusKey: "collecting", tone: "amber" },
-  { no: "INV-24079", customer: "مؤسسة الربيع", value: 8720, statusKey: "overdue", tone: "red" },
-  { no: "INV-24078", customer: "متاجر أجيال", value: 21340, statusKey: "paid", tone: "green" },
+  { no: "INV-24081", customer: "", value: 18450, statusKey: "paid", tone: "green" },
+  { no: "INV-24080", customer: "", value: 12880, statusKey: "collecting", tone: "amber" },
+  { no: "INV-24079", customer: "", value: 8720, statusKey: "overdue", tone: "red" },
+  { no: "INV-24078", customer: "", value: 21340, statusKey: "paid", tone: "green" },
 ];
 
 const sectionIcons: Record<Exclude<SectionKey, "dashboard">, typeof Package> = {
@@ -235,7 +235,7 @@ export default function Home() {
         <div className="mt-8 px-2"><p className="text-[10px] font-semibold tracking-[.18em] text-[#777f90]">{chromeCopy.mainNavigation}</p></div>
         <nav className="mt-3 flex-1 space-y-1 overflow-y-auto thin-scrollbar">{navItems.map(item => { const Icon = item.icon; const active = item.key === section; return <button key={item.key} onClick={() => changeSection(item.key)} className={cn("group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm transition-all", active ? "bg-primary text-primary-foreground shadow-[0_12px_22px_rgba(217,180,107,.12)]" : "text-[#afb7c4] hover:bg-white/[.045] hover:text-white")}><Icon className={cn("h-[18px] w-[18px]", active ? "" : "text-[#7e899b] group-hover:text-primary")} /><span className="flex-1 text-right font-medium">{t(item.label as never)}</span>{item.module === "reports" && <span className={cn("rounded-md px-1.5 py-0.5 text-[9px]", active ? "bg-black/10" : "bg-primary/10 text-primary")}>{chromeCopy.newBadge}</span>}</button>})}</nav>
         <div className="mt-4 rounded-2xl border border-primary/15 bg-gradient-to-br from-primary/[.12] to-primary/[.025] p-4"><div className="flex items-center gap-2 text-primary"><Zap className="h-4 w-4" /><p className="text-xs font-bold">{chromeCopy.assistantTitle}</p></div><p className="mt-2 text-[11px] leading-6 text-[#b4b9c4]">{chromeCopy.assistantDescription}</p><button onClick={() => setAssistantOpen(true)} className="mt-3 text-xs font-semibold text-[#e8c87f] hover:text-[#f5dc9e]">{chromeCopy.startConversation} ←</button></div>
-        <div className="mt-4 flex items-center gap-3 rounded-2xl border border-white/[.07] bg-white/[.025] p-3"><Avatar className="h-9 w-9 border border-primary/20"><AvatarFallback className="bg-primary/10 text-xs text-primary">ن</AvatarFallback></Avatar><div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold text-white">{chromeCopy.teamName}</p><p className="mt-1 text-[10px] text-muted-foreground">{chromeCopy.organizationManager}</p></div><MoreHorizontal className="h-4 w-4 text-muted-foreground" /></div>
+        <div className="mt-4 flex items-center gap-3 rounded-2xl border border-white/[.07] bg-white/[.025] p-3"><Avatar className="h-9 w-9 border border-primary/20"><AvatarFallback className="bg-primary/10 text-xs text-primary">{chromeCopy.teamName.slice(0, 1)}</AvatarFallback></Avatar><div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold text-white">{chromeCopy.teamName}</p><p className="mt-1 text-[10px] text-muted-foreground">{chromeCopy.organizationManager}</p></div><MoreHorizontal className="h-4 w-4 text-muted-foreground" /></div>
       </aside>
 
       {isSidebarOpen && <button className="fixed inset-0 z-30 bg-black/45 lg:hidden" onClick={() => setSidebarOpen(false)} aria-label={chromeCopy.closeMenu} />}
