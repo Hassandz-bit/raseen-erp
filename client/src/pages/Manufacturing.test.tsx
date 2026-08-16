@@ -12,7 +12,7 @@ vi.mock("@/lib/trpc", () => {
   return { trpc: { erp: { manufacturing: {
     overview: { useQuery: () => ({ data: { planned: 3, inProduction: 1, completed: 2, closed: 0, materialShortages: 0, qualityHold: 0, goodOutputQuantity: 48, wasteQuantity: 2, averageUnitCost: 15.5 }, isLoading: false, isError: false, refetch: refreshOverview }) },
     orders: { useQuery: () => ({ data: [], isLoading: false, isError: false, refetch: refreshOrders }) },
-    capabilities: { useQuery: () => ({ data: { capabilities: { "manufacturing.order.plan": true, "manufacturing.order.approve": true } } }) },
+    capabilities: { useQuery: () => ({ data: { capabilities: { "manufacturing.order.plan": true, "manufacturing.order.approve": true, "manufacturing.order.create": true, "manufacturing.reports.export": true } } }) },
     operationalOptions: { useQuery: () => ({ data: { boms: [], warehouses: [], productionLines: [] } }) },
     orderDetails: { useQuery: () => ({ data: undefined, isLoading: false, refetch: vi.fn() }) },
     batchGenealogy: { useQuery: () => ({ data: undefined, isError: false }) },
@@ -26,6 +26,7 @@ describe("Manufacturing UI", () => {
   it("يعرض المؤشرات المعزولة وحالة الفراغ ويعيد تحديث بيانات المركز", () => {
     render(<Manufacturing />);
     expect(screen.getByText("مركز التصنيع والإنتاج")).toBeTruthy();
+    expect(screen.getByText("أمر إنتاج جديد")).toBeTruthy();
     expect(screen.getByText("3")).toBeTruthy();
     expect(screen.getByText("لا توجد أوامر إنتاج بعد. أنشئ BOM معتمد ثم ابدأ التخطيط.")).toBeTruthy();
     fireEvent.click(screen.getByText("تحديث المركز"));

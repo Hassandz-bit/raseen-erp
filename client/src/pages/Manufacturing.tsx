@@ -23,6 +23,9 @@ export default function Manufacturing() {
   const [createOpen, setCreateOpen] = useState(false);
   const overview = trpc.erp.manufacturing.overview.useQuery();
   const orders = trpc.erp.manufacturing.orders.useQuery();
+  const capabilities = trpc.erp.manufacturing.capabilities.useQuery();
+  const canCreateOrder = Boolean(capabilities.data?.capabilities["manufacturing.order.create"]);
+  const canExportReports = Boolean(capabilities.data?.capabilities["manufacturing.reports.export"]);
   const refresh = () => { void overview.refetch(); void orders.refetch(); };
   const isLoading = overview.isLoading || orders.isLoading;
   const metrics = [
@@ -51,7 +54,7 @@ export default function Manufacturing() {
       <div className="absolute -top-16 -end-12 h-48 w-48 rounded-full bg-primary/10 blur-3xl" />
       <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div className="max-w-2xl space-y-2"><div className="flex items-center gap-2 text-primary"><Factory className="h-5 w-5" /><span className="text-sm font-medium">Nawa ERP</span></div><h1 className="text-2xl font-bold tracking-tight md:text-3xl">{copy.title}</h1><p className="text-sm leading-6 text-muted-foreground">{copy.description}</p></div>
-        <div className="flex flex-wrap gap-2 self-start lg:self-auto"><Button onClick={() => setCreateOpen(true)} className="gap-2"><Plus className="h-4 w-4" />{language === "ar" ? "أمر إنتاج جديد" : language === "fr" ? "Nouvel ordre" : "New order"}</Button><Button variant="outline" onClick={exportExcel} disabled={isLoading} className="gap-2"><Download className="h-4 w-4" />{t("exportSpreadsheet")}</Button><Button variant="outline" onClick={exportPdf} disabled={isLoading} className="gap-2"><FileText className="h-4 w-4" />{t("downloadPdf")}</Button><Button onClick={refresh} disabled={isLoading} className="gap-2"><RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin motion-reduce:animate-none" : ""}`} />{copy.refresh}</Button></div>
+        <div className="flex flex-wrap gap-2 self-start lg:self-auto">{canCreateOrder ? <Button onClick={() => setCreateOpen(true)} className="gap-2"><Plus className="h-4 w-4" />{language === "ar" ? "أمر إنتاج جديد" : language === "fr" ? "Nouvel ordre" : "New order"}</Button> : null}{canExportReports ? <><Button variant="outline" onClick={exportExcel} disabled={isLoading} className="gap-2"><Download className="h-4 w-4" />{t("exportSpreadsheet")}</Button><Button variant="outline" onClick={exportPdf} disabled={isLoading} className="gap-2"><FileText className="h-4 w-4" />{t("downloadPdf")}</Button></> : null}<Button onClick={refresh} disabled={isLoading} className="gap-2"><RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin motion-reduce:animate-none" : ""}`} />{copy.refresh}</Button></div>
       </div>
     </section>
 
