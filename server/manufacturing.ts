@@ -1,6 +1,6 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { auditLogs, manufacturingBomItems, manufacturingBoms, organizationExchangeRates, organizations, productBatches, productionMaterialReservations, productionOrders, productionStages, products, warehouses } from "../drizzle/schema";
-import { manufacturingProductProfiles, productionExpenses, productionOutputs, productionQualityChecks } from "../drizzle/manufacturingSchema";
+import { manufacturingProductProfiles, productionExpenses, productionLines, productionOutputs, productionQualityChecks } from "../drizzle/manufacturingSchema";
 import { createProductBatch, getDb, previewFefoAllocation, recordStockMovement } from "./db";
 import { calculateUnitProductionCost, canTransitionProductionOrder, type ProductionStatus } from "./manufacturingPolicy";
 
@@ -20,18 +20,22 @@ export async function createManufacturingBom(organizationId: number, actorUserId
   });
 }
 
-export async function createProductionOrder(organizationId: number, actorUserId: number, input: { bomId: number; plannedQuantity: number; plannedUnit: string; baseQuantity: number; rawMaterialWarehouseId: number; finishedGoodsWarehouseId: number; branchId?: number; responsibleUserId?: number }) {
+export async function createProductionOrder(organizationId: number, actorUserId: number, input: { bomId: number; plannedQuantity: number; plannedUnit: string; baseQuantity: number; rawMaterialWarehouseId: number; finishedGoodsWarehouseId: number; branchId?: number; productionLineId?: number; responsibleUserId?: number }) {
   const db = await getDb(); if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
   if (input.plannedQuantity <= 0 || input.baseQuantity <= 0) throw new Error("كمية الإنتاج يجب أن تكون أكبر من صفر.");
   const [bom] = await db.select().from(manufacturingBoms).where(and(eq(manufacturingBoms.id, input.bomId), eq(manufacturingBoms.organizationId, organizationId), eq(manufacturingBoms.status, "active"))).limit(1);
   const activeWarehouses = await db.select({ id: warehouses.id }).from(warehouses).where(and(eq(warehouses.organizationId, organizationId), inArray(warehouses.id, [input.rawMaterialWarehouseId, input.finishedGoodsWarehouseId]), eq(warehouses.status, "active")));
   if (!bom || activeWarehouses.length !== 2) throw new Error("BOM أو مخازن الإنتاج غير متاحة ضمن المؤسسة.");
-  const inserted = await db.insert(productionOrders).values({ organizationId, branchId: input.branchId, orderNumber: productionNumber(), productId: bom.productId, bomId: bom.id, bomVersion: bom.version, plannedQuantity: String(input.plannedQuantity), plannedUnit: input.plannedUnit, baseQuantity: String(input.baseQuantity), rawMaterialWarehouseId: input.rawMaterialWarehouseId, finishedGoodsWarehouseId: input.finishedGoodsWarehouseId, responsibleUserId: input.responsibleUserId, createdByUserId: actorUserId });
+  if (input.productionLineId) {
+    const [line] = await db.select({ id: productionLines.id, branchId: productionLines.branchId }).from(productionLines).where(and(eq(productionLines.id, input.productionLineId), eq(productionLines.organizationId, organizationId), eq(productionLines.status, "active"))).limit(1);
+    if (!line || (input.branchId && line.branchId && line.branchId !== input.branchId)) throw new Error("خط الإنتاج غير نشط أو لا يتبع فرع الأمر المحدد.");
+  }
+  const inserted = await db.insert(productionOrders).values({ organizationId, branchId: input.branchId, productionLineId: input.productionLineId, orderNumber: productionNumber(), productId: bom.productId, bomId: bom.id, bomVersion: bom.version, plannedQuantity: String(input.plannedQuantity), plannedUnit: input.plannedUnit, baseQuantity: String(input.baseQuantity), rawMaterialWarehouseId: input.rawMaterialWarehouseId, finishedGoodsWarehouseId: input.finishedGoodsWarehouseId, responsibleUserId: input.responsibleUserId, createdByUserId: actorUserId });
   const productionOrderId = Number(inserted[0].insertId);
   const bomItems = await db.select({ stageCode: manufacturingBomItems.stageCode }).from(manufacturingBomItems).where(and(eq(manufacturingBomItems.organizationId, organizationId), eq(manufacturingBomItems.bomId, bom.id)));
   const stageCodes = Array.from(new Set(bomItems.flatMap(item => item.stageCode ? [item.stageCode] : [])));
   if (stageCodes.length) await db.insert(productionStages).values(stageCodes.map((code, index) => ({ organizationId, productionOrderId, sequence: index + 1, code, name: code, responsibleUserId: input.responsibleUserId })));
-  await db.insert(auditLogs).values({ organizationId, actorUserId, action: "manufacturing.order_created", entityType: "production_order", entityId: String(productionOrderId), metadata: { bomId: bom.id } });
+  await db.insert(auditLogs).values({ organizationId, actorUserId, action: "manufacturing.order_created", entityType: "production_order", entityId: String(productionOrderId), metadata: { bomId: bom.id, productionLineId: input.productionLineId } });
   return { id: productionOrderId };
 }
 
@@ -185,6 +189,12 @@ export async function getProductionTraceability(organizationId: number, producti
 export async function listProductionOrders(organizationId: number) {
   const db = await getDb(); if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
   return db.select().from(productionOrders).where(eq(productionOrders.organizationId, organizationId)).orderBy(desc(productionOrders.updatedAt), desc(productionOrders.id)).limit(100);
+}
+
+export async function getProductionOrderScope(organizationId: number, productionOrderId: number) {
+  const db = await getDb(); if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const [order] = await db.select({ id: productionOrders.id, branchId: productionOrders.branchId, productionLineId: productionOrders.productionLineId, rawMaterialWarehouseId: productionOrders.rawMaterialWarehouseId, finishedGoodsWarehouseId: productionOrders.finishedGoodsWarehouseId }).from(productionOrders).where(and(eq(productionOrders.organizationId, organizationId), eq(productionOrders.id, productionOrderId))).limit(1);
+  return order;
 }
 
 export async function getManufacturingOverview(organizationId: number) {

@@ -148,6 +148,13 @@
       "when": 1786906189323,
       "tag": "0020_perfect_the_renegades",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "5",
+      "when": 1786908397515,
+      "tag": "0021_giant_silver_samurai",
+      "breakpoints": true
     }
   ]
 }

@@ -13,7 +13,8 @@ import { canUseDistributionPermission, isScopedIdAllowed, type DistributionPermi
 import { addDistributionRouteExpense, completeDriverStop, createDistributionRoute, createDistributionTerritory, createDriverVanSale, createFleetVehicle, createMaintenanceRecord, createVehicleDocument, createVehicleLoadOrder, getDistributionControlCenter, getDistributionOwnerAlertReasons, getDistributionSettings, getDriverRouteFeed, getDriverRouteInventory, getLatestFleetLocations, listDistributionRoutes, listDistributionTerritories, listFleetVehicles, listVehicleInventory, logFuel, recordDistributionCollection, recordDistributionDelivery, recordDistributionReturn, recordFleetGpsPoint, recordGeofenceEvent, returnVehicleStockToWarehouse, saveDistributionSettings, submitDistributionDeliveryProof, submitRouteClosing, transitionDistributionRoute, transitionRouteClosing, transitionVehicleLoadOrder } from "./distribution";
 import { cancelRetailerOrder, createB2bPromotion, createRetailerOrder, getRetailerCatalog, grantRetailerAccess, listManagedRetailerAccesses, listOrganizationB2bOrders, listRetailerAccesses, listRetailerDocuments, listRetailerOrders, reorderRetailerOrder, reviewAndConvertRetailerOrder, updateRetailerAccessStatus } from "./b2b";
 import { calculatePackagingLogistics, findSuitableVehicles, listProductPackaging, listUomCatalog } from "./uomPackaging";
-import { closeProductionOrder, createManufacturingBom, createProductionOrder, getManufacturingOverview, getProductionTraceability, issueMaterialsForProduction, listProductionOrders, recordProductionExpense, recordProductionOutput, recordProductionQualityCheck, recordProductionWaste, reserveProductionMaterials, returnMaterialsFromProduction, saveManufacturingProductProfile, transitionProductionOrderStatus } from "./manufacturing";
+import { closeProductionOrder, createManufacturingBom, createProductionOrder, getManufacturingOverview, getProductionOrderScope, getProductionTraceability, issueMaterialsForProduction, listProductionOrders, recordProductionExpense, recordProductionOutput, recordProductionQualityCheck, recordProductionWaste, reserveProductionMaterials, returnMaterialsFromProduction, saveManufacturingProductProfile, transitionProductionOrderStatus } from "./manufacturing";
+import { canAccessManufacturingOrderScope, canUseManufacturingPermission, isManufacturingScopeAllowed, type ManufacturingPermission } from "./manufacturingPermissionPolicy";
 
 type ModuleKey = "inventory" | "sales" | "purchases" | "finance" | "hr" | "reports" | "ai_assistant" | "distribution" | "manufacturing";
 const operationalModuleKeys = ["inventory", "sales", "purchases", "finance", "hr"] as const;
@@ -51,6 +52,26 @@ export async function requireManufacturingOwner(userId: number) {
   if (!isOrganizationOwner(context.membership.roleKey)) {
     throw new TRPCError({ code: "FORBIDDEN", message: "يلزم دور مالك المؤسسة وإتاحة وحدة التصنيع للوصول إلى عمليات الإنتاج." });
   }
+  return context;
+}
+
+export async function requireManufacturingPermission(userId: number, permission: ManufacturingPermission) {
+  const context = await requireModule(userId, "manufacturing");
+  const permissions = await getOrganizationRolePermissions(context.organization.id, context.membership.roleKey);
+  if (!canUseManufacturingPermission(context.membership.roleKey, permissions, permission)) throw new TRPCError({ code: "FORBIDDEN", message: "لا تملك صلاحية التصنيع المطلوبة لهذه العملية." });
+  return context;
+}
+
+function assertManufacturingScope(context: Awaited<ReturnType<typeof getTenantContext>>, input: { branchId?: number; productionLineId?: number; rawMaterialWarehouseId?: number; finishedGoodsWarehouseId?: number }) {
+  const scope = context.membership.dataScope;
+  if (!isManufacturingScopeAllowed(scope, "branchIds", input.branchId) || !isManufacturingScopeAllowed(scope, "productionLineIds", input.productionLineId) || !isManufacturingScopeAllowed(scope, "warehouseIds", input.rawMaterialWarehouseId) || !isManufacturingScopeAllowed(scope, "warehouseIds", input.finishedGoodsWarehouseId) || !isManufacturingScopeAllowed(scope, "rawMaterialWarehouseIds", input.rawMaterialWarehouseId) || !isManufacturingScopeAllowed(scope, "finishedGoodsWarehouseIds", input.finishedGoodsWarehouseId)) throw new TRPCError({ code: "FORBIDDEN", message: "أمر الإنتاج خارج نطاق الفرع أو الخط أو المخازن المسموح لعضويتك." });
+}
+
+async function requireManufacturingOrderPermission(userId: number, permission: ManufacturingPermission, productionOrderId: number) {
+  const context = await requireManufacturingPermission(userId, permission);
+  const order = await getProductionOrderScope(context.organization.id, productionOrderId);
+  if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "أمر الإنتاج غير موجود ضمن المؤسسة الحالية." });
+  if (!canAccessManufacturingOrderScope(context.membership.dataScope, order)) throw new TRPCError({ code: "FORBIDDEN", message: "أمر الإنتاج خارج نطاق بيانات عضويتك." });
   return context;
 }
 
@@ -411,63 +432,68 @@ export const erpRouter = router({
   }),
   manufacturing: router({
     overview: protectedProcedure.query(async ({ ctx }) => {
-      const context = await requireManufacturingOwner(ctx.user.id);
+      const context = await requireManufacturingPermission(ctx.user.id, "manufacturing.view");
       return getManufacturingOverview(context.organization.id);
     }),
     orders: protectedProcedure.query(async ({ ctx }) => {
-      const context = await requireManufacturingOwner(ctx.user.id);
+      const context = await requireManufacturingPermission(ctx.user.id, "manufacturing.view");
       return listProductionOrders(context.organization.id);
     }),
     saveProductProfile: protectedProcedure.input(z.object({ productId: z.number().int().positive(), manufacturingType: z.enum(["raw_material", "packaging_material", "semi_finished", "finished_good", "consumable", "by_product"]), requiresQualityCheck: z.enum(["yes", "no"]).optional(), defaultShelfLifeDays: z.number().int().nonnegative().optional() })).mutation(async ({ ctx, input }) => {
-      const context = await requireManufacturingOwner(ctx.user.id);
+      const context = await requireManufacturingPermission(ctx.user.id, "manufacturing.bom.edit");
       return saveManufacturingProductProfile(context.organization.id, ctx.user.id, input);
     }),
     createBom: protectedProcedure.input(z.object({ code: z.string().trim().min(2).max(64), version: z.string().trim().min(1).max(32), productId: z.number().int().positive(), outputQuantity: z.number().positive(), outputUnit: z.string().trim().min(1).max(32), notes: z.string().trim().max(2000).optional(), items: z.array(z.object({ componentProductId: z.number().int().positive(), quantity: z.number().positive(), unit: z.string().trim().min(1).max(32), baseQuantity: z.number().positive(), wasteAllowance: z.number().min(0).max(100).optional(), stageCode: z.string().trim().max(64).optional(), required: z.enum(["yes", "no"]).optional() })).min(1).max(200) })).mutation(async ({ ctx, input }) => {
-      const context = await requireManufacturingOwner(ctx.user.id);
+      const context = await requireManufacturingPermission(ctx.user.id, "manufacturing.bom.create");
       return createManufacturingBom(context.organization.id, ctx.user.id, input);
     }),
-    createOrder: protectedProcedure.input(z.object({ bomId: z.number().int().positive(), plannedQuantity: z.number().positive(), plannedUnit: z.string().trim().min(1).max(32), baseQuantity: z.number().positive(), rawMaterialWarehouseId: z.number().int().positive(), finishedGoodsWarehouseId: z.number().int().positive(), branchId: z.number().int().positive().optional(), responsibleUserId: z.number().int().positive().optional() })).mutation(async ({ ctx, input }) => {
-      const context = await requireManufacturingOwner(ctx.user.id);
+    createOrder: protectedProcedure.input(z.object({ bomId: z.number().int().positive(), plannedQuantity: z.number().positive(), plannedUnit: z.string().trim().min(1).max(32), baseQuantity: z.number().positive(), rawMaterialWarehouseId: z.number().int().positive(), finishedGoodsWarehouseId: z.number().int().positive(), branchId: z.number().int().positive().optional(), productionLineId: z.number().int().positive().optional(), responsibleUserId: z.number().int().positive().optional() })).mutation(async ({ ctx, input }) => {
+      const context = await requireManufacturingPermission(ctx.user.id, "manufacturing.order.create");
+      assertManufacturingScope(context, input);
       return createProductionOrder(context.organization.id, ctx.user.id, input);
     }),
     reserveMaterials: protectedProcedure.input(z.object({ productionOrderId: z.number().int().positive(), overrideReason: z.string().trim().min(3).max(1000).optional() })).mutation(async ({ ctx, input }) => {
-      const context = await requireManufacturingOwner(ctx.user.id);
+      const context = await requireManufacturingOrderPermission(ctx.user.id, "manufacturing.materials.reserve", input.productionOrderId);
       return reserveProductionMaterials(context.organization.id, ctx.user.id, input.productionOrderId, input.overrideReason);
     }),
     issueMaterials: protectedProcedure.input(z.object({ productionOrderId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
-      const context = await requireManufacturingOwner(ctx.user.id);
+      const context = await requireManufacturingOrderPermission(ctx.user.id, "manufacturing.materials.issue", input.productionOrderId);
       return issueMaterialsForProduction(context.organization.id, ctx.user.id, input.productionOrderId);
     }),
     returnMaterials: protectedProcedure.input(z.object({ productionOrderId: z.number().int().positive(), items: z.array(z.object({ reservationId: z.number().int().positive(), quantity: z.number().positive() })).min(1).max(200) })).mutation(async ({ ctx, input }) => {
-      const context = await requireManufacturingOwner(ctx.user.id);
+      const context = await requireManufacturingOrderPermission(ctx.user.id, "manufacturing.materials.return", input.productionOrderId);
       return returnMaterialsFromProduction(context.organization.id, ctx.user.id, input.productionOrderId, input.items);
     }),
     recordOutput: protectedProcedure.input(z.object({ productionOrderId: z.number().int().positive(), lotNumber: z.string().trim().min(2).max(96), goodQuantity: z.number().positive(), defectiveQuantity: z.number().nonnegative().optional(), reworkQuantity: z.number().nonnegative().optional(), scrapQuantity: z.number().nonnegative().optional(), manufacturingDate: z.coerce.date().optional(), expiryDate: z.coerce.date().optional() })).mutation(async ({ ctx, input }) => {
-      const context = await requireManufacturingOwner(ctx.user.id);
+      const context = await requireManufacturingOrderPermission(ctx.user.id, "manufacturing.output.record", input.productionOrderId);
       return recordProductionOutput(context.organization.id, ctx.user.id, input.productionOrderId, input);
     }),
     qualityCheck: protectedProcedure.input(z.object({ productionOrderId: z.number().int().positive(), productionOutputId: z.number().int().positive(), checkType: z.string().trim().min(2).max(120), result: z.enum(["pass", "fail"]), numericValue: z.number().finite().optional(), notes: z.string().trim().max(2000).optional(), checkedAt: z.coerce.date().optional() })).mutation(async ({ ctx, input }) => {
-      const context = await requireManufacturingOwner(ctx.user.id);
+      const context = await requireManufacturingOrderPermission(ctx.user.id, input.result === "pass" ? "manufacturing.quality.approve" : "manufacturing.quality.inspect", input.productionOrderId);
+      if (input.result === "pass") await requireManufacturingOrderPermission(ctx.user.id, "manufacturing.batch.release", input.productionOrderId);
       return recordProductionQualityCheck(context.organization.id, ctx.user.id, input);
     }),
     recordWaste: protectedProcedure.input(z.object({ productionOrderId: z.number().int().positive(), productionOutputId: z.number().int().positive(), defectiveQuantity: z.number().nonnegative().optional(), reworkQuantity: z.number().nonnegative().optional(), scrapQuantity: z.number().nonnegative().optional(), reason: z.string().trim().max(1000).optional() })).mutation(async ({ ctx, input }) => {
-      const context = await requireManufacturingOwner(ctx.user.id);
+      const context = await requireManufacturingOrderPermission(ctx.user.id, "manufacturing.waste.record", input.productionOrderId);
+      if ((input.scrapQuantity ?? 0) > 0) await requireManufacturingOrderPermission(ctx.user.id, "manufacturing.scrap.record", input.productionOrderId);
+      if ((input.reworkQuantity ?? 0) > 0) await requireManufacturingOrderPermission(ctx.user.id, "manufacturing.rework.record", input.productionOrderId);
       return recordProductionWaste(context.organization.id, ctx.user.id, input);
     }),
     recordExpense: protectedProcedure.input(z.object({ productionOrderId: z.number().int().positive(), category: z.enum(["labor", "energy", "cleaning", "setup", "other"]), amount: z.number().positive(), currencyCode: z.string().trim().length(3), notes: z.string().trim().max(2000).optional() })).mutation(async ({ ctx, input }) => {
-      const context = await requireManufacturingOwner(ctx.user.id);
+      const context = await requireManufacturingOrderPermission(ctx.user.id, "manufacturing.costs.edit", input.productionOrderId);
       return recordProductionExpense(context.organization.id, ctx.user.id, input);
     }),
     closeOrder: protectedProcedure.input(z.object({ productionOrderId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
-      const context = await requireManufacturingOwner(ctx.user.id);
+      const context = await requireManufacturingOrderPermission(ctx.user.id, "manufacturing.order.close", input.productionOrderId);
       return closeProductionOrder(context.organization.id, ctx.user.id, input.productionOrderId);
     }),
     traceability: protectedProcedure.input(z.object({ productionOrderId: z.number().int().positive() })).query(async ({ ctx, input }) => {
-      const context = await requireManufacturingOwner(ctx.user.id);
+      const context = await requireManufacturingOrderPermission(ctx.user.id, "manufacturing.view", input.productionOrderId);
       return getProductionTraceability(context.organization.id, input.productionOrderId);
     }),
     transitionOrder: protectedProcedure.input(z.object({ productionOrderId: z.number().int().positive(), nextStatus: z.enum(["planned", "approved", "in_production", "quality_hold", "completed", "closed", "cancelled"]) })).mutation(async ({ ctx, input }) => {
-      const context = await requireManufacturingOwner(ctx.user.id);
+      const permissionByStatus = { planned: "manufacturing.order.plan", approved: "manufacturing.order.approve", in_production: "manufacturing.order.start", quality_hold: "manufacturing.quality.inspect", completed: "manufacturing.order.complete", closed: "manufacturing.order.close", cancelled: "manufacturing.order.plan" } as const;
+      const context = await requireManufacturingOrderPermission(ctx.user.id, permissionByStatus[input.nextStatus], input.productionOrderId);
       return transitionProductionOrderStatus(context.organization.id, ctx.user.id, input.productionOrderId, input.nextStatus);
     }),
   }),
