@@ -1,5 +1,5 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
-import { auditLogs, manufacturingBomItems, manufacturingBoms, productBatches, productionMaterialReservations, productionOrders, productionStages, products, warehouses } from "../drizzle/schema";
+import { auditLogs, manufacturingBomItems, manufacturingBoms, organizationExchangeRates, organizations, productBatches, productionMaterialReservations, productionOrders, productionStages, products, warehouses } from "../drizzle/schema";
 import { manufacturingProductProfiles, productionExpenses, productionOutputs, productionQualityChecks } from "../drizzle/manufacturingSchema";
 import { createProductBatch, getDb, previewFefoAllocation, recordStockMovement } from "./db";
 import { calculateUnitProductionCost, canTransitionProductionOrder, type ProductionStatus } from "./manufacturingPolicy";
@@ -179,6 +179,52 @@ export async function getManufacturingOverview(organizationId: number) {
   ]);
   const countByStatus = Object.fromEntries(orders.map(row => [row.status, Number(row.value)]));
   return { planned: (countByStatus.planned ?? 0) + (countByStatus.approved ?? 0) + (countByStatus.materials_reserved ?? 0), inProduction: countByStatus.in_production ?? 0, completed: countByStatus.completed ?? 0, closed: countByStatus.closed ?? 0, materialShortages: Number(shortages[0]?.value ?? 0), qualityHold: Number(qualityHolds[0]?.value ?? 0), goodOutputQuantity: Number(outputs[0]?.goodQuantity ?? 0), wasteQuantity: Number(outputs[0]?.wasteQuantity ?? 0), averageUnitCost: Number(outputs[0]?.averageUnitCost ?? 0) };
+}
+
+export async function saveManufacturingProductProfile(organizationId: number, actorUserId: number, input: { productId: number; manufacturingType: "raw_material" | "packaging_material" | "semi_finished" | "finished_good" | "consumable" | "by_product"; requiresQualityCheck?: "yes" | "no"; defaultShelfLifeDays?: number }) {
+  const db = await getDb(); if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  if (input.defaultShelfLifeDays !== undefined && (input.defaultShelfLifeDays < 0 || !Number.isInteger(input.defaultShelfLifeDays))) throw new Error("مدة الصلاحية الافتراضية يجب أن تكون عدداً صحيحاً غير سالب.");
+  const [product] = await db.select({ id: products.id }).from(products).where(and(eq(products.id, input.productId), eq(products.organizationId, organizationId))).limit(1);
+  if (!product) throw new Error("المنتج خارج نطاق المؤسسة.");
+  await db.transaction(async tx => {
+    await tx.insert(manufacturingProductProfiles).values({ organizationId, productId: input.productId, manufacturingType: input.manufacturingType, requiresQualityCheck: input.requiresQualityCheck ?? "no", defaultShelfLifeDays: input.defaultShelfLifeDays }).onDuplicateKeyUpdate({ set: { manufacturingType: input.manufacturingType, requiresQualityCheck: input.requiresQualityCheck ?? "no", defaultShelfLifeDays: input.defaultShelfLifeDays } });
+    await tx.insert(auditLogs).values({ organizationId, actorUserId, action: "manufacturing.product_profile_saved", entityType: "product", entityId: String(input.productId), metadata: input });
+  });
+  return { productId: input.productId };
+}
+
+export async function recordProductionExpense(organizationId: number, actorUserId: number, input: { productionOrderId: number; category: "labor" | "energy" | "cleaning" | "setup" | "other"; amount: number; currencyCode: string; notes?: string }) {
+  const db = await getDb(); if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  if (input.amount <= 0) throw new Error("قيمة مصروف الإنتاج يجب أن تكون أكبر من صفر.");
+  const [order, organization] = await Promise.all([
+    db.select().from(productionOrders).where(and(eq(productionOrders.id, input.productionOrderId), eq(productionOrders.organizationId, organizationId))).limit(1).then(rows => rows[0]),
+    db.select({ baseCurrency: organizations.baseCurrency }).from(organizations).where(eq(organizations.id, organizationId)).limit(1).then(rows => rows[0]),
+  ]);
+  if (!order || !organization || !["in_production", "quality_hold"].includes(order.status)) throw new Error("لا يمكن تسجيل مصروف لهذا الأمر في حالته الحالية.");
+  const currencyCode = input.currencyCode.trim().toUpperCase();
+  const [rate] = currencyCode === organization.baseCurrency ? [{ rate: "1" }] : await db.select({ rate: organizationExchangeRates.rate }).from(organizationExchangeRates).where(and(eq(organizationExchangeRates.organizationId, organizationId), eq(organizationExchangeRates.baseCurrencyCode, organization.baseCurrency), eq(organizationExchangeRates.quoteCurrencyCode, currencyCode), sql`${organizationExchangeRates.effectiveAt} <= now()`)).orderBy(desc(organizationExchangeRates.effectiveAt)).limit(1);
+  if (!rate) throw new Error("لا يوجد سعر صرف تاريخي صالح لعملة مصروف الإنتاج.");
+  const inserted = await db.transaction(async tx => {
+    const expense = await tx.insert(productionExpenses).values({ organizationId, productionOrderId: input.productionOrderId, category: input.category, amount: String(input.amount), currencyCode, exchangeRateSnapshot: String(rate.rate), notes: input.notes?.trim(), createdByUserId: actorUserId });
+    const expenseId = Number(expense[0].insertId);
+    await tx.insert(auditLogs).values({ organizationId, actorUserId, action: "manufacturing.expense_recorded", entityType: "production_expense", entityId: String(expenseId), metadata: { productionOrderId: input.productionOrderId, currencyCode, exchangeRateSnapshot: rate.rate } });
+    return expenseId;
+  });
+  return { id: inserted, exchangeRateSnapshot: Number(rate.rate) };
+}
+
+export async function closeProductionOrder(organizationId: number, actorUserId: number, productionOrderId: number) {
+  const db = await getDb(); if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const [order] = await db.select().from(productionOrders).where(and(eq(productionOrders.id, productionOrderId), eq(productionOrders.organizationId, organizationId), eq(productionOrders.status, "completed"))).limit(1);
+  const outputs = await db.select().from(productionOutputs).where(and(eq(productionOutputs.organizationId, organizationId), eq(productionOutputs.productionOrderId, productionOrderId), eq(productionOutputs.qualityStatus, "passed")));
+  if (!order || !outputs.length) throw new Error("لا يمكن إقفال أمر لا يملك مخرجات معتمدة.");
+  const totalGoodQuantity = outputs.reduce((total, row) => total + Number(row.goodQuantity), 0);
+  const weightedCost = outputs.reduce((total, row) => total + Number(row.goodQuantity) * Number(row.unitCost ?? 0), 0);
+  await db.transaction(async tx => {
+    await tx.update(productionOrders).set({ status: "closed", actualEnd: order.actualEnd ?? new Date() }).where(and(eq(productionOrders.id, productionOrderId), eq(productionOrders.organizationId, organizationId)));
+    await tx.insert(auditLogs).values({ organizationId, actorUserId, action: "manufacturing.order_closed", entityType: "production_order", entityId: String(productionOrderId), metadata: { totalGoodQuantity, totalActualCost: weightedCost, unitCost: totalGoodQuantity ? weightedCost / totalGoodQuantity : 0 } });
+  });
+  return { id: productionOrderId, status: "closed" as const, totalGoodQuantity, totalActualCost: weightedCost };
 }
 
 export async function transitionProductionOrderStatus(organizationId: number, actorUserId: number, productionOrderId: number, nextStatus: ProductionStatus) {
