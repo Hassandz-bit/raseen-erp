@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { auditLogs, inventoryBalances, organizations, productBatches, products, stockMovements, warehouses } from "../drizzle/schema";
 import { manufacturingBomItems, manufacturingBoms, manufacturingProductProfiles, productionMaterialReservations, productionOrders, productionOutputs, productionQualityChecks, productionStages } from "../drizzle/manufacturingSchema";
 import { getDb } from "./db";
-import { closeProductionOrder, createProductionOrder, getProductionBatchGenealogy, getProductionOrderOperationalDetails, getProductionTraceability, issueMaterialsForProduction, recordProductionOutput, recordProductionQualityCheck, recordProductionWaste, reserveProductionMaterials, saveManufacturingProductProfile, transitionProductionOrderStatus } from "./manufacturing";
+import { closeProductionOrder, createProductionOrder, getProductionBatchGenealogy, getProductionOrderOperationalDetails, getProductionTraceability, issueMaterialsForProduction, recordProductionOutput, recordProductionQualityCheck, recordProductionWaste, reserveProductionMaterials, saveManufacturingProductProfile, transitionProductionOrderStatus, updateProductionStage } from "./manufacturing";
 
 let organizationId: number | null = null;
 let auxiliaryOrganizationIds: number[] = [];
@@ -68,6 +68,10 @@ describe("تكامل دورة التصنيع", () => {
     const stages = await db.select().from(productionStages).where(and(eq(productionStages.organizationId, organizationId), eq(productionStages.productionOrderId, order.id)));
     expect(reservation.reservations.map(item => item.batchId)).toEqual([earlierBatchId, laterBatchId]);
     expect(stages.map(stage => stage.code)).toEqual(["mixing"]);
+    await updateProductionStage(organizationId, 1, { productionOrderId: order.id, stageId: stages[0]!.id, status: "in_progress", responsibleUserId: 1, notes: "بدء مرحلة الخلط" });
+    const [updatedStage] = await db.select().from(productionStages).where(and(eq(productionStages.organizationId, organizationId), eq(productionStages.id, stages[0]!.id))).limit(1);
+    expect(updatedStage?.responsibleUserId).toBe(1);
+    expect(updatedStage?.notes).toBe("بدء مرحلة الخلط");
     await issueMaterialsForProduction(organizationId, 1, order.id);
     await saveManufacturingProductProfile(organizationId, 1, { productId: finishedProductId, manufacturingType: "finished_good", requiresQualityCheck: "yes", defaultShelfLifeDays: 30 });
     const output = await recordProductionOutput(organizationId, 1, order.id, { lotNumber: `FG-${suffix}`, goodQuantity: 6 });
