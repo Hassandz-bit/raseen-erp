@@ -8,9 +8,12 @@ export type DocumentPreviewExportData = {
   signatureLabel?: string;
   fontFamily?: "ibm-plex" | "tajawal" | "noto-arabic" | "inter" | "system";
   fontSize?: "small" | "normal" | "large";
+  paperSize?: "A4" | "A5" | "thermal";
 };
 
 const resolveDocumentFont = (fontFamily: DocumentPreviewExportData["fontFamily"]) => ({ "ibm-plex": "IBM Plex Sans", tajawal: "Tajawal", "noto-arabic": "Noto Arabic", inter: "Inter", system: "Arial" }[fontFamily ?? "noto-arabic"]);
+const paperProfiles: Record<NonNullable<DocumentPreviewExportData["paperSize"]>, { cssWidth: string; cssHeight: string; hostWidth: string; pdfPage: [number, number] }> = { A4: { cssWidth: "210mm", cssHeight: "297mm", hostWidth: "794px", pdfPage: [595.28, 841.89] }, A5: { cssWidth: "148mm", cssHeight: "210mm", hostWidth: "559px", pdfPage: [419.53, 595.28] }, thermal: { cssWidth: "80mm", cssHeight: "auto", hostWidth: "302px", pdfPage: [226.77, 841.89] } };
+const resolvePaperProfile = (paperSize: DocumentPreviewExportData["paperSize"]) => paperProfiles[paperSize ?? "A4"];
 
 const escapeHtml = (value: string) => value.replace(/[&<>'"]/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character] ?? character);
 
@@ -18,7 +21,8 @@ export function buildDocumentPreviewHtml(data: DocumentPreviewExportData) {
   const signature = data.signatureLabel ? `<div class="signature">${escapeHtml(data.signatureLabel)}</div>` : "";
   const fontSize = data.fontSize === "small" ? "14px" : data.fontSize === "large" ? "18px" : "16px";
   const fontFamily = resolveDocumentFont(data.fontFamily);
-  return `<!doctype html><html dir="${data.direction}"><head><meta charset="utf-8"><title>${escapeHtml(data.title)}</title><style>body{font-family:${fontFamily},sans-serif;font-size:${fontSize};color:#172033;padding:32px}article{max-width:680px;margin:auto;border:1px solid #d7dce5;border-radius:16px;padding:28px}.muted{color:#64748b;font-size:12px}.line{border-top:1px solid #d7dce5;border-bottom:1px solid #d7dce5;margin:24px 0;padding:16px 0}.amount{font-size:24px;font-weight:700}.signature{border-top:1px solid #94a3b8;margin-top:42px;padding-top:8px;font-size:12px}@media print{body{padding:0}article{border:0}}</style></head><body><article><h1>${escapeHtml(data.title)}</h1><p class="muted">${escapeHtml(data.date)}</p><div class="line"><p>${escapeHtml(data.documentLabel)}</p><p class="amount">${escapeHtml(data.amount)}</p></div><p class="muted">${escapeHtml(data.footer ?? "")}</p>${signature}</article></body></html>`;
+  const paper = resolvePaperProfile(data.paperSize);
+  return `<!doctype html><html dir="${data.direction}"><head><meta charset="utf-8"><title>${escapeHtml(data.title)}</title><style>body{font-family:${fontFamily},sans-serif;font-size:${fontSize};color:#172033;padding:32px}article{width:${paper.cssWidth};min-height:${paper.cssHeight};box-sizing:border-box;margin:auto;border:1px solid #d7dce5;border-radius:16px;padding:28px}.muted{color:#64748b;font-size:12px}.line{border-top:1px solid #d7dce5;border-bottom:1px solid #d7dce5;margin:24px 0;padding:16px 0}.amount{font-size:24px;font-weight:700}.signature{border-top:1px solid #94a3b8;margin-top:42px;padding-top:8px;font-size:12px}@media print{body{padding:0}article{border:0}}</style></head><body><article><h1>${escapeHtml(data.title)}</h1><p class="muted">${escapeHtml(data.date)}</p><div class="line"><p>${escapeHtml(data.documentLabel)}</p><p class="amount">${escapeHtml(data.amount)}</p></div><p class="muted">${escapeHtml(data.footer ?? "")}</p>${signature}</article></body></html>`;
 }
 
 export function createDocumentPreviewDownload(data: DocumentPreviewExportData, filename: string) {
@@ -40,7 +44,8 @@ export async function createDocumentPreviewPdf(data: DocumentPreviewExportData, 
   const host = document.createElement("div");
   host.dir = data.direction;
   const fontSize = data.fontSize === "small" ? "14px" : data.fontSize === "large" ? "18px" : "16px";
-  host.style.cssText = `position:fixed;left:-10000px;top:0;width:720px;padding:32px;background:#fff;color:#172033;font-family:${resolveDocumentFont(data.fontFamily)},sans-serif;font-size:${fontSize};z-index:-1;`;
+  const paper = resolvePaperProfile(data.paperSize);
+  host.style.cssText = `position:fixed;left:-10000px;top:0;width:${paper.hostWidth};padding:32px;background:#fff;color:#172033;font-family:${resolveDocumentFont(data.fontFamily)},sans-serif;font-size:${fontSize};z-index:-1;`;
   host.innerHTML = `<article style="border:1px solid #d7dce5;border-radius:16px;padding:28px"><h1 style="margin:0;font-size:28px">${escapeHtml(data.title)}</h1><p style="color:#64748b;font-size:12px">${escapeHtml(data.date)}</p><div style="border-top:1px solid #d7dce5;border-bottom:1px solid #d7dce5;margin:24px 0;padding:16px 0"><p>${escapeHtml(data.documentLabel)}</p><p style="font-size:24px;font-weight:700">${escapeHtml(data.amount)}</p></div><p style="color:#64748b;font-size:12px">${escapeHtml(data.footer ?? "")}</p>${data.signatureLabel ? `<div style="border-top:1px solid #94a3b8;margin-top:42px;padding-top:8px;font-size:12px">${escapeHtml(data.signatureLabel)}</div>` : ""}</article>`;
   document.body.append(host);
   try {
@@ -48,7 +53,7 @@ export async function createDocumentPreviewPdf(data: DocumentPreviewExportData, 
     const canvas = await html2canvas(host, { backgroundColor: "#ffffff", scale: 2, logging: false });
     const pdf = await PDFDocument.create();
     const image = await pdf.embedPng(canvas.toDataURL("image/png"));
-    const page = pdf.addPage([595.28, 841.89]);
+    const page = pdf.addPage(paper.pdfPage);
     const maxWidth = page.getWidth() - 64;
     const maxHeight = page.getHeight() - 64;
     const scale = Math.min(maxWidth / image.width, maxHeight / image.height);

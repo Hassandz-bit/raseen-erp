@@ -12,11 +12,12 @@ vi.mock("pdf-lib", () => ({ PDFDocument: { create: vi.fn().mockResolvedValue(sta
 
 describe("تنزيل PDF لمعاينة المستند", () => {
   it("ينشئ Blob PDF باسم صحيح ويرسم المعاينة المرئية", async () => {
-    const result = await createDocumentPreviewPdf({ direction: "rtl", title: "فاتورة", date: "2026-08-16", documentLabel: "المستند", amount: "١٠٠ د.ج", fontFamily: "noto-arabic", fontSize: "large" }, "nawa-preview.pdf");
+    const result = await createDocumentPreviewPdf({ direction: "rtl", title: "فاتورة", date: "2026-08-16", documentLabel: "المستند", amount: "١٠٠ د.ج", fontFamily: "noto-arabic", fontSize: "large", paperSize: "A5" }, "nawa-preview.pdf");
     expect(result.filename).toBe("nawa-preview.pdf");
     expect(result.blob.type).toBe("application/pdf");
     expect(state.capture).toHaveBeenCalledOnce();
     expect(state.pdf.embedPng).toHaveBeenCalledOnce();
+    expect(state.pdf.addPage).toHaveBeenCalledWith([419.53, 595.28]);
     expect(state.page.drawImage).toHaveBeenCalledOnce();
   });
 });
