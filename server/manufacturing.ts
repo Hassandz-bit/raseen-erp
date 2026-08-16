@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { auditLogs, manufacturingBomItems, manufacturingBoms, productBatches, productionMaterialReservations, productionOrders, productionStages, products, warehouses } from "../drizzle/schema";
 import { manufacturingProductProfiles, productionExpenses, productionOutputs, productionQualityChecks } from "../drizzle/manufacturingSchema";
 import { createProductBatch, getDb, previewFefoAllocation, recordStockMovement } from "./db";
@@ -119,8 +119,9 @@ export async function recordProductionOutput(organizationId: number, actorUserId
   const directCost = expenses.reduce((total, expense) => total + Number(expense.amount) * Number(expense.exchangeRateSnapshot ?? 1), 0);
   const unitCost = calculateUnitProductionCost({ materialCost, overheadCost: directCost, goodQuantity: input.goodQuantity });
   const manufacturingDate = input.manufacturingDate ?? new Date();
+  const suggestedExpiryDate = profile?.defaultShelfLifeDays ? new Date(manufacturingDate.getTime() + profile.defaultShelfLifeDays * 86_400_000) : undefined;
   const qualityPending = profile?.requiresQualityCheck === "yes";
-  const batch = await createProductBatch(organizationId, { productId: order.productId, warehouseId: order.finishedGoodsWarehouseId, lotNumber: input.lotNumber.trim(), receivedQuantity: input.goodQuantity, cost: unitCost, manufacturingDate, expiryDate: input.expiryDate, status: qualityPending ? "quarantined" : "active", movementType: "production_output", sourceDocumentType: "production_order", sourceDocumentId: productionOrderId });
+  const batch = await createProductBatch(organizationId, { productId: order.productId, warehouseId: order.finishedGoodsWarehouseId, lotNumber: input.lotNumber.trim(), receivedQuantity: input.goodQuantity, cost: unitCost, manufacturingDate, expiryDate: input.expiryDate ?? suggestedExpiryDate, status: qualityPending ? "quarantined" : "active", movementType: "production_output", sourceDocumentType: "production_order", sourceDocumentId: productionOrderId });
   const inserted = await db.transaction(async tx => {
     const output = await tx.insert(productionOutputs).values({ organizationId, productionOrderId, productId: order.productId, batchId: batch.id, goodQuantity: String(input.goodQuantity), defectiveQuantity: String(input.defectiveQuantity ?? 0), reworkQuantity: String(input.reworkQuantity ?? 0), scrapQuantity: String(input.scrapQuantity ?? 0), unitCost: String(unitCost), qualityStatus: qualityPending ? "pending" : "passed" });
     await tx.update(productionOrders).set({ status: qualityPending ? "quality_hold" : "completed", actualEnd: qualityPending ? undefined : new Date() }).where(and(eq(productionOrders.id, productionOrderId), eq(productionOrders.organizationId, organizationId)));
@@ -161,6 +162,23 @@ export async function getProductionTraceability(organizationId: number, producti
     finishedBatchIds.length ? db.select().from(productBatches).where(and(eq(productBatches.organizationId, organizationId), inArray(productBatches.id, finishedBatchIds))) : Promise.resolve([]),
   ]);
   return { order, rawMaterials: reservations.map(reservation => ({ reservation, batch: rawBatches.find(batch => batch.id === reservation.batchId) ?? null })), outputs: outputs.map(output => ({ output, batch: finishedBatches.find(batch => batch.id === output.batchId) ?? null })) };
+}
+
+export async function listProductionOrders(organizationId: number) {
+  const db = await getDb(); if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  return db.select().from(productionOrders).where(eq(productionOrders.organizationId, organizationId)).orderBy(desc(productionOrders.updatedAt), desc(productionOrders.id)).limit(100);
+}
+
+export async function getManufacturingOverview(organizationId: number) {
+  const db = await getDb(); if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const [orders, outputs, shortages, qualityHolds] = await Promise.all([
+    db.select({ status: productionOrders.status, value: sql<string>`count(*)` }).from(productionOrders).where(eq(productionOrders.organizationId, organizationId)).groupBy(productionOrders.status),
+    db.select({ goodQuantity: sql<string>`coalesce(sum(${productionOutputs.goodQuantity}), 0)`, wasteQuantity: sql<string>`coalesce(sum(${productionOutputs.scrapQuantity}) + sum(${productionOutputs.defectiveQuantity}), 0)`, averageUnitCost: sql<string>`coalesce(avg(${productionOutputs.unitCost}), 0)` }).from(productionOutputs).where(eq(productionOutputs.organizationId, organizationId)),
+    db.select({ value: sql<string>`count(*)` }).from(productionMaterialReservations).where(and(eq(productionMaterialReservations.organizationId, organizationId), sql`${productionMaterialReservations.shortageQuantity} > 0`)),
+    db.select({ value: sql<string>`count(*)` }).from(productionOrders).where(and(eq(productionOrders.organizationId, organizationId), eq(productionOrders.status, "quality_hold"))),
+  ]);
+  const countByStatus = Object.fromEntries(orders.map(row => [row.status, Number(row.value)]));
+  return { planned: (countByStatus.planned ?? 0) + (countByStatus.approved ?? 0) + (countByStatus.materials_reserved ?? 0), inProduction: countByStatus.in_production ?? 0, completed: countByStatus.completed ?? 0, closed: countByStatus.closed ?? 0, materialShortages: Number(shortages[0]?.value ?? 0), qualityHold: Number(qualityHolds[0]?.value ?? 0), goodOutputQuantity: Number(outputs[0]?.goodQuantity ?? 0), wasteQuantity: Number(outputs[0]?.wasteQuantity ?? 0), averageUnitCost: Number(outputs[0]?.averageUnitCost ?? 0) };
 }
 
 export async function transitionProductionOrderStatus(organizationId: number, actorUserId: number, productionOrderId: number, nextStatus: ProductionStatus) {

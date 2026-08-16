@@ -24,7 +24,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useIsMobile } from "@/hooks/useMobile";
 import { navigationFeedbackCopy } from "@/i18n/translations";
-import { Bot, Boxes, GitBranch, LayoutDashboard, Loader2, LogOut, PanelLeft, Settings2, Truck } from "lucide-react";
+import { Bot, Boxes, Factory, GitBranch, LayoutDashboard, Loader2, LogOut, PanelLeft, Settings2, Truck } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
@@ -117,6 +117,7 @@ function DashboardLayoutContent({
   const menuItems = [
     { icon: LayoutDashboard, label: t("dashboard"), path: "/" },
     { icon: Boxes, label: t("commerceInventory"), path: "/commerce" },
+    { icon: Factory, label: t("manufacturingProduction"), path: "/manufacturing" },
     { icon: Truck, label: t("distributionFleet"), path: "/distribution" },
     { icon: Boxes, label: t("modules"), path: "/modules" },
     { icon: Bot, label: t("workspace"), path: "/workspace" },

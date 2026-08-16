@@ -24,7 +24,7 @@ export const nawaFlowNodes: FlowNodeConfig[] = [
   { id: "finance", labelKey: "financialAccounting", descriptionKey: "flowOverview", icon: Landmark, moduleRequirements: ["finance"], route: "/workspace", position: { x: 83, y: 72 } },
   { id: "hr", labelKey: "humanResources", descriptionKey: "flowOverview", icon: UsersRound, moduleRequirements: ["hr"], route: "/workspace", position: { x: 18, y: 76 } },
   { id: "distribution", labelKey: "distributionFleet", descriptionKey: "flowLockedDescription", icon: Truck, moduleRequirements: ["distribution"], route: "/distribution", position: { x: 84, y: 17 }, internalNodes: [{ key: "inventory", icon: Package, module: "inventory" }, { key: "sales", icon: ReceiptText, module: "sales" }, { key: "finance", icon: Landmark, module: "finance" }] },
-  { id: "manufacturing", labelKey: "manufacturingProduction", descriptionKey: "flowLockedDescription", icon: Factory, moduleRequirements: ["manufacturing"], position: { x: 17, y: 18 } },
+  { id: "manufacturing", labelKey: "manufacturingProduction", descriptionKey: "flowLockedDescription", icon: Factory, moduleRequirements: ["manufacturing"], route: "/manufacturing", position: { x: 17, y: 18 } },
 ];
 
 export const nawaFlowEdges: FlowEdgeConfig[] = [

@@ -13,7 +13,7 @@ import { canUseDistributionPermission, isScopedIdAllowed, type DistributionPermi
 import { addDistributionRouteExpense, completeDriverStop, createDistributionRoute, createDistributionTerritory, createDriverVanSale, createFleetVehicle, createMaintenanceRecord, createVehicleDocument, createVehicleLoadOrder, getDistributionControlCenter, getDistributionOwnerAlertReasons, getDistributionSettings, getDriverRouteFeed, getDriverRouteInventory, getLatestFleetLocations, listDistributionRoutes, listDistributionTerritories, listFleetVehicles, listVehicleInventory, logFuel, recordDistributionCollection, recordDistributionDelivery, recordDistributionReturn, recordFleetGpsPoint, recordGeofenceEvent, returnVehicleStockToWarehouse, saveDistributionSettings, submitDistributionDeliveryProof, submitRouteClosing, transitionDistributionRoute, transitionRouteClosing, transitionVehicleLoadOrder } from "./distribution";
 import { cancelRetailerOrder, createB2bPromotion, createRetailerOrder, getRetailerCatalog, grantRetailerAccess, listManagedRetailerAccesses, listOrganizationB2bOrders, listRetailerAccesses, listRetailerDocuments, listRetailerOrders, reorderRetailerOrder, reviewAndConvertRetailerOrder, updateRetailerAccessStatus } from "./b2b";
 import { calculatePackagingLogistics, findSuitableVehicles, listProductPackaging, listUomCatalog } from "./uomPackaging";
-import { createManufacturingBom, createProductionOrder, getProductionTraceability, issueMaterialsForProduction, recordProductionOutput, recordProductionQualityCheck, reserveProductionMaterials, returnMaterialsFromProduction, transitionProductionOrderStatus } from "./manufacturing";
+import { createManufacturingBom, createProductionOrder, getManufacturingOverview, getProductionTraceability, issueMaterialsForProduction, listProductionOrders, recordProductionOutput, recordProductionQualityCheck, reserveProductionMaterials, returnMaterialsFromProduction, transitionProductionOrderStatus } from "./manufacturing";
 
 type ModuleKey = "inventory" | "sales" | "purchases" | "finance" | "hr" | "reports" | "ai_assistant" | "distribution";
 const operationalModuleKeys = ["inventory", "sales", "purchases", "finance", "hr"] as const;
@@ -402,6 +402,14 @@ export const erpRouter = router({
     }),
   }),
   manufacturing: router({
+    overview: protectedProcedure.query(async ({ ctx }) => {
+      const context = await requireOrganizationOwner(ctx.user.id);
+      return getManufacturingOverview(context.organization.id);
+    }),
+    orders: protectedProcedure.query(async ({ ctx }) => {
+      const context = await requireOrganizationOwner(ctx.user.id);
+      return listProductionOrders(context.organization.id);
+    }),
     createBom: protectedProcedure.input(z.object({ code: z.string().trim().min(2).max(64), version: z.string().trim().min(1).max(32), productId: z.number().int().positive(), outputQuantity: z.number().positive(), outputUnit: z.string().trim().min(1).max(32), notes: z.string().trim().max(2000).optional(), items: z.array(z.object({ componentProductId: z.number().int().positive(), quantity: z.number().positive(), unit: z.string().trim().min(1).max(32), baseQuantity: z.number().positive(), wasteAllowance: z.number().min(0).max(100).optional(), stageCode: z.string().trim().max(64).optional(), required: z.enum(["yes", "no"]).optional() })).min(1).max(200) })).mutation(async ({ ctx, input }) => {
       const context = await requireOrganizationOwner(ctx.user.id);
       return createManufacturingBom(context.organization.id, ctx.user.id, input);
