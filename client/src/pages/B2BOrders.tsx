@@ -1,0 +1,21 @@
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { trpc } from "@/lib/trpc";
+import { Check, ClipboardList, X } from "lucide-react";
+import React, { useState } from "react";
+import { toast } from "sonner";
+
+const text = { ar: { title: "طلبات B2B", subtitle: "مراجعة طلبات المحلات قبل تحويلها إلى أوامر مبيعات", approve: "اعتماد وتحويل", reject: "رفض", empty: "لا توجد طلبات B2B للمراجعة.", items: "البنود", total: "الإجمالي", reason: "سبب الرفض", error: "تعذر إتمام المراجعة.", converted: "تم اعتماد الطلب وتحويله إلى Sales Order.", rejected: "تم رفض الطلب.", prompt: "اكتب سبب الرفض" }, fr: { title: "Commandes B2B", subtitle: "Examinez les commandes avant conversion en ordre de vente", approve: "Approuver et convertir", reject: "Rejeter", empty: "Aucune commande B2B à examiner.", items: "Articles", total: "Total", reason: "Motif du refus", error: "La révision a échoué.", converted: "Commande approuvée et convertie en ordre de vente.", rejected: "Commande rejetée.", prompt: "Saisissez le motif du refus" }, en: { title: "B2B orders", subtitle: "Review retailer orders before conversion to a sales order", approve: "Approve & convert", reject: "Reject", empty: "No B2B orders to review.", items: "Items", total: "Total", reason: "Rejection reason", error: "The review could not be completed.", converted: "Order approved and converted to a sales order.", rejected: "Order rejected.", prompt: "Enter rejection reason" } } as const;
+
+export default function B2BOrders() {
+  const { language, direction, formatNumber } = useLanguage();
+  const copy = text[language];
+  const utils = trpc.useUtils();
+  const [busyId, setBusyId] = useState<number | null>(null);
+  const orders = trpc.erp.b2b.management.orders.useQuery();
+  const review = trpc.erp.b2b.review.useMutation({ onSuccess: () => { utils.erp.b2b.management.orders.invalidate(); }, onError: () => toast.error(copy.error), onSettled: () => setBusyId(null) });
+  const approve = (orderId: number) => { setBusyId(orderId); review.mutate({ orderId, action: "approve" }, { onSuccess: () => toast.success(copy.converted) }); };
+  const reject = (orderId: number) => { const reason = window.prompt(copy.prompt); if (!reason?.trim()) return; setBusyId(orderId); review.mutate({ orderId, action: "reject", reason }, { onSuccess: () => toast.success(copy.rejected) }); };
+  return <main dir={direction} className="min-h-screen bg-background text-foreground"><div className="mx-auto max-w-5xl space-y-5 px-4 py-6"><Card><CardHeader><CardTitle className="flex items-center gap-2"><ClipboardList className="h-5 w-5 text-primary" />{copy.title}</CardTitle><CardDescription>{copy.subtitle}</CardDescription></CardHeader></Card>{orders.isLoading ? <Card><CardContent className="p-6">…</CardContent></Card> : !orders.data?.length ? <Card><CardContent className="p-6 text-sm text-muted-foreground">{copy.empty}</CardContent></Card> : <div className="space-y-4">{orders.data.map((order: any) => <Card key={order.id}><CardHeader><div className="flex flex-wrap items-start justify-between gap-3"><div><CardTitle className="text-base">{order.orderNumber}</CardTitle><CardDescription>{order.retailerName} · {order.status} · {order.accessStatus}</CardDescription></div><strong>{formatNumber(Number(order.totalAmount))} {order.currencyCode}</strong></div></CardHeader><CardContent><p className="mb-2 text-sm font-medium">{copy.items}</p><div className="space-y-2">{order.items.map((item: any) => <div className="flex justify-between rounded-lg bg-muted/50 p-2 text-sm" key={item.id}><span>{item.productId} · {item.unit}</span><span>{formatNumber(Number(item.quantity))} × {formatNumber(Number(item.unitPrice))}</span></div>)}</div><div className="mt-4 flex flex-wrap gap-2"><Button disabled={busyId === order.id || order.status === "cancelled" || order.status === "confirmed"} onClick={() => approve(order.id)}><Check className="me-1 h-4 w-4" />{copy.approve}</Button><Button variant="outline" disabled={busyId === order.id || order.status === "cancelled" || order.status === "confirmed"} onClick={() => reject(order.id)}><X className="me-1 h-4 w-4" />{copy.reject}</Button></div></CardContent></Card>)}</div>}</div></main>;
+}

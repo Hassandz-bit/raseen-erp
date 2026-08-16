@@ -11,7 +11,7 @@ import { isValidTextBarcode } from "./barcodePolicy";
 import { classifyBranchPersistenceError } from "./branchPolicy";
 import { canUseDistributionPermission, isScopedIdAllowed, type DistributionPermission } from "./distributionPolicy";
 import { addDistributionRouteExpense, completeDriverStop, createDistributionRoute, createDistributionTerritory, createDriverVanSale, createFleetVehicle, createMaintenanceRecord, createVehicleDocument, createVehicleLoadOrder, getDistributionControlCenter, getDistributionOwnerAlertReasons, getDistributionSettings, getDriverRouteFeed, getDriverRouteInventory, getLatestFleetLocations, listDistributionRoutes, listDistributionTerritories, listFleetVehicles, listVehicleInventory, logFuel, recordDistributionCollection, recordDistributionDelivery, recordDistributionReturn, recordFleetGpsPoint, recordGeofenceEvent, returnVehicleStockToWarehouse, saveDistributionSettings, submitDistributionDeliveryProof, submitRouteClosing, transitionDistributionRoute, transitionRouteClosing, transitionVehicleLoadOrder } from "./distribution";
-import { createRetailerOrder, getRetailerCatalog, grantRetailerAccess, listRetailerAccesses, listRetailerDocuments, listRetailerOrders, reorderRetailerOrder } from "./b2b";
+import { cancelRetailerOrder, createB2bPromotion, createRetailerOrder, getRetailerCatalog, grantRetailerAccess, listManagedRetailerAccesses, listOrganizationB2bOrders, listRetailerAccesses, listRetailerDocuments, listRetailerOrders, reorderRetailerOrder, reviewAndConvertRetailerOrder, updateRetailerAccessStatus } from "./b2b";
 
 type ModuleKey = "inventory" | "sales" | "purchases" | "finance" | "hr" | "reports" | "ai_assistant" | "distribution";
 const operationalModuleKeys = ["inventory", "sales", "purchases", "finance", "hr"] as const;
@@ -389,10 +389,30 @@ export const erpRouter = router({
   b2b: router({
     accesses: protectedProcedure.query(({ ctx }) => listRetailerAccesses(ctx.user.id)),
     management: router({
+      accesses: protectedProcedure.query(async ({ ctx }) => {
+        const context = await getTenantContext(ctx.user.id);
+        if (!isOrganizationOwner(context.membership.roleKey)) throw new TRPCError({ code: "FORBIDDEN", message: "تقتصر إدارة وصول B2B على مالك المؤسسة." });
+        return listManagedRetailerAccesses(context.organization.id);
+      }),
+      orders: protectedProcedure.query(async ({ ctx }) => {
+        const context = await getTenantContext(ctx.user.id);
+        if (!isOrganizationOwner(context.membership.roleKey)) throw new TRPCError({ code: "FORBIDDEN", message: "تقتصر مراجعة طلبات B2B على مالك المؤسسة." });
+        return listOrganizationB2bOrders(context.organization.id);
+      }),
       grant: protectedProcedure.input(z.object({ customerId: z.number().int().positive(), userId: z.number().int().positive(), priceListId: z.number().int().positive().optional(), customerSegment: z.string().trim().max(96).optional(), territoryId: z.number().int().positive().optional(), deliveryTrackingPolicy: z.enum(["off", "status_only", "eta_only", "limited_live"]).optional(), availabilityDisclosure: z.enum(["available", "low", "request"]).optional(), permissions: z.record(z.string(), z.boolean()).optional() })).mutation(async ({ ctx, input }) => {
         const context = await getTenantContext(ctx.user.id);
         if (!isOrganizationOwner(context.membership.roleKey)) throw new TRPCError({ code: "FORBIDDEN", message: "يقتصر منح وصول B2B على مالك المؤسسة." });
         return grantRetailerAccess(context.organization.id, ctx.user.id, input);
+      }),
+      accessStatus: protectedProcedure.input(z.object({ accessId: z.number().int().positive(), status: z.enum(["active", "suspended", "revoked"]) })).mutation(async ({ ctx, input }) => {
+        const context = await getTenantContext(ctx.user.id);
+        if (!isOrganizationOwner(context.membership.roleKey)) throw new TRPCError({ code: "FORBIDDEN", message: "يقتصر تعديل وصول B2B على مالك المؤسسة." });
+        return updateRetailerAccessStatus(context.organization.id, ctx.user.id, input.accessId, input.status);
+      }),
+      promotion: protectedProcedure.input(z.object({ name: z.string().trim().min(2).max(180), type: z.enum(["percentage_discount", "fixed_discount", "special_price", "quantity_discount", "buy_x_get_y"]), productId: z.number().int().positive(), batchId: z.number().int().positive().optional(), customerId: z.number().int().positive().optional(), customerSegment: z.string().trim().max(96).optional(), territoryId: z.number().int().positive().optional(), minimumQuantity: z.number().positive().optional(), discountPercentage: z.number().min(0).max(100).optional(), discountAmount: z.number().nonnegative().optional(), specialPrice: z.number().nonnegative().optional(), buyQuantity: z.number().positive().optional(), getQuantity: z.number().positive().optional(), startsAt: z.coerce.date(), endsAt: z.coerce.date(), visibleToB2b: z.enum(["yes", "no"]).optional() })).mutation(async ({ ctx, input }) => {
+        const context = await getTenantContext(ctx.user.id);
+        if (!isOrganizationOwner(context.membership.roleKey)) throw new TRPCError({ code: "FORBIDDEN", message: "يقتصر نشر عروض B2B على مالك المؤسسة." });
+        return createB2bPromotion(context.organization.id, ctx.user.id, input);
       }),
     }),
     catalog: protectedProcedure.input(z.object({ accessId: z.number().int().positive(), query: z.string().trim().max(160).optional(), categoryId: z.number().int().positive().optional(), brandId: z.number().int().positive().optional(), favoritesOnly: z.boolean().optional() })).query(({ ctx, input }) => getRetailerCatalog(ctx.user.id, input.accessId, input)),
@@ -400,6 +420,12 @@ export const erpRouter = router({
       list: protectedProcedure.input(z.object({ accessId: z.number().int().positive() })).query(({ ctx, input }) => listRetailerOrders(ctx.user.id, input.accessId)),
       create: protectedProcedure.input(z.object({ accessId: z.number().int().positive(), notes: z.string().trim().max(2000).optional(), requestedDeliveryDate: z.coerce.date().optional(), lines: z.array(z.object({ productId: z.number().int().positive(), quantity: z.number().positive(), unit: z.string().trim().min(1).max(32).optional() })).min(1).max(100) })).mutation(({ ctx, input }) => createRetailerOrder(ctx.user.id, input.accessId, input)),
       reorder: protectedProcedure.input(z.object({ accessId: z.number().int().positive(), orderId: z.number().int().positive() })).mutation(({ ctx, input }) => reorderRetailerOrder(ctx.user.id, input.accessId, input.orderId)),
+      cancel: protectedProcedure.input(z.object({ accessId: z.number().int().positive(), orderId: z.number().int().positive(), reason: z.string().trim().max(1000).optional() })).mutation(({ ctx, input }) => cancelRetailerOrder(ctx.user.id, input.accessId, input.orderId, input.reason)),
+    }),
+    review: protectedProcedure.input(z.object({ orderId: z.number().int().positive(), action: z.enum(["approve", "reject"]), reason: z.string().trim().max(1000).optional(), confirmedDeliveryDate: z.coerce.date().optional(), lines: z.array(z.object({ orderItemId: z.number().int().positive(), quantity: z.number().positive(), unitPrice: z.number().nonnegative().optional(), reason: z.string().trim().max(1000).optional() })).max(100).optional() })).mutation(async ({ ctx, input }) => {
+      const context = await getTenantContext(ctx.user.id);
+      if (!isOrganizationOwner(context.membership.roleKey)) throw new TRPCError({ code: "FORBIDDEN", message: "تقتصر مراجعة وتحويل طلبات B2B على مالك المؤسسة." });
+      return reviewAndConvertRetailerOrder(context.organization.id, ctx.user.id, input);
     }),
     documents: protectedProcedure.input(z.object({ accessId: z.number().int().positive() })).query(({ ctx, input }) => listRetailerDocuments(ctx.user.id, input.accessId)),
   }),
