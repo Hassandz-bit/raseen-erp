@@ -120,6 +120,13 @@
       "when": 1786903687105,
       "tag": "0016_sad_kylun",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "5",
+      "when": 1786905367867,
+      "tag": "0017_abandoned_white_tiger",
+      "breakpoints": true
     }
   ]
 }
