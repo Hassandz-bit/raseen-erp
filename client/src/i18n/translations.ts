@@ -67,9 +67,9 @@ export const homeChromeCopy = {
 } as const;
 
 export const settingsPageCopy = {
-  ar: { placeholderDescription: "هذه المساحة منظمة ضمن مركز الإعدادات وتحافظ على عزل المؤسسة القائم." },
-  fr: { placeholderDescription: "Cette zone est organisée dans le centre des paramètres tout en préservant l’isolation existante de l’organisation." },
-  en: { placeholderDescription: "This area is organized in the settings center while preserving the existing organization isolation." },
+  ar: { placeholderDescription: "هذه المساحة منظمة ضمن مركز الإعدادات وتحافظ على عزل المؤسسة القائم.", notificationDescription: "راجع تنبيهات المؤسسة وحدد ما تمت مراجعته ضمن المؤسسة الحالية فقط.", markRead: "تعليم كمقروء", markReadError: "تعذر تعليم الإشعار كمقروء." },
+  fr: { placeholderDescription: "Cette zone est organisée dans le centre des paramètres tout en préservant l’isolation existante de l’organisation.", notificationDescription: "Consultez les alertes de l’organisation et marquez celles traitées uniquement dans l’organisation actuelle.", markRead: "Marquer comme lu", markReadError: "Impossible de marquer la notification comme lue." },
+  en: { placeholderDescription: "This area is organized in the settings center while preserving the existing organization isolation.", notificationDescription: "Review organization alerts and mark handled ones as read only within the current organization.", markRead: "Mark as read", markReadError: "Unable to mark the notification as read." },
 } as const;
 
 const messages = {
