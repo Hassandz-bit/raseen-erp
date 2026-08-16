@@ -15,4 +15,11 @@ describe("تفضيلات المظهر", () => {
     expect({ ...defaults }).not.toEqual(altered);
     expect({ ...defaults }).toEqual(defaults);
   });
+
+  it("يحصر خيارات الخط والحجم ونمط الأرقام وطريقة عرض الوحدات في القيم المدعومة", () => {
+    expect((["ibm-plex", "tajawal", "noto-arabic", "inter", "system"] as const)).toContain(defaults.fontFamily);
+    expect((["small", "normal", "large", "extra_large"] as const)).toContain(defaults.fontScale);
+    expect((["western", "arabic_indic"] as const)).toContain(defaults.numeralStyle);
+    expect((["classic", "nawa_flow"] as const)).toContain(defaults.moduleViewMode);
+  });
 });
