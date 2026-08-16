@@ -243,6 +243,19 @@ export async function listBranchesForOrganization(organizationId: number) {
   return db.select().from(branches).where(eq(branches.organizationId, organizationId)).orderBy(branches.name).limit(100);
 }
 
+export async function listOrganizationMembersForOrganization(organizationId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  return db.select({
+    id: organizationMemberships.id,
+    userId: organizationMemberships.userId,
+    roleKey: organizationMemberships.roleKey,
+    status: organizationMemberships.status,
+    name: users.name,
+    email: users.email,
+  }).from(organizationMemberships).innerJoin(users, eq(users.id, organizationMemberships.userId)).where(eq(organizationMemberships.organizationId, organizationId)).orderBy(users.name).limit(100);
+}
+
 export async function createBranchForOrganization(organizationId: number, input: { code: string; name: string }) {
   const db = await getDb();
   if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
