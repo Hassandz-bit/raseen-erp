@@ -1,5 +1,5 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
-import { auditLogs, manufacturingBomItems, manufacturingBoms, organizationExchangeRates, organizations, productBatches, productionMaterialReservations, productionOrders, products, warehouses } from "../drizzle/schema";
+import { auditLogs, manufacturingBomItems, manufacturingBoms, organizationExchangeRates, organizations, productBatches, productionMaterialReservations, productionOrders, productionStages, products, warehouses } from "../drizzle/schema";
 import { manufacturingProductProfiles, productionExpenses, productionOutputs, productionQualityChecks } from "../drizzle/manufacturingSchema";
 import { createProductBatch, getDb, previewFefoAllocation, recordStockMovement } from "./db";
 import { calculateUnitProductionCost, canTransitionProductionOrder, type ProductionStatus } from "./manufacturingPolicy";
@@ -28,6 +28,9 @@ export async function createProductionOrder(organizationId: number, actorUserId:
   if (!bom || activeWarehouses.length !== 2) throw new Error("BOM أو مخازن الإنتاج غير متاحة ضمن المؤسسة.");
   const inserted = await db.insert(productionOrders).values({ organizationId, branchId: input.branchId, orderNumber: productionNumber(), productId: bom.productId, bomId: bom.id, bomVersion: bom.version, plannedQuantity: String(input.plannedQuantity), plannedUnit: input.plannedUnit, baseQuantity: String(input.baseQuantity), rawMaterialWarehouseId: input.rawMaterialWarehouseId, finishedGoodsWarehouseId: input.finishedGoodsWarehouseId, responsibleUserId: input.responsibleUserId, createdByUserId: actorUserId });
   const productionOrderId = Number(inserted[0].insertId);
+  const bomItems = await db.select({ stageCode: manufacturingBomItems.stageCode }).from(manufacturingBomItems).where(and(eq(manufacturingBomItems.organizationId, organizationId), eq(manufacturingBomItems.bomId, bom.id)));
+  const stageCodes = Array.from(new Set(bomItems.flatMap(item => item.stageCode ? [item.stageCode] : [])));
+  if (stageCodes.length) await db.insert(productionStages).values(stageCodes.map((code, index) => ({ organizationId, productionOrderId, sequence: index + 1, code, name: code, responsibleUserId: input.responsibleUserId })));
   await db.insert(auditLogs).values({ organizationId, actorUserId, action: "manufacturing.order_created", entityType: "production_order", entityId: String(productionOrderId), metadata: { bomId: bom.id } });
   return { id: productionOrderId };
 }
