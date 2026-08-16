@@ -6,12 +6,14 @@ describe("سياسة صلاحيات التصنيع", () => {
     expect(canUseManufacturingPermission("production_manager", [...manufacturingRolePresets.production_manager], "manufacturing.order.approve")).toBe(true);
     expect(canUseManufacturingPermission("member", ["manufacturing.view"], "manufacturing.order.approve")).toBe(false);
     expect(canUseManufacturingPermission("owner", [], "manufacturing.costs.edit")).toBe(true);
+    expect(canUseManufacturingPermission("owner", [], "manufacturing.reports.export")).toBe(true);
   });
 
   it("يسمح للمفتش بفحص الجودة من دون كشف صلاحيات التكلفة", () => {
     const inspectorPermissions = [...manufacturingRolePresets.quality_inspector];
     expect(canUseManufacturingPermission("quality_inspector", inspectorPermissions, "manufacturing.quality.inspect")).toBe(true);
     expect(canUseManufacturingPermission("quality_inspector", inspectorPermissions, "manufacturing.costs.view")).toBe(false);
+    expect(canUseManufacturingPermission("quality_inspector", inspectorPermissions, "manufacturing.reports.export")).toBe(false);
   });
 
   it("يقيد عامل المخزن ضمن الفرع والخط ومخزني الخام والمنتج النهائي المسموحين", () => {
