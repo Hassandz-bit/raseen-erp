@@ -1,4 +1,5 @@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import React from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -199,7 +200,7 @@ function DashboardContent({ onOpenModule }: { onOpenModule: (key: SectionKey) =>
   );
 }
 
-function ModuleView({ section, onBack }: { section: Exclude<SectionKey, "dashboard">; onBack: () => void }) {
+export function ModuleView({ section, onBack }: { section: Exclude<SectionKey, "dashboard">; onBack: () => void }) {
   const { t, language, formatNumber } = useLanguage();
   const info = { ...moduleViewCopy[language][section], eyebrow: t(section as never) };
   const ui = moduleViewUiCopy[language];
