@@ -23,8 +23,10 @@ import { startLogin } from "@/const";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useIsMobile } from "@/hooks/useMobile";
-import { Bot, Boxes, GitBranch, LayoutDashboard, LogOut, PanelLeft, Settings2 } from "lucide-react";
+import { navigationFeedbackCopy } from "@/i18n/translations";
+import { Bot, Boxes, GitBranch, LayoutDashboard, Loader2, LogOut, PanelLeft, Settings2 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
@@ -103,12 +105,13 @@ function DashboardLayoutContent({
   setSidebarWidth,
 }: DashboardLayoutContentProps) {
   const { user, logout } = useAuth();
-  const { direction, t } = useLanguage();
+  const { direction, language, t } = useLanguage();
   const { preferences } = useTheme();
   const [location, setLocation] = useLocation();
   const { state, toggleSidebar } = useSidebar();
   const isCollapsed = state === "collapsed";
   const [isResizing, setIsResizing] = useState(false);
+  const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const menuItems = [
     { icon: LayoutDashboard, label: t("dashboard"), path: "/" },
@@ -162,6 +165,16 @@ function DashboardLayoutContent({
     };
   }, [isResizing, setSidebarWidth]);
 
+  const navigateTo = (path: string, label: string) => {
+    if (path === location || navigatingTo) return;
+    setNavigatingTo(path);
+    window.setTimeout(() => {
+      setLocation(path);
+      setNavigatingTo(null);
+      toast.success(navigationFeedbackCopy[language].opened(label));
+    }, 180);
+  };
+
   return (
     <div dir={direction}>
       <div className="relative" ref={sidebarRef}>
@@ -198,13 +211,11 @@ function DashboardLayoutContent({
                   <SidebarMenuItem key={item.path}>
                     <SidebarMenuButton
                       isActive={isActive}
-                      onClick={() => setLocation(item.path)}
+                      onClick={() => navigateTo(item.path, item.label)}
                       tooltip={item.label}
                       className={`h-10 transition-all font-normal`}
                     >
-                      <item.icon
-                        className={`h-4 w-4 ${isActive ? "text-primary" : ""}`}
-                      />
+                      {navigatingTo === item.path ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" /> : <item.icon className={`h-4 w-4 ${isActive ? "text-primary" : ""}`} />}
                       <span>{item.label}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -269,7 +280,7 @@ function DashboardLayoutContent({
             </div>
           </div>
         )}
-        <main className="flex-1 p-4">{children}</main>
+        <main className="flex-1 p-4" aria-busy={Boolean(navigatingTo)}>{navigatingTo && <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground" role="status"><Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" />{navigationFeedbackCopy[language].moving}</div>}{children}</main>
       </SidebarInset>
     </div>
   );

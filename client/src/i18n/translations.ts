@@ -36,6 +36,18 @@ export const workspaceAssistantCopy = {
   en: { assistantDescription: "Ask about your organization’s indicators or request an operational summary. Every request passes membership and module guards before any summary is accessed.", enabledModules: "enabled modules", chatEmpty: "How can I help you manage your organization today?", chatPlaceholder: "Enter your operational question here…", promptMetrics: "Which indicators deserve priority review?", promptCommerce: "Summarize the state of invoices and inventory.", promptRecommendation: "What is the next operational recommendation?", scopeDescription: "The assistant receives a summary for the current organization only. It has no independent access to other organizations and does not modify operational records.", practicalSuggestion: "Practical suggestion", practicalSuggestionDetail: "Start by reviewing critical alerts, then due invoices.", practicalSuggestionNote: "Recommendations use only the data, subscription, and permissions available to you.", evaluateDescription: "Checks current-organization indicators and informs the platform owner when a critical condition exists." },
 } as const;
 
+export const workspaceOverviewCopy = {
+  ar: { title: "متابعة الوحدات", description: "ملخص حيّ للوحدات المتاحة والمؤشرات التشغيلية ضمن مؤسستك الحالية.", refresh: "تحديث الملخص", refreshed: "تم تحديث ملخص الوحدات.", activeModules: "وحدات مفعلة", active: "مفعلة", suspended: "معلقة", expired: "منتهية", noMetric: "لا يتوفر مؤشر تشغيلي لهذه الوحدة حالياً.", selectedModule: "المؤشر المحدد", unreadNotifications: "تنبيهات غير مقروءة" },
+  fr: { title: "Suivi des modules", description: "Vue en direct des modules disponibles et des indicateurs opérationnels de votre organisation actuelle.", refresh: "Actualiser la synthèse", refreshed: "La synthèse des modules a été actualisée.", activeModules: "Modules actifs", active: "Actif", suspended: "Suspendu", expired: "Expiré", noMetric: "Aucun indicateur opérationnel n’est disponible pour ce module.", selectedModule: "Indicateur sélectionné", unreadNotifications: "Notifications non lues" },
+  en: { title: "Module monitoring", description: "A live view of available modules and operating indicators for your current organization.", refresh: "Refresh summary", refreshed: "Module summary refreshed.", activeModules: "Active modules", active: "Active", suspended: "Suspended", expired: "Expired", noMetric: "No operating indicator is currently available for this module.", selectedModule: "Selected indicator", unreadNotifications: "Unread notifications" },
+} as const;
+
+export const navigationFeedbackCopy = {
+  ar: { opened: (label: string) => `تم فتح ${label}.`, moving: "جارٍ فتح القسم…" },
+  fr: { opened: (label: string) => `${label} est ouvert.`, moving: "Ouverture de la section…" },
+  en: { opened: (label: string) => `${label} is open.`, moving: "Opening section…" },
+} as const;
+
 export const dashboardHeroCopy = {
   ar: { welcome: "مرحباً بك، فريق النواة", title: "نبض مؤسستك في مكان واحد", description: "راقب الأداء، عالج التنبيهات، وانتقل مباشرة إلى ما يحتاج قرارك اليوم.", salesTrend: "اتجاه المبيعات", weeklyUpdate: "تحديث أسبوعي", interfacePreview: "عرض معاينة للواجهة", currentYear: "هذا العام", periodHint: "يمكن تعديل الفترة من واجهة التقارير." },
   fr: { welcome: "Bienvenue, équipe Nawa", title: "Le pouls de votre organisation en un seul endroit", description: "Suivez la performance, traitez les alertes et accédez directement aux décisions prioritaires.", salesTrend: "Tendance des ventes", weeklyUpdate: "Mise à jour hebdomadaire", interfacePreview: "Aperçu de l’interface", currentYear: "Cette année", periodHint: "La période peut être modifiée depuis les rapports." },

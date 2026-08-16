@@ -1,13 +1,15 @@
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/contexts/LanguageContext", () => ({
   useLanguage: () => ({
     direction: "ltr",
+    language: "fr",
     t: (key: string) => ({ financialSummary: "Résumé financier", currentMonth: "Mois en cours", commerceSnapshot: "Indicateurs commerce", openInvoices: "Factures ouvertes", lowStockProducts: "Produits à faible stock", issuedValue: "Valeur facturée", notificationCenter: "Notifications", subscriptionModules: "Modules", organizationAccessStatus: "Accès organisation", enabled: "Activé", locked: "Verrouillé", revenue: "Revenus", expenses: "Dépenses", netProfit: "Bénéfice net", exportCsv: "Exporter CSV" })[key] ?? key,
     formatCurrency: (value: number) => `DZD ${value.toFixed(2)}`,
     formatNumber: (value: number) => `#${value}`,
+    formatDate: () => "16/08/2026",
   }),
 }));
 
@@ -25,7 +27,7 @@ vi.mock("@/lib/trpc", () => ({
 
 vi.mock("@/components/AIChatBox", () => ({ AIChatBox: () => null }));
 
-import { InsightsPanel } from "./Workspace";
+import { InsightsPanel, OperationalOverview } from "./Workspace";
 
 describe("InsightsPanel UI", () => {
   it("يعرض البطاقات المترجمة وقيم المؤسسة المنسقة", () => {
@@ -35,5 +37,16 @@ describe("InsightsPanel UI", () => {
     expect(screen.getByText("DZD 1200.00")).toBeTruthy();
     expect(screen.getByText("DZD 700.00")).toBeTruthy();
     expect(screen.getByText("Activé")).toBeTruthy();
+  });
+});
+
+describe("OperationalOverview UI", () => {
+  it("يعرض حالة الوحدات ويحدّث المؤشر المحدد عند اختيار وحدة", () => {
+    render(<OperationalOverview modules={[{ key: "inventory", status: "active" }, { key: "sales", status: "suspended" }]} />);
+    expect(screen.getByText("Suivi des modules")).toBeTruthy();
+    expect(screen.getByText("Actif")).toBeTruthy();
+    expect(screen.getByText("Suspendu")).toBeTruthy();
+    fireEvent.click(screen.getByText("sales"));
+    expect(screen.getAllByText(/Valeur facturée/).length).toBeGreaterThan(0);
   });
 });

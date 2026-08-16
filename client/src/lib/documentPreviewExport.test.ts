@@ -3,13 +3,15 @@ import { buildDocumentPreviewFilename, buildDocumentPreviewHtml, buildDocumentPr
 
 describe("تصدير معاينة المستند", () => {
   it("يحافظ على العربية ويؤمّن النص قبل عرضه في وثيقة قابلة للطباعة", () => {
-    const html = buildDocumentPreviewHtml({ direction: "rtl", title: "فاتورة <تجريبية>", date: "2026-08-14", documentLabel: "المستند", amount: "١٬٢٥٠٫٥٠ د.ج", footer: "معلومة قانونية", signatureLabel: "التوقيع", fontFamily: "noto-arabic", fontSize: "large", paperSize: "thermal" });
+    const html = buildDocumentPreviewHtml({ direction: "rtl", title: "فاتورة <تجريبية>", date: "2026-08-14", documentLabel: "المستند", amount: "١٬٢٥٠٫٥٠ د.ج", footer: "معلومة قانونية", signatureLabel: "التوقيع", rows: [{ label: "صافي الربح", value: "١٬٠٠٠" }, { label: "<مؤشر>", value: "<قيمة>" }], fontFamily: "noto-arabic", fontSize: "large", paperSize: "thermal" });
     expect(html).toContain('dir="rtl"');
     expect(html).toContain("فاتورة &lt;تجريبية&gt;");
     expect(html).toContain("١٬٢٥٠٫٥٠ د.ج");
     expect(html).toContain("font-family:Noto Arabic");
     expect(html).toContain("font-size:18px");
     expect(html).toContain("width:80mm");
+    expect(html).toContain("صافي الربح");
+    expect(html).toContain("&lt;مؤشر&gt;");
   });
 
   it("يجهز ملف معاينة HTML مسمى قابل للطباعة والحفظ PDF من المتصفح", () => {

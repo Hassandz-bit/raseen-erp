@@ -3,7 +3,7 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { dashboardHeroCopy, dashboardSampleCopy, homeChromeCopy, homeShellCopy, moduleViewCopy, moduleViewUiCopy } from "@/i18n/translations";
+import { dashboardHeroCopy, dashboardSampleCopy, homeChromeCopy, homeShellCopy, moduleViewCopy, moduleViewUiCopy, navigationFeedbackCopy } from "@/i18n/translations";
 import { cn } from "@/lib/utils";
 import {
   ArrowUpLeft,
@@ -218,9 +218,19 @@ export default function Home() {
   const [isSidebarOpen, setSidebarOpen] = useState(false);
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [isTransitioning, setTransitioning] = useState(false);
   const [, setLocation] = useLocation();
 
-  const changeSection = (key: SectionKey) => { setSection(key); setSidebarOpen(false); };
+  const changeSection = (key: SectionKey) => {
+    if (key === section || isTransitioning) return;
+    setTransitioning(true);
+    setSidebarOpen(false);
+    window.setTimeout(() => {
+      setSection(key);
+      setTransitioning(false);
+      toast.success(navigationFeedbackCopy[language].opened(t(key as never)));
+    }, 180);
+  };
   const submitAssistant = () => {
     if (!query.trim()) return toast.error(shellCopy.assistantQuestionRequired);
     toast.success(shellCopy.assistantQueryAdded);
@@ -242,7 +252,7 @@ export default function Home() {
       <main className={cn("min-h-screen", language === "ar" ? "lg:mr-[278px]" : "lg:ml-[278px]")}>
         <header className="sticky top-0 z-20 flex h-[76px] items-center gap-3 border-b border-white/[.06] bg-[#10141d]/72 px-4 backdrop-blur-xl md:px-7"><button onClick={() => setSidebarOpen(true)} className="grid h-10 w-10 place-items-center rounded-xl border border-white/10 bg-white/[.035] text-slate-300 hover:bg-white/[.07] lg:hidden"><Menu className="h-5 w-5" /></button><div className="hidden min-w-0 flex-1 items-center gap-3 sm:flex"><Search className="h-4 w-4 text-muted-foreground" /><input aria-label={shellCopy.searchLabel} placeholder={shellCopy.searchPlaceholder} className="w-full max-w-lg bg-transparent text-sm text-white outline-none placeholder:text-[#778092]" /></div><div className="flex flex-1 items-center gap-2 sm:flex-none"><button onClick={() => setLocation("/workspace")} className="hidden h-10 items-center gap-2 rounded-xl border border-primary/20 bg-primary/[.08] px-3 text-xs font-semibold text-primary transition-colors hover:bg-primary/[.14] md:flex"><ShieldCheck className="h-4 w-4" />{shellCopy.workspace}</button><div className="flex min-w-0 items-center gap-2 rounded-xl border border-white/[.08] bg-white/[.035] px-3 py-2"><Building2 className="h-4 w-4 shrink-0 text-primary" /><span className="truncate text-xs font-semibold text-slate-200">{shellCopy.organizationName}</span><ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /></div><button onClick={() => toast.info(shellCopy.noUnreadNotifications)} className="relative grid h-10 w-10 place-items-center rounded-xl border border-white/[.08] bg-white/[.035] text-slate-300 hover:bg-white/[.07]" aria-label={shellCopy.notifications}><Bell className="h-[18px] w-[18px]" /><span className="absolute left-2 top-2 h-1.5 w-1.5 rounded-full bg-primary" /></button><button onClick={() => toast.info(shellCopy.permissionAwareInterface)} className="hidden h-10 w-10 place-items-center rounded-xl border border-white/[.08] bg-white/[.035] text-slate-300 hover:bg-white/[.07] sm:grid" aria-label={shellCopy.help}><HelpCircle className="h-[18px] w-[18px]" /></button></div></header>
 
-        <div className="mx-auto max-w-[1600px] p-4 md:p-7">{section === "dashboard" ? <DashboardContent onOpenModule={changeSection} /> : <ModuleView section={section} onBack={() => changeSection("dashboard")} />}</div>
+        <div className="mx-auto max-w-[1600px] p-4 md:p-7" aria-busy={isTransitioning}>{isTransitioning ? <div className="enter flex min-h-[55vh] items-center justify-center gap-3 text-sm text-muted-foreground" role="status"><span className="h-5 w-5 animate-spin rounded-full border-2 border-primary/25 border-t-primary motion-reduce:animate-none" />{navigationFeedbackCopy[language].moving}</div> : section === "dashboard" ? <DashboardContent onOpenModule={changeSection} /> : <ModuleView section={section} onBack={() => changeSection("dashboard")} />}</div>
       </main>
 
       <button onClick={() => setAssistantOpen(true)} className="fixed bottom-5 left-5 z-20 flex items-center gap-2 rounded-2xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground shadow-[0_15px_38px_rgba(217,180,107,.25)] transition-transform active:scale-[.97]"><Bot className="h-5 w-5" />{shellCopy.assistantButton}</button>
