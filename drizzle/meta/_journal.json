@@ -134,6 +134,13 @@
       "when": 1786905760344,
       "tag": "0018_crazy_yellowjacket",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "5",
+      "when": 1786905920094,
+      "tag": "0019_easy_jackpot",
+      "breakpoints": true
     }
   ]
 }

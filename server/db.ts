@@ -667,7 +667,7 @@ export async function listInventoryCountsForOrganization(organizationId: number)
   return db.select().from(inventoryCounts).where(eq(inventoryCounts.organizationId, organizationId)).orderBy(desc(inventoryCounts.createdAt), desc(inventoryCounts.id)).limit(100);
 }
 
-export async function recordStockMovement({ organizationId, warehouseId, productId, batchId, movementType, quantity, unit, actorUserId, sourceDocumentType, sourceDocumentId }: { organizationId: number; warehouseId: number; productId: number; batchId?: number; movementType: "purchase_receipt" | "sales_issue" | "sales_return" | "supplier_return" | "transfer_out" | "transfer_in" | "adjustment" | "opening_balance" | "count_adjustment"; quantity: number; unit: string; actorUserId: number; sourceDocumentType?: string; sourceDocumentId?: number }) {
+export async function recordStockMovement({ organizationId, warehouseId, productId, batchId, movementType, quantity, unit, actorUserId, sourceDocumentType, sourceDocumentId }: { organizationId: number; warehouseId: number; productId: number; batchId?: number; movementType: "purchase_receipt" | "sales_issue" | "sales_return" | "supplier_return" | "transfer_out" | "transfer_in" | "adjustment" | "opening_balance" | "count_adjustment" | "production_issue" | "production_return" | "production_output"; quantity: number; unit: string; actorUserId: number; sourceDocumentType?: string; sourceDocumentId?: number }) {
   const db = await getDb();
   if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
   if (quantity === 0) throw new Error("كمية الحركة لا يمكن أن تكون صفراً.");
@@ -726,7 +726,7 @@ export async function createProductBatch(organizationId: number, input: { produc
   return result;
 }
 
-export async function listStockMovementsForOrganization(organizationId: number, filters?: { productId?: number; warehouseId?: number; movementType?: "purchase_receipt" | "sales_issue" | "sales_return" | "supplier_return" | "transfer_out" | "transfer_in" | "adjustment" | "opening_balance" | "count_adjustment" }) {
+export async function listStockMovementsForOrganization(organizationId: number, filters?: { productId?: number; warehouseId?: number; movementType?: "purchase_receipt" | "sales_issue" | "sales_return" | "supplier_return" | "transfer_out" | "transfer_in" | "adjustment" | "opening_balance" | "count_adjustment" | "production_issue" | "production_return" | "production_output" }) {
   const db = await getDb();
   if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
   const conditions = [eq(stockMovements.organizationId, organizationId)];
@@ -736,11 +736,11 @@ export async function listStockMovementsForOrganization(organizationId: number, 
   return db.select().from(stockMovements).where(and(...conditions)).orderBy(desc(stockMovements.occurredAt), desc(stockMovements.id)).limit(200);
 }
 
-export async function issueStockByFefo({ organizationId, warehouseId, productId, quantity, unit, actorUserId, sourceDocumentType, sourceDocumentId }: { organizationId: number; warehouseId: number; productId: number; quantity: number; unit: string; actorUserId: number; sourceDocumentType?: string; sourceDocumentId?: number }) {
+export async function issueStockByFefo({ organizationId, warehouseId, productId, quantity, unit, actorUserId, movementType = "sales_issue", sourceDocumentType, sourceDocumentId }: { organizationId: number; warehouseId: number; productId: number; quantity: number; unit: string; actorUserId: number; movementType?: "sales_issue" | "production_issue"; sourceDocumentType?: string; sourceDocumentId?: number }) {
   const allocation = await previewFefoAllocation(organizationId, warehouseId, productId, quantity);
   if (allocation.remainingQuantity > 0) throw new Error("لا توجد كميات صالحة كافية لتغطية الصرف وفق FEFO.");
   for (const item of allocation.allocations) {
-    await recordStockMovement({ organizationId, warehouseId, productId, batchId: item.batchId, movementType: "sales_issue", quantity: -item.quantity, unit, actorUserId, sourceDocumentType, sourceDocumentId });
+    await recordStockMovement({ organizationId, warehouseId, productId, batchId: item.batchId, movementType, quantity: -item.quantity, unit, actorUserId, sourceDocumentType, sourceDocumentId });
   }
   return allocation;
 }

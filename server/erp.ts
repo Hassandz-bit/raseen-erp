@@ -13,7 +13,7 @@ import { canUseDistributionPermission, isScopedIdAllowed, type DistributionPermi
 import { addDistributionRouteExpense, completeDriverStop, createDistributionRoute, createDistributionTerritory, createDriverVanSale, createFleetVehicle, createMaintenanceRecord, createVehicleDocument, createVehicleLoadOrder, getDistributionControlCenter, getDistributionOwnerAlertReasons, getDistributionSettings, getDriverRouteFeed, getDriverRouteInventory, getLatestFleetLocations, listDistributionRoutes, listDistributionTerritories, listFleetVehicles, listVehicleInventory, logFuel, recordDistributionCollection, recordDistributionDelivery, recordDistributionReturn, recordFleetGpsPoint, recordGeofenceEvent, returnVehicleStockToWarehouse, saveDistributionSettings, submitDistributionDeliveryProof, submitRouteClosing, transitionDistributionRoute, transitionRouteClosing, transitionVehicleLoadOrder } from "./distribution";
 import { cancelRetailerOrder, createB2bPromotion, createRetailerOrder, getRetailerCatalog, grantRetailerAccess, listManagedRetailerAccesses, listOrganizationB2bOrders, listRetailerAccesses, listRetailerDocuments, listRetailerOrders, reorderRetailerOrder, reviewAndConvertRetailerOrder, updateRetailerAccessStatus } from "./b2b";
 import { calculatePackagingLogistics, findSuitableVehicles, listProductPackaging, listUomCatalog } from "./uomPackaging";
-import { createManufacturingBom, createProductionOrder, reserveProductionMaterials } from "./manufacturing";
+import { createManufacturingBom, createProductionOrder, issueMaterialsForProduction, reserveProductionMaterials, returnMaterialsFromProduction, transitionProductionOrderStatus } from "./manufacturing";
 
 type ModuleKey = "inventory" | "sales" | "purchases" | "finance" | "hr" | "reports" | "ai_assistant" | "distribution";
 const operationalModuleKeys = ["inventory", "sales", "purchases", "finance", "hr"] as const;
@@ -413,6 +413,18 @@ export const erpRouter = router({
     reserveMaterials: protectedProcedure.input(z.object({ productionOrderId: z.number().int().positive(), overrideReason: z.string().trim().min(3).max(1000).optional() })).mutation(async ({ ctx, input }) => {
       const context = await requireOrganizationOwner(ctx.user.id);
       return reserveProductionMaterials(context.organization.id, ctx.user.id, input.productionOrderId, input.overrideReason);
+    }),
+    issueMaterials: protectedProcedure.input(z.object({ productionOrderId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+      const context = await requireOrganizationOwner(ctx.user.id);
+      return issueMaterialsForProduction(context.organization.id, ctx.user.id, input.productionOrderId);
+    }),
+    returnMaterials: protectedProcedure.input(z.object({ productionOrderId: z.number().int().positive(), items: z.array(z.object({ reservationId: z.number().int().positive(), quantity: z.number().positive() })).min(1).max(200) })).mutation(async ({ ctx, input }) => {
+      const context = await requireOrganizationOwner(ctx.user.id);
+      return returnMaterialsFromProduction(context.organization.id, ctx.user.id, input.productionOrderId, input.items);
+    }),
+    transitionOrder: protectedProcedure.input(z.object({ productionOrderId: z.number().int().positive(), nextStatus: z.enum(["planned", "approved", "in_production", "quality_hold", "completed", "closed", "cancelled"]) })).mutation(async ({ ctx, input }) => {
+      const context = await requireOrganizationOwner(ctx.user.id);
+      return transitionProductionOrderStatus(context.organization.id, ctx.user.id, input.productionOrderId, input.nextStatus);
     }),
   }),
   b2b: router({
