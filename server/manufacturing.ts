@@ -244,7 +244,8 @@ export async function getProductionOrderOperationalDetails(organizationId: numbe
     db.select().from(auditLogs).where(and(eq(auditLogs.organizationId, organizationId), eq(auditLogs.entityType, "production_order"), eq(auditLogs.entityId, String(productionOrderId)))).orderBy(desc(auditLogs.createdAt)).limit(100),
     includeCosts ? db.select().from(productionExpenses).where(and(eq(productionExpenses.organizationId, organizationId), eq(productionExpenses.productionOrderId, productionOrderId))).orderBy(desc(productionExpenses.id)) : Promise.resolve([]),
   ]);
-  return { order, reservations, stages, outputs: includeCosts ? outputs : outputs.map(({ unitCost: _unitCost, ...output }) => output), qualityChecks, audit, expenses, canViewCosts: includeCosts };
+  const operationalReservations = reservations.map(reservation => ({ ...reservation, consumedQuantity: String(Math.max(0, Number(reservation.issuedQuantity) - Number(reservation.returnedQuantity))) }));
+  return { order, reservations: operationalReservations, stages, outputs: includeCosts ? outputs : outputs.map(({ unitCost: _unitCost, ...output }) => output), qualityChecks, audit, expenses, canViewCosts: includeCosts };
 }
 
 export async function updateProductionStage(organizationId: number, actorUserId: number, input: { productionOrderId: number; stageId: number; status: "pending" | "in_progress" | "completed" | "blocked" | "skipped"; responsibleUserId?: number; notes?: string }) {
