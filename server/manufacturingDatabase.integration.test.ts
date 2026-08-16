@@ -1,11 +1,12 @@
 import { and, eq } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vitest";
 import { auditLogs, inventoryBalances, organizations, productBatches, products, stockMovements, warehouses } from "../drizzle/schema";
-import { manufacturingBomItems, manufacturingBoms, productionMaterialReservations, productionOrders, productionOutputs, productionStages } from "../drizzle/manufacturingSchema";
+import { manufacturingBomItems, manufacturingBoms, manufacturingProductProfiles, productionMaterialReservations, productionOrders, productionOutputs, productionQualityChecks, productionStages } from "../drizzle/manufacturingSchema";
 import { getDb } from "./db";
-import { closeProductionOrder, createProductionOrder, getProductionTraceability, issueMaterialsForProduction, recordProductionOutput, recordProductionWaste, reserveProductionMaterials, transitionProductionOrderStatus } from "./manufacturing";
+import { closeProductionOrder, createProductionOrder, getProductionTraceability, issueMaterialsForProduction, recordProductionOutput, recordProductionQualityCheck, recordProductionWaste, reserveProductionMaterials, saveManufacturingProductProfile, transitionProductionOrderStatus } from "./manufacturing";
 
 let organizationId: number | null = null;
+let auxiliaryOrganizationIds: number[] = [];
 
 afterEach(async () => {
   if (!organizationId) return;
@@ -15,17 +16,21 @@ afterEach(async () => {
   await db.delete(auditLogs).where(eq(auditLogs.organizationId, id));
   await db.delete(stockMovements).where(eq(stockMovements.organizationId, id));
   await db.delete(inventoryBalances).where(eq(inventoryBalances.organizationId, id));
+  await db.delete(productionQualityChecks).where(eq(productionQualityChecks.organizationId, id));
   await db.delete(productionOutputs).where(eq(productionOutputs.organizationId, id));
   await db.delete(productionMaterialReservations).where(eq(productionMaterialReservations.organizationId, id));
   await db.delete(productionStages).where(eq(productionStages.organizationId, id));
   await db.delete(productionOrders).where(eq(productionOrders.organizationId, id));
   await db.delete(manufacturingBomItems).where(eq(manufacturingBomItems.organizationId, id));
   await db.delete(manufacturingBoms).where(eq(manufacturingBoms.organizationId, id));
+  await db.delete(manufacturingProductProfiles).where(eq(manufacturingProductProfiles.organizationId, id));
   await db.delete(productBatches).where(eq(productBatches.organizationId, id));
   await db.delete(warehouses).where(eq(warehouses.organizationId, id));
   await db.delete(products).where(eq(products.organizationId, id));
   await db.delete(organizations).where(eq(organizations.id, id));
+  for (const auxiliaryOrganizationId of auxiliaryOrganizationIds) await db.delete(organizations).where(eq(organizations.id, auxiliaryOrganizationId));
   organizationId = null;
+  auxiliaryOrganizationIds = [];
 });
 
 describe("تكامل دورة التصنيع", () => {
@@ -53,6 +58,10 @@ describe("تكامل دورة التصنيع", () => {
     await db.insert(manufacturingBomItems).values({ organizationId, bomId, componentProductId: rawProductId, quantity: "6", unit: "قطعة", baseQuantity: "6", wasteAllowance: "0", stageCode: "mixing", required: "yes" });
 
     const order = await createProductionOrder(organizationId, 1, { bomId, plannedQuantity: 6, plannedUnit: "قطعة", baseQuantity: 6, rawMaterialWarehouseId: rawWarehouseId, finishedGoodsWarehouseId: finishedWarehouseId });
+    const otherOrganization = await db.insert(organizations).values({ name: `مؤسسة معزولة ${suffix}`, slug: `manufacturing-isolated-${suffix}`, status: "active", baseCurrency: "SAR", locale: "ar-SA", monthlyBudget: "0" });
+    const otherOrganizationId = Number(otherOrganization[0].insertId);
+    auxiliaryOrganizationIds.push(otherOrganizationId);
+    await expect(getProductionTraceability(otherOrganizationId, order.id)).rejects.toThrow("خارج نطاق المؤسسة");
     await transitionProductionOrderStatus(organizationId, 1, order.id, "planned");
     await transitionProductionOrderStatus(organizationId, 1, order.id, "approved");
     const reservation = await reserveProductionMaterials(organizationId, 1, order.id);
@@ -60,7 +69,10 @@ describe("تكامل دورة التصنيع", () => {
     expect(reservation.reservations.map(item => item.batchId)).toEqual([earlierBatchId, laterBatchId]);
     expect(stages.map(stage => stage.code)).toEqual(["mixing"]);
     await issueMaterialsForProduction(organizationId, 1, order.id);
+    await saveManufacturingProductProfile(organizationId, 1, { productId: finishedProductId, manufacturingType: "finished_good", requiresQualityCheck: "yes", defaultShelfLifeDays: 30 });
     const output = await recordProductionOutput(organizationId, 1, order.id, { lotNumber: `FG-${suffix}`, goodQuantity: 6 });
+    expect(output.qualityStatus).toBe("pending");
+    await recordProductionQualityCheck(organizationId, 1, { productionOrderId: order.id, productionOutputId: output.outputId, checkType: "visual", result: "pass", notes: "تم اجتياز الفحص" });
     await recordProductionWaste(organizationId, 1, { productionOrderId: order.id, productionOutputId: output.outputId, defectiveQuantity: 0.25, scrapQuantity: 0.5, reworkQuantity: 0.1, reason: "اختبار تدفق الهدر" });
     const traceability = await getProductionTraceability(organizationId, order.id);
     const close = await closeProductionOrder(organizationId, 1, order.id);
@@ -72,6 +84,7 @@ describe("تكامل دورة التصنيع", () => {
     expect(earlierAfter?.currentQuantity).toBe("0.000");
     expect(laterAfter?.currentQuantity).toBe("0.000");
     expect(finishedBatch?.status).toBe("active");
+    expect(finishedBatch?.expiryDate).toBeTruthy();
     expect(outputAfterWaste?.defectiveQuantity).toBe("0.250000");
     expect(outputAfterWaste?.scrapQuantity).toBe("0.500000");
     expect(outputAfterWaste?.reworkQuantity).toBe("0.100000");
