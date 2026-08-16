@@ -710,16 +710,16 @@ export async function listProductBatchesForOrganization(organizationId: number, 
   return db.select().from(productBatches).where(and(...conditions)).orderBy(asc(productBatches.expiryDate), desc(productBatches.createdAt)).limit(200);
 }
 
-export async function createProductBatch(organizationId: number, input: { productId: number; warehouseId: number; lotNumber: string; receivedQuantity: number; cost: number; sourcePartyId?: number; manufacturingDate?: Date; expiryDate?: Date }) {
+export async function createProductBatch(organizationId: number, input: { productId: number; warehouseId: number; lotNumber: string; receivedQuantity: number; cost: number; sourcePartyId?: number; manufacturingDate?: Date; expiryDate?: Date; status?: "active" | "blocked" | "quarantined" | "expired"; movementType?: "opening_balance" | "production_output"; sourceDocumentType?: string; sourceDocumentId?: number }) {
   const db = await getDb();
   if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
   const result = await db.transaction(async tx => {
     const product = await tx.select({ id: products.id, baseUnit: products.baseUnit }).from(products).where(and(eq(products.id, input.productId), eq(products.organizationId, organizationId))).limit(1);
     const warehouse = await tx.select({ id: warehouses.id }).from(warehouses).where(and(eq(warehouses.id, input.warehouseId), eq(warehouses.organizationId, organizationId), eq(warehouses.status, "active"))).limit(1);
     if (!product[0] || !warehouse[0]) throw new Error("لا يمكن إنشاء دفعة لمنتج أو مخزن خارج نطاق المؤسسة الحالية.");
-    const inserted = await tx.insert(productBatches).values({ organizationId, productId: input.productId, warehouseId: input.warehouseId, lotNumber: input.lotNumber, sourcePartyId: input.sourcePartyId, receivedQuantity: String(input.receivedQuantity), currentQuantity: String(input.receivedQuantity), reservedQuantity: "0", cost: String(input.cost), manufacturingDate: input.manufacturingDate, expiryDate: input.expiryDate, status: "active" });
+    const inserted = await tx.insert(productBatches).values({ organizationId, productId: input.productId, warehouseId: input.warehouseId, lotNumber: input.lotNumber, sourcePartyId: input.sourcePartyId, receivedQuantity: String(input.receivedQuantity), currentQuantity: String(input.receivedQuantity), reservedQuantity: "0", cost: String(input.cost), manufacturingDate: input.manufacturingDate, expiryDate: input.expiryDate, status: input.status ?? "active" });
     const batchId = Number(inserted[0].insertId);
-    await tx.insert(stockMovements).values({ organizationId, warehouseId: input.warehouseId, productId: input.productId, batchId, movementType: "opening_balance", quantity: String(input.receivedQuantity), unit: product[0].baseUnit, sourceDocumentType: "product_batch", sourceDocumentId: batchId, occurredAt: new Date(), auditReference: `BAT-${batchId}` });
+    await tx.insert(stockMovements).values({ organizationId, warehouseId: input.warehouseId, productId: input.productId, batchId, movementType: input.movementType ?? "opening_balance", quantity: String(input.receivedQuantity), unit: product[0].baseUnit, sourceDocumentType: input.sourceDocumentType ?? "product_batch", sourceDocumentId: input.sourceDocumentId ?? batchId, occurredAt: new Date(), auditReference: `BAT-${batchId}` });
     await tx.insert(inventoryBalances).values({ organizationId, warehouseId: input.warehouseId, productId: input.productId, quantity: String(input.receivedQuantity), reservedQuantity: "0" }).onDuplicateKeyUpdate({ set: { quantity: sql`${inventoryBalances.quantity} + ${input.receivedQuantity}` } });
     return { id: batchId };
   });

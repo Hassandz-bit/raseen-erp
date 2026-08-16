@@ -1,7 +1,8 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { auditLogs, manufacturingBomItems, manufacturingBoms, productBatches, productionMaterialReservations, productionOrders, productionStages, products, warehouses } from "../drizzle/schema";
-import { getDb, previewFefoAllocation, recordStockMovement } from "./db";
-import { canTransitionProductionOrder, type ProductionStatus } from "./manufacturingPolicy";
+import { manufacturingProductProfiles, productionExpenses, productionOutputs, productionQualityChecks } from "../drizzle/manufacturingSchema";
+import { createProductBatch, getDb, previewFefoAllocation, recordStockMovement } from "./db";
+import { calculateUnitProductionCost, canTransitionProductionOrder, type ProductionStatus } from "./manufacturingPolicy";
 
 const productionNumber = () => `PO-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 
@@ -101,6 +102,65 @@ export async function returnMaterialsFromProduction(organizationId: number, acto
   }
   await db.insert(auditLogs).values({ organizationId, actorUserId, action: "manufacturing.materials_returned", entityType: "production_order", entityId: String(productionOrderId), metadata: { items } });
   return { returnedCount: items.length };
+}
+
+export async function recordProductionOutput(organizationId: number, actorUserId: number, productionOrderId: number, input: { lotNumber: string; goodQuantity: number; defectiveQuantity?: number; reworkQuantity?: number; scrapQuantity?: number; manufacturingDate?: Date; expiryDate?: Date }) {
+  const db = await getDb(); if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  if (input.goodQuantity <= 0) throw new Error("يجب أن تكون كمية المنتج الجيد أكبر من صفر.");
+  const [order] = await db.select().from(productionOrders).where(and(eq(productionOrders.id, productionOrderId), eq(productionOrders.organizationId, organizationId), eq(productionOrders.status, "in_production"))).limit(1);
+  if (!order) throw new Error("لا يمكن تسجيل مخرجات لهذا الأمر في حالته الحالية.");
+  const [profile] = await db.select().from(manufacturingProductProfiles).where(and(eq(manufacturingProductProfiles.organizationId, organizationId), eq(manufacturingProductProfiles.productId, order.productId))).limit(1);
+  const reservations = await db.select().from(productionMaterialReservations).where(and(eq(productionMaterialReservations.organizationId, organizationId), eq(productionMaterialReservations.productionOrderId, productionOrderId)));
+  const batchIds = reservations.flatMap(row => row.batchId ? [row.batchId] : []);
+  const consumedBatches = batchIds.length ? await db.select().from(productBatches).where(and(eq(productBatches.organizationId, organizationId), inArray(productBatches.id, batchIds))) : [];
+  const batchCostById = new Map(consumedBatches.map(batch => [batch.id, Number(batch.cost)]));
+  const materialCost = reservations.reduce((total, row) => total + Math.max(0, Number(row.issuedQuantity) - Number(row.returnedQuantity)) * (row.batchId ? batchCostById.get(row.batchId) ?? 0 : 0), 0);
+  const expenses = await db.select().from(productionExpenses).where(and(eq(productionExpenses.organizationId, organizationId), eq(productionExpenses.productionOrderId, productionOrderId)));
+  const directCost = expenses.reduce((total, expense) => total + Number(expense.amount) * Number(expense.exchangeRateSnapshot ?? 1), 0);
+  const unitCost = calculateUnitProductionCost({ materialCost, overheadCost: directCost, goodQuantity: input.goodQuantity });
+  const manufacturingDate = input.manufacturingDate ?? new Date();
+  const qualityPending = profile?.requiresQualityCheck === "yes";
+  const batch = await createProductBatch(organizationId, { productId: order.productId, warehouseId: order.finishedGoodsWarehouseId, lotNumber: input.lotNumber.trim(), receivedQuantity: input.goodQuantity, cost: unitCost, manufacturingDate, expiryDate: input.expiryDate, status: qualityPending ? "quarantined" : "active", movementType: "production_output", sourceDocumentType: "production_order", sourceDocumentId: productionOrderId });
+  const inserted = await db.transaction(async tx => {
+    const output = await tx.insert(productionOutputs).values({ organizationId, productionOrderId, productId: order.productId, batchId: batch.id, goodQuantity: String(input.goodQuantity), defectiveQuantity: String(input.defectiveQuantity ?? 0), reworkQuantity: String(input.reworkQuantity ?? 0), scrapQuantity: String(input.scrapQuantity ?? 0), unitCost: String(unitCost), qualityStatus: qualityPending ? "pending" : "passed" });
+    await tx.update(productionOrders).set({ status: qualityPending ? "quality_hold" : "completed", actualEnd: qualityPending ? undefined : new Date() }).where(and(eq(productionOrders.id, productionOrderId), eq(productionOrders.organizationId, organizationId)));
+    await tx.insert(auditLogs).values({ organizationId, actorUserId, action: "manufacturing.output_recorded", entityType: "production_order", entityId: String(productionOrderId), metadata: { batchId: batch.id, goodQuantity: input.goodQuantity, materialCost, directCost, unitCost, qualityPending } });
+    return Number(output[0].insertId);
+  });
+  return { outputId: inserted, batchId: batch.id, unitCost, qualityStatus: qualityPending ? "pending" as const : "passed" as const };
+}
+
+export async function recordProductionQualityCheck(organizationId: number, actorUserId: number, input: { productionOrderId: number; productionOutputId: number; checkType: string; result: "pass" | "fail"; numericValue?: number; notes?: string; checkedAt?: Date }) {
+  const db = await getDb(); if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const [output] = await db.select().from(productionOutputs).where(and(eq(productionOutputs.id, input.productionOutputId), eq(productionOutputs.organizationId, organizationId), eq(productionOutputs.productionOrderId, input.productionOrderId))).limit(1);
+  if (!output?.batchId) throw new Error("مخرج الإنتاج أو دفعة المنتج النهائي خارج نطاق المؤسسة.");
+  const [order] = await db.select().from(productionOrders).where(and(eq(productionOrders.id, input.productionOrderId), eq(productionOrders.organizationId, organizationId))).limit(1);
+  if (!order || !["quality_hold", "in_production"].includes(order.status)) throw new Error("لا يمكن تسجيل فحص جودة لأمر الإنتاج في حالته الحالية.");
+  await db.transaction(async tx => {
+    await tx.insert(productionQualityChecks).values({ organizationId, productionOrderId: input.productionOrderId, productionOutputId: input.productionOutputId, batchId: output.batchId!, checkType: input.checkType.trim(), result: input.result, numericValue: input.numericValue === undefined ? undefined : String(input.numericValue), notes: input.notes?.trim(), inspectorUserId: actorUserId, checkedAt: input.checkedAt ?? new Date() });
+    await tx.update(productionOutputs).set({ qualityStatus: input.result === "pass" ? "passed" : "quarantined" }).where(and(eq(productionOutputs.id, input.productionOutputId), eq(productionOutputs.organizationId, organizationId)));
+    await tx.update(productBatches).set({ status: input.result === "pass" ? "active" : "quarantined" }).where(and(eq(productBatches.id, output.batchId!), eq(productBatches.organizationId, organizationId)));
+    await tx.update(productionOrders).set({ status: input.result === "pass" ? "completed" : "quality_hold", actualEnd: input.result === "pass" ? new Date() : undefined }).where(and(eq(productionOrders.id, input.productionOrderId), eq(productionOrders.organizationId, organizationId)));
+    await tx.insert(auditLogs).values({ organizationId, actorUserId, action: "manufacturing.quality_checked", entityType: "production_output", entityId: String(input.productionOutputId), metadata: { productionOrderId: input.productionOrderId, batchId: output.batchId, result: input.result, checkType: input.checkType } });
+  });
+  return { productionOutputId: input.productionOutputId, batchId: output.batchId, result: input.result };
+}
+
+export async function getProductionTraceability(organizationId: number, productionOrderId: number) {
+  const db = await getDb(); if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const [order] = await db.select().from(productionOrders).where(and(eq(productionOrders.id, productionOrderId), eq(productionOrders.organizationId, organizationId))).limit(1);
+  if (!order) throw new Error("أمر الإنتاج خارج نطاق المؤسسة.");
+  const [reservations, outputs] = await Promise.all([
+    db.select().from(productionMaterialReservations).where(and(eq(productionMaterialReservations.organizationId, organizationId), eq(productionMaterialReservations.productionOrderId, productionOrderId))),
+    db.select().from(productionOutputs).where(and(eq(productionOutputs.organizationId, organizationId), eq(productionOutputs.productionOrderId, productionOrderId))),
+  ]);
+  const rawBatchIds = reservations.flatMap(row => row.batchId ? [row.batchId] : []);
+  const finishedBatchIds = outputs.flatMap(row => row.batchId ? [row.batchId] : []);
+  const [rawBatches, finishedBatches] = await Promise.all([
+    rawBatchIds.length ? db.select().from(productBatches).where(and(eq(productBatches.organizationId, organizationId), inArray(productBatches.id, rawBatchIds))) : Promise.resolve([]),
+    finishedBatchIds.length ? db.select().from(productBatches).where(and(eq(productBatches.organizationId, organizationId), inArray(productBatches.id, finishedBatchIds))) : Promise.resolve([]),
+  ]);
+  return { order, rawMaterials: reservations.map(reservation => ({ reservation, batch: rawBatches.find(batch => batch.id === reservation.batchId) ?? null })), outputs: outputs.map(output => ({ output, batch: finishedBatches.find(batch => batch.id === output.batchId) ?? null })) };
 }
 
 export async function transitionProductionOrderStatus(organizationId: number, actorUserId: number, productionOrderId: number, nextStatus: ProductionStatus) {

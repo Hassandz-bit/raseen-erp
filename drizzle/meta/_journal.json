@@ -141,6 +141,13 @@
       "when": 1786905920094,
       "tag": "0019_easy_jackpot",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "5",
+      "when": 1786906189323,
+      "tag": "0020_perfect_the_renegades",
+      "breakpoints": true
     }
   ]
 }

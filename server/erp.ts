@@ -13,7 +13,7 @@ import { canUseDistributionPermission, isScopedIdAllowed, type DistributionPermi
 import { addDistributionRouteExpense, completeDriverStop, createDistributionRoute, createDistributionTerritory, createDriverVanSale, createFleetVehicle, createMaintenanceRecord, createVehicleDocument, createVehicleLoadOrder, getDistributionControlCenter, getDistributionOwnerAlertReasons, getDistributionSettings, getDriverRouteFeed, getDriverRouteInventory, getLatestFleetLocations, listDistributionRoutes, listDistributionTerritories, listFleetVehicles, listVehicleInventory, logFuel, recordDistributionCollection, recordDistributionDelivery, recordDistributionReturn, recordFleetGpsPoint, recordGeofenceEvent, returnVehicleStockToWarehouse, saveDistributionSettings, submitDistributionDeliveryProof, submitRouteClosing, transitionDistributionRoute, transitionRouteClosing, transitionVehicleLoadOrder } from "./distribution";
 import { cancelRetailerOrder, createB2bPromotion, createRetailerOrder, getRetailerCatalog, grantRetailerAccess, listManagedRetailerAccesses, listOrganizationB2bOrders, listRetailerAccesses, listRetailerDocuments, listRetailerOrders, reorderRetailerOrder, reviewAndConvertRetailerOrder, updateRetailerAccessStatus } from "./b2b";
 import { calculatePackagingLogistics, findSuitableVehicles, listProductPackaging, listUomCatalog } from "./uomPackaging";
-import { createManufacturingBom, createProductionOrder, issueMaterialsForProduction, reserveProductionMaterials, returnMaterialsFromProduction, transitionProductionOrderStatus } from "./manufacturing";
+import { createManufacturingBom, createProductionOrder, getProductionTraceability, issueMaterialsForProduction, recordProductionOutput, recordProductionQualityCheck, reserveProductionMaterials, returnMaterialsFromProduction, transitionProductionOrderStatus } from "./manufacturing";
 
 type ModuleKey = "inventory" | "sales" | "purchases" | "finance" | "hr" | "reports" | "ai_assistant" | "distribution";
 const operationalModuleKeys = ["inventory", "sales", "purchases", "finance", "hr"] as const;
@@ -421,6 +421,18 @@ export const erpRouter = router({
     returnMaterials: protectedProcedure.input(z.object({ productionOrderId: z.number().int().positive(), items: z.array(z.object({ reservationId: z.number().int().positive(), quantity: z.number().positive() })).min(1).max(200) })).mutation(async ({ ctx, input }) => {
       const context = await requireOrganizationOwner(ctx.user.id);
       return returnMaterialsFromProduction(context.organization.id, ctx.user.id, input.productionOrderId, input.items);
+    }),
+    recordOutput: protectedProcedure.input(z.object({ productionOrderId: z.number().int().positive(), lotNumber: z.string().trim().min(2).max(96), goodQuantity: z.number().positive(), defectiveQuantity: z.number().nonnegative().optional(), reworkQuantity: z.number().nonnegative().optional(), scrapQuantity: z.number().nonnegative().optional(), manufacturingDate: z.coerce.date().optional(), expiryDate: z.coerce.date().optional() })).mutation(async ({ ctx, input }) => {
+      const context = await requireOrganizationOwner(ctx.user.id);
+      return recordProductionOutput(context.organization.id, ctx.user.id, input.productionOrderId, input);
+    }),
+    qualityCheck: protectedProcedure.input(z.object({ productionOrderId: z.number().int().positive(), productionOutputId: z.number().int().positive(), checkType: z.string().trim().min(2).max(120), result: z.enum(["pass", "fail"]), numericValue: z.number().finite().optional(), notes: z.string().trim().max(2000).optional(), checkedAt: z.coerce.date().optional() })).mutation(async ({ ctx, input }) => {
+      const context = await requireOrganizationOwner(ctx.user.id);
+      return recordProductionQualityCheck(context.organization.id, ctx.user.id, input);
+    }),
+    traceability: protectedProcedure.input(z.object({ productionOrderId: z.number().int().positive() })).query(async ({ ctx, input }) => {
+      const context = await requireOrganizationOwner(ctx.user.id);
+      return getProductionTraceability(context.organization.id, input.productionOrderId);
     }),
     transitionOrder: protectedProcedure.input(z.object({ productionOrderId: z.number().int().positive(), nextStatus: z.enum(["planned", "approved", "in_production", "quality_hold", "completed", "closed", "cancelled"]) })).mutation(async ({ ctx, input }) => {
       const context = await requireOrganizationOwner(ctx.user.id);
