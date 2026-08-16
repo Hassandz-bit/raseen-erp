@@ -1,0 +1,9 @@
+{
+  "name": "Nawa Driver",
+  "short_name": "Nawa Driver",
+  "start_url": "/driver",
+  "display": "standalone",
+  "background_color": "#0b0e14",
+  "theme_color": "#0b0e14",
+  "description": "واجهة Nawa ERP الميدانية للسائقين. تتطلب مشاركة الموقع موافقة صريحة ولا توفر تتبعاً خلفياً بعد إغلاق التطبيق."
+}

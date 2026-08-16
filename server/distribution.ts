@@ -381,6 +381,16 @@ export async function listVehicleInventory(organizationId: number, vehicleId: nu
   return db.select().from(productBatches).where(and(eq(productBatches.organizationId, organizationId), eq(productBatches.warehouseId, vehicle.mobileWarehouseId!))).orderBy(asc(productBatches.expiryDate), desc(productBatches.createdAt)).limit(300);
 }
 
+export async function getDriverRouteInventory(organizationId: number, routeId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const [route] = await db.select().from(distributionRoutes).where(and(eq(distributionRoutes.id, routeId), eq(distributionRoutes.organizationId, organizationId))).limit(1);
+  await assertOrganizationRecord(route, "الجولة");
+  if (!route.vehicleId) throw new Error("لا توجد مركبة مسندة لهذه الجولة.");
+  const vehicle = await assertVehicle(db, organizationId, route.vehicleId);
+  return db.select({ batchId: productBatches.id, productId: products.id, productName: products.name, sku: products.sku, unit: products.salesUnit, lotNumber: productBatches.lotNumber, expiryDate: productBatches.expiryDate, loadedQuantity: productBatches.receivedQuantity, remainingQuantity: productBatches.currentQuantity, reservedQuantity: productBatches.reservedQuantity, batchStatus: productBatches.status }).from(productBatches).innerJoin(products, and(eq(products.id, productBatches.productId), eq(products.organizationId, productBatches.organizationId))).where(and(eq(productBatches.organizationId, organizationId), eq(productBatches.warehouseId, vehicle.mobileWarehouseId!))).orderBy(asc(productBatches.expiryDate), asc(products.name)).limit(300);
+}
+
 export async function addDistributionRouteExpense(organizationId: number, actorUserId: number, input: { routeId: number; vehicleId?: number; category: "fuel" | "toll" | "parking" | "minor"; amount: number; currencyCode: string; receiptUrl?: string; notes?: string }) {
   const db = await getDb();
   if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
@@ -471,6 +481,17 @@ export async function recordGeofenceEvent(organizationId: number, actorUserId: n
   if (input.eventType === "arrival") await db.update(distributionRouteStops).set({ arrivedAt: input.recordedAt, deliveryStatus: "arrived" }).where(and(eq(distributionRouteStops.id, input.stopId), eq(distributionRouteStops.organizationId, organizationId), eq(distributionRouteStops.routeId, input.routeId), eq(distributionRouteStops.deliveryStatus, "pending")));
   await db.insert(auditLogs).values({ organizationId, actorUserId, action: `distribution_geofence.${input.eventType}`, entityType: "distribution_route_stop", entityId: String(input.stopId), metadata: { routeId: input.routeId, distanceMeters: input.distanceMeters ?? null } });
   return { id: Number(result[0].insertId) };
+}
+
+export async function completeDriverStop(organizationId: number, actorUserId: number, input: { routeId: number; stopId: number; status: "skipped" | "failed"; reason: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const [stop] = await db.select().from(distributionRouteStops).where(and(eq(distributionRouteStops.id, input.stopId), eq(distributionRouteStops.organizationId, organizationId), eq(distributionRouteStops.routeId, input.routeId))).limit(1);
+  await assertOrganizationRecord(stop, "محطة الجولة");
+  if (["delivered", "partial", "skipped"].includes(stop.deliveryStatus)) throw new Error("لا يمكن تعديل محطة منجزة أو متخطاة من تطبيق السائق.");
+  await db.update(distributionRouteStops).set({ deliveryStatus: input.status, notes: `${stop.notes ? `${stop.notes}\n` : ""}${input.reason.trim()}` }).where(and(eq(distributionRouteStops.id, input.stopId), eq(distributionRouteStops.organizationId, organizationId), eq(distributionRouteStops.deliveryStatus, stop.deliveryStatus)));
+  await db.insert(auditLogs).values({ organizationId, actorUserId, action: `distribution_stop.${input.status}`, entityType: "distribution_route_stop", entityId: String(input.stopId), metadata: { routeId: input.routeId, reason: input.reason.trim() } });
+  return { id: input.stopId, status: input.status };
 }
 
 export async function getLatestFleetLocations(organizationId: number) {

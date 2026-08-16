@@ -11,7 +11,7 @@ import { hasValidExchangeRateDateRange, normalizeExchangeRateFilters } from "./e
 import { isValidTextBarcode } from "./barcodePolicy";
 import { classifyBranchPersistenceError } from "./branchPolicy";
 import { canUseDistributionPermission, isScopedIdAllowed, type DistributionPermission } from "./distributionPolicy";
-import { addDistributionRouteExpense, createDistributionRoute, createDistributionTerritory, createFleetVehicle, createMaintenanceRecord, createVehicleDocument, createVehicleLoadOrder, getDistributionControlCenter, getDistributionOwnerAlertReasons, getDistributionSettings, getDriverRouteFeed, getLatestFleetLocations, listDistributionRoutes, listDistributionTerritories, listFleetVehicles, listVehicleInventory, logFuel, recordDistributionCollection, recordDistributionDelivery, recordDistributionReturn, recordFleetGpsPoint, recordGeofenceEvent, returnVehicleStockToWarehouse, saveDistributionSettings, submitDistributionDeliveryProof, submitRouteClosing, transitionDistributionRoute, transitionRouteClosing, transitionVehicleLoadOrder } from "./distribution";
+import { addDistributionRouteExpense, completeDriverStop, createDistributionRoute, createDistributionTerritory, createFleetVehicle, createMaintenanceRecord, createVehicleDocument, createVehicleLoadOrder, getDistributionControlCenter, getDistributionOwnerAlertReasons, getDistributionSettings, getDriverRouteFeed, getDriverRouteInventory, getLatestFleetLocations, listDistributionRoutes, listDistributionTerritories, listFleetVehicles, listVehicleInventory, logFuel, recordDistributionCollection, recordDistributionDelivery, recordDistributionReturn, recordFleetGpsPoint, recordGeofenceEvent, returnVehicleStockToWarehouse, saveDistributionSettings, submitDistributionDeliveryProof, submitRouteClosing, transitionDistributionRoute, transitionRouteClosing, transitionVehicleLoadOrder } from "./distribution";
 
 type ModuleKey = "inventory" | "sales" | "purchases" | "finance" | "hr" | "reports" | "ai_assistant" | "distribution";
 const operationalModuleKeys = ["inventory", "sales", "purchases", "finance", "hr"] as const;
@@ -461,6 +461,12 @@ export const erpRouter = router({
         const context = await requireDistributionPermission(ctx.user.id, "distribution.deliver");
         return getDriverRouteFeed(context.organization.id, context.membership.dataScope?.assignedRouteIds ?? []);
       }),
+      inventory: protectedProcedure.input(z.object({ routeId: z.number().int().positive() })).query(async ({ ctx, input }) => {
+        const context = await requireDistributionPermission(ctx.user.id, "distribution.deliver");
+        assertDistributionScope(context, { routeId: input.routeId });
+        if (!context.membership.dataScope?.assignedRouteIds?.includes(input.routeId)) throw new TRPCError({ code: "FORBIDDEN", message: "لا يمكنك عرض مخزون جولة غير مسندة إليك." });
+        return getDriverRouteInventory(context.organization.id, input.routeId);
+      }),
       transition: protectedProcedure.input(z.object({ routeId: z.number().int().positive(), status: z.enum(["in_progress", "returning"]) })).mutation(async ({ ctx, input }) => {
         const context = await requireDistributionPermission(ctx.user.id, "distribution.deliver");
         assertDistributionScope(context, { routeId: input.routeId });
@@ -472,6 +478,12 @@ export const erpRouter = router({
         assertDistributionScope(context, { routeId: input.routeId });
         if (!context.membership.dataScope?.assignedRouteIds?.includes(input.routeId)) throw new TRPCError({ code: "FORBIDDEN", message: "لا يمكنك إضافة إثبات لتسليم خارج جولتك المسندة." });
         return submitDistributionDeliveryProof(context.organization.id, ctx.user.id, input);
+      }),
+      completeStop: protectedProcedure.input(z.object({ routeId: z.number().int().positive(), stopId: z.number().int().positive(), status: z.enum(["skipped", "failed"]), reason: z.string().trim().min(3).max(1000) })).mutation(async ({ ctx, input }) => {
+        const context = await requireDistributionPermission(ctx.user.id, "distribution.deliver");
+        assertDistributionScope(context, { routeId: input.routeId });
+        if (!context.membership.dataScope?.assignedRouteIds?.includes(input.routeId)) throw new TRPCError({ code: "FORBIDDEN", message: "لا يمكنك إكمال محطة خارج جولتك المسندة." });
+        return completeDriverStop(context.organization.id, ctx.user.id, input);
       }),
     }),
     loads: router({
