@@ -1,5 +1,5 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
-import { auditLogs, manufacturingBomItems, manufacturingBoms, organizationExchangeRates, organizations, productBatches, productionMaterialReservations, productionOrders, productionStages, products, warehouses } from "../drizzle/schema";
+import { auditLogs, manufacturingBomItems, manufacturingBoms, organizationExchangeRates, organizations, productBatches, productionMaterialReservations, productionOrders, products, warehouses } from "../drizzle/schema";
 import { manufacturingProductProfiles, productionExpenses, productionOutputs, productionQualityChecks } from "../drizzle/manufacturingSchema";
 import { createProductBatch, getDb, previewFefoAllocation, recordStockMovement } from "./db";
 import { calculateUnitProductionCost, canTransitionProductionOrder, type ProductionStatus } from "./manufacturingPolicy";

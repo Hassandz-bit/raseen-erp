@@ -7,7 +7,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { manufacturingCenterCopy } from "@/i18n/translations";
 import { trpc } from "@/lib/trpc";
-import { Boxes, CircleDollarSign, Factory, FlaskConical, RefreshCw, ShieldCheck, TriangleAlert } from "lucide-react";
+import { Boxes, Factory, FlaskConical, RefreshCw, ShieldCheck, TriangleAlert } from "lucide-react";
 import { useState } from "react";
 
 const statusKey = (status: string) => ({ draft: "draft", planned: "planned", approved: "approved", materials_reserved: "materialsReserved", in_production: "activeProduction", quality_hold: "qualityHoldStatus", completed: "completedStatus", closed: "closed", cancelled: "cancelled" }[status] ?? "draft") as keyof typeof manufacturingCenterCopy.ar;
