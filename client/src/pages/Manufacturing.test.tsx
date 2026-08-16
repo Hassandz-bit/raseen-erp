@@ -1,9 +1,10 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import React from "react";
 import { describe, expect, it, vi } from "vitest";
 
 const refreshOverview = vi.fn();
 const refreshOrders = vi.fn();
+let mockCapabilities: Record<string, boolean> = { "manufacturing.order.plan": true, "manufacturing.order.approve": true, "manufacturing.order.create": true, "manufacturing.reports.export": true };
 
 vi.mock("@/components/DashboardLayout", () => ({ default: ({ children }: { children: React.ReactNode }) => <>{children}</> }));
 vi.mock("@/contexts/LanguageContext", () => ({ useLanguage: () => ({ language: "ar", direction: "rtl", t: (key: string) => key === "status" ? "الحالة" : key }) }));
@@ -12,7 +13,7 @@ vi.mock("@/lib/trpc", () => {
   return { trpc: { erp: { manufacturing: {
     overview: { useQuery: () => ({ data: { planned: 3, inProduction: 1, completed: 2, closed: 0, materialShortages: 0, qualityHold: 0, goodOutputQuantity: 48, wasteQuantity: 2, averageUnitCost: 15.5 }, isLoading: false, isError: false, refetch: refreshOverview }) },
     orders: { useQuery: () => ({ data: [], isLoading: false, isError: false, refetch: refreshOrders }) },
-    capabilities: { useQuery: () => ({ data: { capabilities: { "manufacturing.order.plan": true, "manufacturing.order.approve": true, "manufacturing.order.create": true, "manufacturing.reports.export": true } } }) },
+    capabilities: { useQuery: () => ({ data: { capabilities: mockCapabilities } }) },
     operationalOptions: { useQuery: () => ({ data: { boms: [], warehouses: [], productionLines: [] } }) },
     orderDetails: { useQuery: () => ({ data: undefined, isLoading: false, refetch: vi.fn() }) },
     batchGenealogy: { useQuery: () => ({ data: undefined, isError: false }) },
@@ -24,6 +25,7 @@ import Manufacturing from "./Manufacturing";
 
 describe("Manufacturing UI", () => {
   it("يعرض المؤشرات المعزولة وحالة الفراغ ويعيد تحديث بيانات المركز", () => {
+    mockCapabilities = { "manufacturing.order.plan": true, "manufacturing.order.approve": true, "manufacturing.order.create": true, "manufacturing.reports.export": true };
     render(<Manufacturing />);
     expect(screen.getByText("مركز التصنيع والإنتاج")).toBeTruthy();
     expect(screen.getByText("أمر إنتاج جديد")).toBeTruthy();
@@ -34,5 +36,14 @@ describe("Manufacturing UI", () => {
     fireEvent.click(screen.getByText("تحديث المركز"));
     expect(refreshOverview).toHaveBeenCalledTimes(1);
     expect(refreshOrders).toHaveBeenCalledTimes(1);
+  });
+
+  it("يخفي الإنشاء والتصدير عند غياب الصلاحيات", () => {
+    cleanup();
+    mockCapabilities = { "manufacturing.order.plan": true };
+    render(<Manufacturing />);
+    expect(screen.queryByText("أمر إنتاج جديد")).toBeNull();
+    expect(screen.queryByText("exportSpreadsheet")).toBeNull();
+    expect(screen.queryByText("downloadPdf")).toBeNull();
   });
 });
