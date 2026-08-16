@@ -27,6 +27,8 @@ describe("Manufacturing UI", () => {
     render(<Manufacturing />);
     expect(screen.getByText("مركز التصنيع والإنتاج")).toBeTruthy();
     expect(screen.getByText("أمر إنتاج جديد")).toBeTruthy();
+    expect(screen.getByText("exportSpreadsheet")).toBeTruthy();
+    expect(screen.getByText("downloadPdf")).toBeTruthy();
     expect(screen.getByText("3")).toBeTruthy();
     expect(screen.getByText("لا توجد أوامر إنتاج بعد. أنشئ BOM معتمد ثم ابدأ التخطيط.")).toBeTruthy();
     fireEvent.click(screen.getByText("تحديث المركز"));
