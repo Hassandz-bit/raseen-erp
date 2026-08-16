@@ -2,7 +2,7 @@ import React from "react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const state = vi.hoisted(() => ({ toastError: vi.fn(), toastSuccess: vi.fn(), createBranch: vi.fn(), markRead: vi.fn(), notificationRefetch: vi.fn(), logout: vi.fn(), branchMode: "conflict" as "conflict" | "success", notificationMode: "success" as "success" | "error", subscriptionMode: "ready" as "ready" | "empty" | "error" }));
+const state = vi.hoisted(() => ({ toastError: vi.fn(), toastSuccess: vi.fn(), createBranch: vi.fn(), markRead: vi.fn(), notificationRefetch: vi.fn(), logout: vi.fn(), branchMode: "conflict" as "conflict" | "success", notificationMode: "success" as "success" | "error", subscriptionMode: "ready" as "ready" | "suspended" | "empty" | "error" }));
 
 vi.mock("@/components/DashboardLayout", () => ({ default: ({ children }: { children: React.ReactNode }) => <>{children}</>, DashboardLayout: ({ children }: { children: React.ReactNode }) => <>{children}</> }));
 vi.mock("@/components/ExchangeRatesPanel", () => ({ ExchangeRatesPanel: () => null }));
@@ -14,7 +14,7 @@ vi.mock("sonner", () => ({ toast: { success: state.toastSuccess, error: state.to
 vi.mock("@/lib/trpc", () => ({
   trpc: {
     erp: {
-      bootstrap: { useQuery: () => ({ data: state.subscriptionMode === "empty" ? { modules: [] } : { modules: [{ key: "inventory", status: "active" }] }, isLoading: false, isError: state.subscriptionMode === "error" }) },
+      bootstrap: { useQuery: () => ({ data: state.subscriptionMode === "empty" ? { modules: [] } : { modules: [{ key: "inventory", status: state.subscriptionMode === "suspended" ? "suspended" : "active" }] }, isLoading: false, isError: state.subscriptionMode === "error" }) },
       preferences: {
         user: { useQuery: () => ({ data: undefined }) }, organization: { useQuery: () => ({ data: undefined, refetch: vi.fn() }) }, currencyCatalog: { useQuery: () => ({ data: [] }) }, currencies: { useQuery: () => ({ data: [], refetch: vi.fn() }) }, branches: { useQuery: () => ({ data: [{ id: 1, name: "Alger", code: "ALG", status: "active" }], isLoading: false, isError: false, refetch: vi.fn() }) }, members: { useQuery: () => ({ data: [{ id: 9, userId: 3, name: "Marie Exemple", email: "marie@example.com", roleKey: "owner", status: "active" }], isLoading: false, isError: false }) },
         saveUser: { useMutation: () => ({ mutate: vi.fn() }) }, saveOrganization: { useMutation: () => ({ mutate: vi.fn() }) }, saveCurrency: { useMutation: () => ({ mutate: vi.fn() }) }, createBranch: { useMutation: (options: { onError: (error: { data?: { code?: string } }) => void; onSuccess: () => void }) => ({ mutate: (...args: unknown[]) => { state.createBranch(...args); state.branchMode === "success" ? options.onSuccess() : options.onError({ data: { code: "CONFLICT" } }); }, isPending: false }) },
@@ -58,6 +58,13 @@ describe("قسم الاشتراكات في الإعدادات", () => {
     render(<SettingsPage />);
     fireEvent.click(screen.getByText("subscriptionModules"));
     expect(screen.getByText("Erreur")).toBeTruthy();
+  });
+
+  it("يعرض حالة الوحدة المعلقة كما وردت من الخادم", () => {
+    state.subscriptionMode = "suspended";
+    render(<SettingsPage />);
+    fireEvent.click(screen.getByText("subscriptionModules"));
+    expect(screen.getByText("Suspendu")).toBeTruthy();
   });
 });
 
