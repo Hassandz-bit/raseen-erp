@@ -22,6 +22,10 @@ export function formatOrganizationNumber(value: number, settings: Pick<Organizat
   return applyNumeralStyle(formatted, settings.numeralStyle);
 }
 
+export function formatOrganizationPercentage(value: number, settings: Pick<OrganizationFormatSettings, "decimalPlaces" | "decimalSeparator" | "thousandsSeparator" | "numeralStyle">) {
+  return `${formatOrganizationNumber(value, settings)}%`;
+}
+
 export function formatOrganizationCurrency(value: number, settings: Pick<OrganizationFormatSettings, "currencyCode" | "currencySymbolPosition" | "decimalPlaces" | "decimalSeparator" | "thousandsSeparator">) {
   const amount = formatOrganizationNumber(value, settings);
   const symbol = currencySymbols[settings.currencyCode] ?? settings.currencyCode;

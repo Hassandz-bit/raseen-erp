@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { getDirection, type AppLanguage, translations, type TranslationKey } from "@/i18n/translations";
-import { formatOrganizationCurrency, formatOrganizationDate, formatOrganizationNumber, formatOrganizationTime, type OrganizationFormatSettings } from "@/lib/formatting";
+import { formatOrganizationCurrency, formatOrganizationDate, formatOrganizationNumber, formatOrganizationPercentage, formatOrganizationTime, type OrganizationFormatSettings } from "@/lib/formatting";
 
 type LanguageContextValue = {
   language: AppLanguage;
@@ -9,6 +9,7 @@ type LanguageContextValue = {
   t: (key: TranslationKey) => string;
   formatDate: (value: Date | string | number, options?: Intl.DateTimeFormatOptions) => string;
   formatNumber: (value: number, options?: Intl.NumberFormatOptions) => string;
+  formatPercentage: (value: number) => string;
   formatCurrency: (value: number) => string;
   formatTime: (value: Date | string | number) => string;
   formatSettings: OrganizationFormatSettings;
@@ -48,6 +49,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     t: key => translations[language][key] ?? translations.en[key],
     formatDate: (value, options) => options ? new Intl.DateTimeFormat(languageLocale[language], options).format(new Date(value)) : formatOrganizationDate(value, organizationFormat),
     formatNumber: (value, options) => options ? new Intl.NumberFormat(languageLocale[language], options).format(value) : formatOrganizationNumber(value, organizationFormat),
+    formatPercentage: value => formatOrganizationPercentage(value, organizationFormat),
     formatCurrency: value => formatOrganizationCurrency(value, organizationFormat),
     formatTime: value => formatOrganizationTime(value, organizationFormat),
     formatSettings: organizationFormat,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyNumeralStyle, formatOrganizationCurrency, formatOrganizationDate, formatOrganizationNumber, formatOrganizationTime } from "./formatting";
+import { applyNumeralStyle, formatOrganizationCurrency, formatOrganizationDate, formatOrganizationNumber, formatOrganizationPercentage, formatOrganizationTime } from "./formatting";
 import { getCurrencyCatalogEntry } from "../../../shared/currencyCatalog";
 
 describe("organization formatting", () => {
@@ -22,6 +22,10 @@ describe("organization formatting", () => {
   it("يفصل شكل الأرقام العربي الهندي عن فواصل الرقم ومكان رمز العملة", () => {
     expect(applyNumeralStyle("1,250.50", "arabic_indic")).toBe("١٬٢٥٠٫٥٠");
     expect(formatOrganizationCurrency(1250.5, { currencyCode: "AED", currencySymbolPosition: "after", decimalPlaces: 2, decimalSeparator: "dot", thousandsSeparator: "comma", numeralStyle: "arabic_indic" })).toBe("١٬٢٥٠٫٥٠ د.إ");
+  });
+  it("ينسق النسبة وفق فواصل ونمط أرقام المؤسسة", () => {
+    expect(formatOrganizationPercentage(12.6, { decimalPlaces: 1, decimalSeparator: "comma", thousandsSeparator: "space" })).toBe("12,6%");
+    expect(formatOrganizationPercentage(8.4, { decimalPlaces: 1, decimalSeparator: "dot", thousandsSeparator: "comma", numeralStyle: "arabic_indic" })).toBe("٨٫٤%");
   });
   it("يتضمن العملات العربية والعالمية المطلوبة ويحترم الدقة الثلاثية", () => {
     expect(getCurrencyCatalogEntry("KWD")?.decimalPlaces).toBe(3);

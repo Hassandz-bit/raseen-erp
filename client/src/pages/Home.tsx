@@ -106,8 +106,8 @@ function StatusPill({ children, tone }: { children: string; tone: string }) {
   return <span className={cn("inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold", style)}>{children}</span>;
 }
 
-function MetricCard({ label, value, trend, icon: Icon, tone }: { label: string; value: number; trend: string; icon: typeof TrendingUp; tone: "gold" | "blue" | "green" | "rose" }) {
-  const { formatCurrency } = useLanguage();
+function MetricCard({ label, value, trend, icon: Icon, tone }: { label: string; value: number; trend: number; icon: typeof TrendingUp; tone: "gold" | "blue" | "green" | "rose" }) {
+  const { formatCurrency, formatPercentage } = useLanguage();
   const tones = {
     gold: "bg-[#d9b46b]/10 text-[#e4c684] ring-[#d9b46b]/20",
     blue: "bg-[#60a8e6]/10 text-[#90c7f0] ring-[#60a8e6]/20",
@@ -118,7 +118,7 @@ function MetricCard({ label, value, trend, icon: Icon, tone }: { label: string; 
     <article className="surface group relative overflow-hidden rounded-3xl border p-5 transition-transform duration-200 hover:-translate-y-0.5">
       <div className="flex items-start justify-between gap-4">
         <div className={cn("grid h-11 w-11 place-items-center rounded-2xl ring-1", tones)}><Icon className="h-5 w-5" /></div>
-        <span className="flex items-center gap-1 rounded-full bg-emerald-400/10 px-2 py-1 text-[11px] font-semibold text-emerald-300"><TrendingUp className="h-3 w-3" />{trend}</span>
+        <span className="flex items-center gap-1 rounded-full bg-emerald-400/10 px-2 py-1 text-[11px] font-semibold text-emerald-300"><TrendingUp className="h-3 w-3" />{formatPercentage(trend)}</span>
       </div>
       <p className="mt-5 text-sm text-muted-foreground">{label}</p>
       <p className="mt-1 text-2xl font-bold tracking-tight text-white">{formatCurrency(value)}</p>
@@ -149,10 +149,10 @@ function DashboardContent({ onOpenModule }: { onOpenModule: (key: SectionKey) =>
       </section>
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label={t("totalSalesMetric")} value={154280} trend="12.6%" icon={CircleDollarSign} tone="gold" />
-        <MetricCard label={t("netRevenueMetric")} value={48920} trend="8.4%" icon={WalletCards} tone="blue" />
-        <MetricCard label={t("inventoryValueMetric")} value={286740} trend="3.2%" icon={Package} tone="green" />
-        <MetricCard label={t("dueInvoicesMetric")} value={18320} trend="-4.1%" icon={ReceiptText} tone="rose" />
+        <MetricCard label={t("totalSalesMetric")} value={154280} trend={12.6} icon={CircleDollarSign} tone="gold" />
+        <MetricCard label={t("netRevenueMetric")} value={48920} trend={8.4} icon={WalletCards} tone="blue" />
+        <MetricCard label={t("inventoryValueMetric")} value={286740} trend={3.2} icon={Package} tone="green" />
+        <MetricCard label={t("dueInvoicesMetric")} value={18320} trend={-4.1} icon={ReceiptText} tone="rose" />
       </section>
 
       <section className="grid gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(310px,0.9fr)]">
