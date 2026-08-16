@@ -3,6 +3,7 @@ import { auditLogs, manufacturingBomItems, manufacturingBoms, organizationExchan
 import { manufacturingProductProfiles, productionExpenses, productionLines, productionOutputs, productionQualityChecks } from "../drizzle/manufacturingSchema";
 import { createProductBatch, getDb, previewFefoAllocation, recordStockMovement } from "./db";
 import { calculateUnitProductionCost, canTransitionProductionOrder, type ProductionStatus } from "./manufacturingPolicy";
+import { canAccessManufacturingOrderScope, type ManufacturingDataScope } from "./manufacturingPermissionPolicy";
 
 const productionNumber = () => `PO-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 
@@ -186,9 +187,10 @@ export async function getProductionTraceability(organizationId: number, producti
   return { order, rawMaterials: reservations.map(reservation => ({ reservation, batch: rawBatches.find(batch => batch.id === reservation.batchId) ?? null })), outputs: outputs.map(output => ({ output, batch: finishedBatches.find(batch => batch.id === output.batchId) ?? null })) };
 }
 
-export async function listProductionOrders(organizationId: number) {
+export async function listProductionOrders(organizationId: number, scope?: ManufacturingDataScope) {
   const db = await getDb(); if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
-  return db.select().from(productionOrders).where(eq(productionOrders.organizationId, organizationId)).orderBy(desc(productionOrders.updatedAt), desc(productionOrders.id)).limit(100);
+  const orders = await db.select().from(productionOrders).where(eq(productionOrders.organizationId, organizationId)).orderBy(desc(productionOrders.updatedAt), desc(productionOrders.id)).limit(100);
+  return orders.filter(order => canAccessManufacturingOrderScope(scope, order));
 }
 
 export async function getProductionOrderScope(organizationId: number, productionOrderId: number) {
@@ -197,16 +199,55 @@ export async function getProductionOrderScope(organizationId: number, production
   return order;
 }
 
-export async function getManufacturingOverview(organizationId: number) {
+export async function getManufacturingOperationalOptions(organizationId: number) {
   const db = await getDb(); if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
-  const [orders, outputs, shortages, qualityHolds] = await Promise.all([
-    db.select({ status: productionOrders.status, value: sql<string>`count(*)` }).from(productionOrders).where(eq(productionOrders.organizationId, organizationId)).groupBy(productionOrders.status),
-    db.select({ goodQuantity: sql<string>`coalesce(sum(${productionOutputs.goodQuantity}), 0)`, wasteQuantity: sql<string>`coalesce(sum(${productionOutputs.scrapQuantity}) + sum(${productionOutputs.defectiveQuantity}), 0)`, averageUnitCost: sql<string>`coalesce(avg(${productionOutputs.unitCost}), 0)` }).from(productionOutputs).where(eq(productionOutputs.organizationId, organizationId)),
-    db.select({ value: sql<string>`count(*)` }).from(productionMaterialReservations).where(and(eq(productionMaterialReservations.organizationId, organizationId), sql`${productionMaterialReservations.shortageQuantity} > 0`)),
-    db.select({ value: sql<string>`count(*)` }).from(productionOrders).where(and(eq(productionOrders.organizationId, organizationId), eq(productionOrders.status, "quality_hold"))),
+  const [productsList, boms, warehousesList, lines] = await Promise.all([
+    db.select({ id: products.id, name: products.name, sku: products.sku, baseUnit: products.baseUnit }).from(products).where(and(eq(products.organizationId, organizationId), eq(products.status, "active"))).orderBy(products.name).limit(500),
+    db.select({ id: manufacturingBoms.id, code: manufacturingBoms.code, version: manufacturingBoms.version, productId: manufacturingBoms.productId, outputQuantity: manufacturingBoms.outputQuantity, outputUnit: manufacturingBoms.outputUnit }).from(manufacturingBoms).where(and(eq(manufacturingBoms.organizationId, organizationId), eq(manufacturingBoms.status, "active"))).orderBy(desc(manufacturingBoms.updatedAt)).limit(500),
+    db.select({ id: warehouses.id, branchId: warehouses.branchId, name: warehouses.name, code: warehouses.code }).from(warehouses).where(and(eq(warehouses.organizationId, organizationId), eq(warehouses.status, "active"))).orderBy(warehouses.name).limit(200),
+    db.select({ id: productionLines.id, branchId: productionLines.branchId, name: productionLines.name, code: productionLines.code }).from(productionLines).where(and(eq(productionLines.organizationId, organizationId), eq(productionLines.status, "active"))).orderBy(productionLines.name).limit(200),
   ]);
-  const countByStatus = Object.fromEntries(orders.map(row => [row.status, Number(row.value)]));
-  return { planned: (countByStatus.planned ?? 0) + (countByStatus.approved ?? 0) + (countByStatus.materials_reserved ?? 0), inProduction: countByStatus.in_production ?? 0, completed: countByStatus.completed ?? 0, closed: countByStatus.closed ?? 0, materialShortages: Number(shortages[0]?.value ?? 0), qualityHold: Number(qualityHolds[0]?.value ?? 0), goodOutputQuantity: Number(outputs[0]?.goodQuantity ?? 0), wasteQuantity: Number(outputs[0]?.wasteQuantity ?? 0), averageUnitCost: Number(outputs[0]?.averageUnitCost ?? 0) };
+  return { products: productsList, boms, warehouses: warehousesList, productionLines: lines };
+}
+
+export async function getProductionOrderOperationalDetails(organizationId: number, productionOrderId: number, includeCosts: boolean) {
+  const db = await getDb(); if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const [order] = await db.select().from(productionOrders).where(and(eq(productionOrders.organizationId, organizationId), eq(productionOrders.id, productionOrderId))).limit(1);
+  if (!order) throw new Error("أمر الإنتاج خارج نطاق المؤسسة.");
+  const [reservations, stages, outputs, qualityChecks, audit, expenses] = await Promise.all([
+    db.select().from(productionMaterialReservations).where(and(eq(productionMaterialReservations.organizationId, organizationId), eq(productionMaterialReservations.productionOrderId, productionOrderId))).orderBy(productionMaterialReservations.id),
+    db.select().from(productionStages).where(and(eq(productionStages.organizationId, organizationId), eq(productionStages.productionOrderId, productionOrderId))).orderBy(productionStages.sequence),
+    db.select().from(productionOutputs).where(and(eq(productionOutputs.organizationId, organizationId), eq(productionOutputs.productionOrderId, productionOrderId))).orderBy(desc(productionOutputs.id)),
+    db.select().from(productionQualityChecks).where(and(eq(productionQualityChecks.organizationId, organizationId), eq(productionQualityChecks.productionOrderId, productionOrderId))).orderBy(desc(productionQualityChecks.checkedAt)),
+    db.select().from(auditLogs).where(and(eq(auditLogs.organizationId, organizationId), eq(auditLogs.entityType, "production_order"), eq(auditLogs.entityId, String(productionOrderId)))).orderBy(desc(auditLogs.createdAt)).limit(100),
+    includeCosts ? db.select().from(productionExpenses).where(and(eq(productionExpenses.organizationId, organizationId), eq(productionExpenses.productionOrderId, productionOrderId))).orderBy(desc(productionExpenses.id)) : Promise.resolve([]),
+  ]);
+  return { order, reservations, stages, outputs: includeCosts ? outputs : outputs.map(({ unitCost: _unitCost, ...output }) => output), qualityChecks, audit, expenses, canViewCosts: includeCosts };
+}
+
+export async function updateProductionStage(organizationId: number, actorUserId: number, input: { productionOrderId: number; stageId: number; status: "pending" | "in_progress" | "completed" | "blocked" | "skipped"; responsibleUserId?: number; notes?: string }) {
+  const db = await getDb(); if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const [stage] = await db.select().from(productionStages).where(and(eq(productionStages.organizationId, organizationId), eq(productionStages.productionOrderId, input.productionOrderId), eq(productionStages.id, input.stageId))).limit(1);
+  if (!stage) throw new Error("مرحلة الإنتاج خارج نطاق الأمر أو المؤسسة.");
+  const timestamps = input.status === "in_progress" ? { actualStart: stage.actualStart ?? new Date(), actualEnd: undefined } : input.status === "completed" ? { actualEnd: new Date() } : {};
+  await db.transaction(async tx => {
+    await tx.update(productionStages).set({ status: input.status, responsibleUserId: input.responsibleUserId ?? stage.responsibleUserId, notes: input.notes?.trim() ?? stage.notes, ...timestamps }).where(and(eq(productionStages.id, input.stageId), eq(productionStages.organizationId, organizationId)));
+    await tx.insert(auditLogs).values({ organizationId, actorUserId, action: "manufacturing.stage_updated", entityType: "production_order", entityId: String(input.productionOrderId), metadata: { stageId: input.stageId, status: input.status, responsibleUserId: input.responsibleUserId } });
+  });
+  return { stageId: input.stageId, status: input.status };
+}
+
+export async function getManufacturingOverview(organizationId: number, scope?: ManufacturingDataScope) {
+  const db = await getDb(); if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const orders = await listProductionOrders(organizationId, scope);
+  const orderIds = orders.map(order => order.id);
+  if (!orderIds.length) return { planned: 0, inProduction: 0, completed: 0, closed: 0, materialShortages: 0, qualityHold: 0, goodOutputQuantity: 0, wasteQuantity: 0, averageUnitCost: 0 };
+  const [outputs, shortages] = await Promise.all([
+    db.select({ goodQuantity: sql<string>`coalesce(sum(${productionOutputs.goodQuantity}), 0)`, wasteQuantity: sql<string>`coalesce(sum(${productionOutputs.scrapQuantity}) + sum(${productionOutputs.defectiveQuantity}), 0)`, averageUnitCost: sql<string>`coalesce(avg(${productionOutputs.unitCost}), 0)` }).from(productionOutputs).where(and(eq(productionOutputs.organizationId, organizationId), inArray(productionOutputs.productionOrderId, orderIds))),
+    db.select({ value: sql<string>`count(*)` }).from(productionMaterialReservations).where(and(eq(productionMaterialReservations.organizationId, organizationId), inArray(productionMaterialReservations.productionOrderId, orderIds), sql`${productionMaterialReservations.shortageQuantity} > 0`)),
+  ]);
+  const countByStatus = Object.fromEntries(orders.map(order => [order.status, (Object.values(orders).filter(candidate => candidate.status === order.status).length)]));
+  return { planned: (countByStatus.planned ?? 0) + (countByStatus.approved ?? 0) + (countByStatus.materials_reserved ?? 0), inProduction: countByStatus.in_production ?? 0, completed: countByStatus.completed ?? 0, closed: countByStatus.closed ?? 0, materialShortages: Number(shortages[0]?.value ?? 0), qualityHold: countByStatus.quality_hold ?? 0, goodOutputQuantity: Number(outputs[0]?.goodQuantity ?? 0), wasteQuantity: Number(outputs[0]?.wasteQuantity ?? 0), averageUnitCost: Number(outputs[0]?.averageUnitCost ?? 0) };
 }
 
 export async function saveManufacturingProductProfile(organizationId: number, actorUserId: number, input: { productId: number; manufacturingType: "raw_material" | "packaging_material" | "semi_finished" | "finished_good" | "consumable" | "by_product"; requiresQualityCheck?: "yes" | "no"; defaultShelfLifeDays?: number }) {

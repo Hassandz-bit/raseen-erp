@@ -7,7 +7,16 @@ const refreshOrders = vi.fn();
 
 vi.mock("@/components/DashboardLayout", () => ({ default: ({ children }: { children: React.ReactNode }) => <>{children}</> }));
 vi.mock("@/contexts/LanguageContext", () => ({ useLanguage: () => ({ language: "ar", direction: "rtl", t: (key: string) => key === "status" ? "الحالة" : key }) }));
-vi.mock("@/lib/trpc", () => ({ trpc: { erp: { manufacturing: { overview: { useQuery: () => ({ data: { planned: 3, inProduction: 1, completed: 2, closed: 0, materialShortages: 0, qualityHold: 0, goodOutputQuantity: 48, wasteQuantity: 2, averageUnitCost: 15.5 }, isLoading: false, isError: false, refetch: refreshOverview }) }, orders: { useQuery: () => ({ data: [], isLoading: false, isError: false, refetch: refreshOrders }) } } } } }));
+vi.mock("@/lib/trpc", () => {
+  const mutation = { useMutation: () => ({ isPending: false, mutate: vi.fn() }) };
+  return { trpc: { erp: { manufacturing: {
+    overview: { useQuery: () => ({ data: { planned: 3, inProduction: 1, completed: 2, closed: 0, materialShortages: 0, qualityHold: 0, goodOutputQuantity: 48, wasteQuantity: 2, averageUnitCost: 15.5 }, isLoading: false, isError: false, refetch: refreshOverview }) },
+    orders: { useQuery: () => ({ data: [], isLoading: false, isError: false, refetch: refreshOrders }) },
+    operationalOptions: { useQuery: () => ({ data: { boms: [], warehouses: [], productionLines: [] } }) },
+    orderDetails: { useQuery: () => ({ data: undefined, isLoading: false, refetch: vi.fn() }) },
+    createOrder: mutation, transitionOrder: mutation, reserveMaterials: mutation, issueMaterials: mutation, returnMaterials: mutation, updateStage: mutation, recordOutput: mutation, recordWaste: mutation, qualityCheck: mutation, closeOrder: mutation, recordExpense: mutation,
+  } } } };
+});
 
 import Manufacturing from "./Manufacturing";
 

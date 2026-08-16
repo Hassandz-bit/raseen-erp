@@ -1,13 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 
-const { getDefaultTenantContext } = vi.hoisted(() => ({ getDefaultTenantContext: vi.fn() }));
+const { getDefaultTenantContext, getOrganizationRolePermissions } = vi.hoisted(() => ({ getDefaultTenantContext: vi.fn(), getOrganizationRolePermissions: vi.fn() }));
 
 vi.mock("./db", async importOriginal => ({
   ...(await importOriginal<typeof import("./db")>()),
   getDefaultTenantContext,
+  getOrganizationRolePermissions,
 }));
 
-import { requireManufacturingOwner, requireModule, requireOrganizationOwner } from "./erp";
+import { requireManufacturingOwner, requireManufacturingPermission, requireModule, requireOrganizationOwner } from "./erp";
 
 describe("حراسة مالك المؤسسة لإجراءات الفروع", () => {
   it("تسمح للمالك وترفض العضو قبل الوصول إلى إجراءات الإعدادات", async () => {
@@ -45,5 +46,16 @@ describe("حراسة التصنيع", () => {
 
     getDefaultTenantContext.mockResolvedValueOnce({ organization: { id: 73 }, membership: { roleKey: "member", status: "active" }, modules: [{ moduleKey: "manufacturing", status: "active" }] });
     await expect(requireManufacturingOwner(13)).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("تسمح لمدير الإنتاج بالصلاحية الممنوحة وترفض الموظف العادي", async () => {
+    const managerContext = { organization: { id: 74 }, membership: { roleKey: "production_manager", status: "active" }, modules: [{ moduleKey: "manufacturing", status: "active" }] };
+    getDefaultTenantContext.mockResolvedValueOnce(managerContext);
+    getOrganizationRolePermissions.mockResolvedValueOnce(["manufacturing.order.approve"]);
+    await expect(requireManufacturingPermission(14, "manufacturing.order.approve")).resolves.toEqual(managerContext);
+
+    getDefaultTenantContext.mockResolvedValueOnce({ organization: { id: 74 }, membership: { roleKey: "member", status: "active" }, modules: [{ moduleKey: "manufacturing", status: "active" }] });
+    getOrganizationRolePermissions.mockResolvedValueOnce(["manufacturing.view"]);
+    await expect(requireManufacturingPermission(15, "manufacturing.order.approve")).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 });
