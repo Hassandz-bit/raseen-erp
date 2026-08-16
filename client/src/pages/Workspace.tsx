@@ -59,7 +59,7 @@ export function InsightsPanel({ modules }: { modules: { key: string; status: str
   const markRead = trpc.erp.notifications.markRead.useMutation({ onSuccess: () => notifications.refetch() });
   const exportReport = () => {
     if (!report.data) return;
-    const csv = buildWorkspaceSummaryCsv({ metric: t("metric"), value: t("value"), revenue: t("revenue"), expenses: t("expenses"), netProfit: t("netProfit"), issuedInvoices: t("issuedInvoices"), products: t("productsCount") }, report.data);
+    const csv = buildWorkspaceSummaryCsv({ metric: t("metric"), value: t("value"), revenue: t("revenue"), expenses: t("expenses"), netProfit: t("netProfit"), issuedInvoices: t("issuedInvoices"), products: t("productsCount") }, report.data, { formatCurrency, formatNumber });
     const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
