@@ -55,9 +55,9 @@ export const homeShellCopy = {
 } as const;
 
 export const homeChromeCopy = {
-  ar: { mainNavigation: "القائمة الرئيسية", newBadge: "جديد" },
-  fr: { mainNavigation: "Navigation principale", newBadge: "Nouveau" },
-  en: { mainNavigation: "Main navigation", newBadge: "New" },
+  ar: { mainNavigation: "القائمة الرئيسية", newBadge: "جديد", assistantTitle: "ذكاء أعمال مدمج", assistantDescription: "اطلب تقريراً أو اسأل عن أداء مؤسستك بلغة طبيعية.", startConversation: "ابدأ المحادثة", teamName: "فريق النواة", organizationManager: "مدير المؤسسة", closeMenu: "إغلاق القائمة" },
+  fr: { mainNavigation: "Navigation principale", newBadge: "Nouveau", assistantTitle: "Intelligence d’affaires intégrée", assistantDescription: "Demandez un rapport ou interrogez la performance de votre organisation en langage naturel.", startConversation: "Ouvrir la conversation", teamName: "Équipe Nawa", organizationManager: "Administrateur de l’organisation", closeMenu: "Fermer le menu" },
+  en: { mainNavigation: "Main navigation", newBadge: "New", assistantTitle: "Embedded business intelligence", assistantDescription: "Request a report or ask about your organization’s performance in natural language.", startConversation: "Start conversation", teamName: "Nawa team", organizationManager: "Organization manager", closeMenu: "Close menu" },
 } as const;
 
 export const settingsPageCopy = {
