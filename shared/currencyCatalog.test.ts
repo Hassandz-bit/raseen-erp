@@ -19,4 +19,11 @@ describe("كتالوج العملات", () => {
     expect(getCurrencyCatalogEntry("DZD")?.names.ar).toBe("الدينار الجزائري");
     expect(getCurrencyCatalogEntry("ZZZ")).toBeUndefined();
   });
+
+  it("يعيد كل سجل من الكتالوج برمزه مع أسماء متكافئة في اللغات المدعومة", () => {
+    currencyCatalog.forEach(currency => {
+      expect(getCurrencyCatalogEntry(currency.code)).toEqual(currency);
+      expect(Object.keys(currency.names).sort()).toEqual(["ar", "en", "fr"]);
+    });
+  });
 });
