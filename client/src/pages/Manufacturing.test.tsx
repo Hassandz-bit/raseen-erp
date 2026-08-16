@@ -14,7 +14,7 @@ vi.mock("@/lib/trpc", () => {
     overview: { useQuery: () => ({ data: { planned: 3, inProduction: 1, completed: 2, closed: 0, materialShortages: 0, qualityHold: 0, goodOutputQuantity: 48, wasteQuantity: 2, averageUnitCost: 15.5 }, isLoading: false, isError: false, refetch: refreshOverview }) },
     orders: { useQuery: () => ({ data: [], isLoading: false, isError: false, refetch: refreshOrders }) },
     capabilities: { useQuery: () => ({ data: { capabilities: mockCapabilities } }) },
-    operationalOptions: { useQuery: () => ({ data: { boms: [], warehouses: [], productionLines: [] } }) },
+    operationalOptions: { useQuery: () => ({ data: { boms: [], warehouses: [], productionLines: [], responsibleUsers: [{ userId: 7, name: "مشرف الإنتاج", roleKey: "production_supervisor" }] } }) },
     orderDetails: { useQuery: () => ({ data: undefined, isLoading: false, refetch: vi.fn() }) },
     batchGenealogy: { useQuery: () => ({ data: undefined, isError: false }) },
     createOrder: mutation, transitionOrder: mutation, reserveMaterials: mutation, issueMaterials: mutation, returnMaterials: mutation, updateStage: mutation, recordOutput: mutation, recordWaste: mutation, qualityCheck: mutation, closeOrder: mutation, recordExpense: mutation,
