@@ -447,7 +447,16 @@ export const erpRouter = router({
     }),
     operationalOptions: protectedProcedure.query(async ({ ctx }) => {
       const context = await requireManufacturingPermission(ctx.user.id, "manufacturing.view");
-      return getManufacturingOperationalOptions(context.organization.id, context.membership.dataScope);
+      const [options, members] = await Promise.all([
+        getManufacturingOperationalOptions(context.organization.id, context.membership.dataScope),
+        listOrganizationMembersForOrganization(context.organization.id),
+      ]);
+      const responsibleUsers = (await Promise.all(members.filter(member => member.status === "active").map(async member => {
+        const permissions = await getOrganizationRolePermissions(context.organization.id, member.roleKey);
+        const canOperate = canUseManufacturingPermission(member.roleKey, permissions, "manufacturing.order.start") || canUseManufacturingPermission(member.roleKey, permissions, "manufacturing.order.complete");
+        return canOperate ? { userId: member.userId, name: member.name ?? member.email ?? `#${member.userId}`, roleKey: member.roleKey } : null;
+      }))).filter((member): member is { userId: number; name: string; roleKey: string } => Boolean(member));
+      return { ...options, responsibleUsers };
     }),
     orderDetails: protectedProcedure.input(z.object({ productionOrderId: z.number().int().positive() })).query(async ({ ctx, input }) => {
       const context = await requireManufacturingOrderPermission(ctx.user.id, "manufacturing.view", input.productionOrderId);
