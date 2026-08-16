@@ -19,24 +19,26 @@ describe("ModuleView", () => {
 
   it("affiche le contenu français du module sans le texte de copie arabe hérité", () => {
     languageState.value = "fr";
-    render(<ModuleView section="inventory" onBack={() => undefined} />);
+    const { container } = render(<ModuleView section="inventory" onBack={() => undefined} />);
     expect(screen.getByText("Une vision instantanée du stock")).toBeTruthy();
     expect(screen.getByText("Retour au tableau de bord")).toBeTruthy();
     expect(screen.getAllByText("Disponible").length).toBeGreaterThan(0);
     expect(screen.getByText("Produit d’exemple 01")).toBeTruthy();
     expect(screen.queryByText("قهوة عربية محمصة")).toBeNull();
     expect(screen.queryByText("رؤية لحظية للمخزون")).toBeNull();
+    expect(container.textContent).not.toMatch(/[\u0600-\u06ff]/);
   });
 
   it("renders English module copy without inherited Arabic text", () => {
     languageState.value = "en";
-    render(<ModuleView section="inventory" onBack={() => undefined} />);
+    const { container } = render(<ModuleView section="inventory" onBack={() => undefined} />);
     expect(screen.getByText("Instant inventory visibility")).toBeTruthy();
     expect(screen.getByText("Back to dashboard")).toBeTruthy();
     expect(screen.getAllByText("Available").length).toBeGreaterThan(0);
     expect(screen.getByText("Sample product 01")).toBeTruthy();
     expect(screen.queryByText("قهوة عربية محمصة")).toBeNull();
     expect(screen.queryByText("رؤية لحظية للمخزون")).toBeNull();
+    expect(container.textContent).not.toMatch(/[\u0600-\u06ff]/);
   });
 
   it("renders translated sample customers in the French sales module", () => {
