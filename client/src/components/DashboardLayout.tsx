@@ -177,8 +177,8 @@ function DashboardLayoutContent({
   };
 
   return (
-    <div dir={direction}>
-      <div className="relative" ref={sidebarRef}>
+    <div dir={direction} className="flex min-h-svh w-full min-w-0 overflow-x-hidden">
+      <div className="relative shrink-0" ref={sidebarRef}>
         <Sidebar
           side={direction === "rtl" ? "right" : "left"}
           collapsible="icon"
@@ -257,7 +257,7 @@ function DashboardLayoutContent({
           </SidebarFooter>
         </Sidebar>
         <div
-          className={`absolute top-0 left-0 w-1 h-full cursor-col-resize hover:bg-primary/20 transition-colors ${isCollapsed ? "hidden" : ""}`}
+          className={`absolute top-0 ${direction === "rtl" ? "right-0" : "left-0"} w-1 h-full cursor-col-resize hover:bg-primary/20 transition-colors ${isCollapsed ? "hidden" : ""}`}
           onMouseDown={() => {
             if (isCollapsed) return;
             setIsResizing(true);
@@ -266,7 +266,7 @@ function DashboardLayoutContent({
         />
       </div>
 
-      <SidebarInset className={direction === "rtl" ? "lg:mr-[var(--sidebar-width)]" : "lg:ml-[var(--sidebar-width)]"}>
+      <SidebarInset className="min-w-0 flex-1">
         {isMobile && (
           <div className="flex border-b h-14 items-center justify-between bg-background/95 px-2 backdrop-blur supports-[backdrop-filter]:backdrop-blur sticky top-0 z-40">
             <div className="flex items-center gap-2">
