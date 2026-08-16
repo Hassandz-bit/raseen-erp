@@ -127,6 +127,13 @@
       "when": 1786905367867,
       "tag": "0017_abandoned_white_tiger",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "5",
+      "when": 1786905760344,
+      "tag": "0018_crazy_yellowjacket",
+      "breakpoints": true
     }
   ]
 }
