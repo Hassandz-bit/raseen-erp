@@ -2,17 +2,19 @@ import React from "react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const state = vi.hoisted(() => ({ toastError: vi.fn(), toastSuccess: vi.fn(), createBranch: vi.fn(), markRead: vi.fn(), notificationRefetch: vi.fn(), branchMode: "conflict" as "conflict" | "success", notificationMode: "success" as "success" | "error" }));
+const state = vi.hoisted(() => ({ toastError: vi.fn(), toastSuccess: vi.fn(), createBranch: vi.fn(), markRead: vi.fn(), notificationRefetch: vi.fn(), logout: vi.fn(), branchMode: "conflict" as "conflict" | "success", notificationMode: "success" as "success" | "error", subscriptionMode: "ready" as "ready" | "empty" | "error" }));
 
 vi.mock("@/components/DashboardLayout", () => ({ default: ({ children }: { children: React.ReactNode }) => <>{children}</>, DashboardLayout: ({ children }: { children: React.ReactNode }) => <>{children}</> }));
 vi.mock("@/components/ExchangeRatesPanel", () => ({ ExchangeRatesPanel: () => null }));
 vi.mock("@/components/DocumentPreviewActions", () => ({ DocumentPreviewActions: () => null }));
 vi.mock("@/contexts/ThemeContext", () => ({ useTheme: () => ({ preferences: { themeMode: "dark", numeralStyle: "western", sidebarMode: "expanded", density: "comfortable", fontFamily: "inter", fontScale: "medium", accentColor: "gold", radiusPreset: "large", moduleViewMode: "classic" }, updatePreferences: vi.fn(), resetPreferences: vi.fn() }) }));
+vi.mock("@/_core/hooks/useAuth", () => ({ useAuth: () => ({ user: { name: "Marie Exemple", email: "marie@example.com" }, loading: false, logout: state.logout }) }));
 vi.mock("@/contexts/LanguageContext", () => ({ useLanguage: () => ({ language: "fr", setLanguage: vi.fn(), formatOrganizationDate: () => "16/08/2026", t: (key: string) => ({ settings: "Paramètres", preferences: "Préférences", branches: "Succursales", branchCode: "Code", branchName: "Nom", createBranch: "Ajouter", branchCreated: "Succursale ajoutée", active: "Actif", inactive: "Inactif", branchCodeConflict: "Code déjà utilisé", branchSaveError: "Échec de sauvegarde", error: "Erreur", empty: "Vide", saved: "Enregistré", organization: "Organisation", language: "Langue", currencies: "Devises", exchangeRates: "Taux", dateAndNumbers: "Dates", appearance: "Apparence", typography: "Typographie", moduleView: "Modules", printing: "Impression", notifications: "Notifications", noNotifications: "Aucune notification", users: "Utilisateurs" })[key] ?? key }) }));
 vi.mock("sonner", () => ({ toast: { success: state.toastSuccess, error: state.toastError } }));
 vi.mock("@/lib/trpc", () => ({
   trpc: {
     erp: {
+      bootstrap: { useQuery: () => ({ data: state.subscriptionMode === "empty" ? { modules: [] } : { modules: [{ key: "inventory", status: "active" }] }, isLoading: false, isError: state.subscriptionMode === "error" }) },
       preferences: {
         user: { useQuery: () => ({ data: undefined }) }, organization: { useQuery: () => ({ data: undefined, refetch: vi.fn() }) }, currencyCatalog: { useQuery: () => ({ data: [] }) }, currencies: { useQuery: () => ({ data: [], refetch: vi.fn() }) }, branches: { useQuery: () => ({ data: [{ id: 1, name: "Alger", code: "ALG", status: "active" }], isLoading: false, isError: false, refetch: vi.fn() }) }, members: { useQuery: () => ({ data: [{ id: 9, userId: 3, name: "Marie Exemple", email: "marie@example.com", roleKey: "owner", status: "active" }], isLoading: false, isError: false }) },
         saveUser: { useMutation: () => ({ mutate: vi.fn() }) }, saveOrganization: { useMutation: () => ({ mutate: vi.fn() }) }, saveCurrency: { useMutation: () => ({ mutate: vi.fn() }) }, createBranch: { useMutation: (options: { onError: (error: { data?: { code?: string } }) => void; onSuccess: () => void }) => ({ mutate: (...args: unknown[]) => { state.createBranch(...args); state.branchMode === "success" ? options.onSuccess() : options.onError({ data: { code: "CONFLICT" } }); }, isPending: false }) },
@@ -25,6 +27,39 @@ vi.mock("@/lib/trpc", () => ({
 import SettingsPage from "./Settings";
 
 afterEach(() => cleanup());
+
+describe("قسم الأمان في الإعدادات", () => {
+  it("يعرض الجلسة الحالية ويربط إجراء إنهائها", () => {
+    state.logout.mockClear();
+    render(<SettingsPage />);
+    fireEvent.click(screen.getByText("security"));
+    expect(screen.getByText("Marie Exemple")).toBeTruthy();
+    fireEvent.click(screen.getByText("Terminer la session"));
+    expect(state.logout).toHaveBeenCalled();
+  });
+});
+
+describe("قسم الاشتراكات في الإعدادات", () => {
+  it("يعرض الوحدة وحالة وصولها", () => {
+    state.subscriptionMode = "ready";
+    render(<SettingsPage />);
+    fireEvent.click(screen.getByText("subscriptionModules"));
+    expect(screen.getByText("inventory")).toBeTruthy();
+    expect(screen.getByText("Actif")).toBeTruthy();
+  });
+
+  it("يعرض حالتي الفراغ والخطأ دون كشف بيانات اشتراك غير صالحة", () => {
+    state.subscriptionMode = "empty";
+    const { unmount } = render(<SettingsPage />);
+    fireEvent.click(screen.getByText("subscriptionModules"));
+    expect(screen.getByText("Vide")).toBeTruthy();
+    unmount();
+    state.subscriptionMode = "error";
+    render(<SettingsPage />);
+    fireEvent.click(screen.getByText("subscriptionModules"));
+    expect(screen.getByText("Erreur")).toBeTruthy();
+  });
+});
 
 describe("قسم الفروع في الإعدادات", () => {
   it("يعرض حالة الفرع الفعلية ويربط تعارض الرمز برسالة مترجمة", () => {
