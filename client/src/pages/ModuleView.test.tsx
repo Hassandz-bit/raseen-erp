@@ -8,7 +8,7 @@ vi.mock("@/contexts/LanguageContext", () => ({
   useLanguage: () => {
     const french = languageState.value === "fr";
     const labels = french ? { inventory: "Stock", available: "Disponible", lowStock: "Faible", criticalStock: "Critique", paid: "Payée", collecting: "En recouvrement", overdue: "En retard" } : { inventory: "Inventory", available: "Available", lowStock: "Low", criticalStock: "Critical", paid: "Paid", collecting: "In collection", overdue: "Overdue" };
-    return { language: languageState.value, t: (key: string) => labels[key as keyof typeof labels] ?? key, formatNumber: (value: number) => new Intl.NumberFormat(french ? "fr-FR" : "en-US").format(value) };
+    return { language: languageState.value, t: (key: string) => labels[key as keyof typeof labels] ?? key, formatNumber: (value: number) => new Intl.NumberFormat(french ? "fr-FR" : "en-US").format(value), formatCurrency: (value: number) => new Intl.NumberFormat(french ? "fr-FR" : "en-US", { style: "currency", currency: "DZD" }).format(value) };
   },
 }));
 
