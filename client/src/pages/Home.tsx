@@ -227,7 +227,7 @@ export default function Home() {
   };
 
   return (
-    <div className="app-shell text-right" dir="rtl">
+    <div className="app-shell text-right" dir={language === "ar" ? "rtl" : "ltr"}>
       <div className="fixed inset-0 -z-10 bg-[radial-gradient(circle_at_75%_0%,rgba(89,143,178,.08),transparent_28rem)]" />
       <aside className={cn("fixed inset-y-0 right-0 z-40 flex w-[278px] flex-col border-l border-white/[.07] bg-[#10141d]/95 p-4 backdrop-blur-xl transition-transform duration-300 lg:translate-x-0", isSidebarOpen ? "translate-x-0" : "translate-x-full")}>
         <div className="flex items-center justify-between px-2 pt-2"><NawaMark /><button onClick={() => setSidebarOpen(false)} className="grid h-9 w-9 place-items-center rounded-xl text-muted-foreground hover:bg-white/[.05] lg:hidden"><X className="h-5 w-5" /></button></div>
