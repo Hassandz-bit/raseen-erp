@@ -12,6 +12,7 @@ import { classifyBranchPersistenceError } from "./branchPolicy";
 import { canUseDistributionPermission, isScopedIdAllowed, type DistributionPermission } from "./distributionPolicy";
 import { addDistributionRouteExpense, completeDriverStop, createDistributionRoute, createDistributionTerritory, createDriverVanSale, createFleetVehicle, createMaintenanceRecord, createVehicleDocument, createVehicleLoadOrder, getDistributionControlCenter, getDistributionOwnerAlertReasons, getDistributionSettings, getDriverRouteFeed, getDriverRouteInventory, getLatestFleetLocations, listDistributionRoutes, listDistributionTerritories, listFleetVehicles, listVehicleInventory, logFuel, recordDistributionCollection, recordDistributionDelivery, recordDistributionReturn, recordFleetGpsPoint, recordGeofenceEvent, returnVehicleStockToWarehouse, saveDistributionSettings, submitDistributionDeliveryProof, submitRouteClosing, transitionDistributionRoute, transitionRouteClosing, transitionVehicleLoadOrder } from "./distribution";
 import { cancelRetailerOrder, createB2bPromotion, createRetailerOrder, getRetailerCatalog, grantRetailerAccess, listManagedRetailerAccesses, listOrganizationB2bOrders, listRetailerAccesses, listRetailerDocuments, listRetailerOrders, reorderRetailerOrder, reviewAndConvertRetailerOrder, updateRetailerAccessStatus } from "./b2b";
+import { calculatePackagingLogistics, findSuitableVehicles, listProductPackaging, listUomCatalog } from "./uomPackaging";
 
 type ModuleKey = "inventory" | "sales" | "purchases" | "finance" | "hr" | "reports" | "ai_assistant" | "distribution";
 const operationalModuleKeys = ["inventory", "sales", "purchases", "finance", "hr"] as const;
@@ -386,6 +387,19 @@ export const erpRouter = router({
     }),
   }),
 
+  uom: router({
+    catalog: protectedProcedure.query(() => listUomCatalog()),
+    packaging: protectedProcedure.input(z.object({ productId: z.number().int().positive() })).query(async ({ ctx, input }) => {
+      const context = await getTenantContext(ctx.user.id);
+      return listProductPackaging(context.organization.id, input.productId);
+    }),
+    logistics: protectedProcedure.input(z.object({ lines: z.array(z.object({ productId: z.number().int().positive(), packagingLevelId: z.number().int().positive(), quantity: z.union([z.string().regex(/^\d+(\.\d+)?$/), z.number().positive()]) })).min(1).max(200) })).query(async ({ ctx, input }) => {
+      const context = await getTenantContext(ctx.user.id);
+      const summary = await calculatePackagingLogistics(context.organization.id, input.lines);
+      const vehicles = await findSuitableVehicles(context.organization.id, summary);
+      return { summary, vehicles };
+    }),
+  }),
   b2b: router({
     accesses: protectedProcedure.query(({ ctx }) => listRetailerAccesses(ctx.user.id)),
     management: router({

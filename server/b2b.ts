@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
-import { auditLogs, b2bOrderAdjustments, b2bOrderReviews, b2bPromotions, b2bRetailerAccesses, b2bRetailerOrderItems, b2bRetailerOrders, businessParties, distributionRouteStops, distributionRoutes, organizations, priceListItems, priceLists, productBatches, products, salesInvoices, salesOrderItems, salesOrders } from "../drizzle/schema";
+import { auditLogs, b2bOrderAdjustments, b2bOrderReviews, b2bPromotions, b2bRetailerAccesses, b2bRetailerOrderItems, b2bRetailerOrders, businessParties, distributionRouteStops, distributionRoutes, organizations, priceListItems, priceLists, productBatches, productPackagingLevels, products, salesInvoices, salesOrderItems, salesOrders } from "../drizzle/schema";
 import { getDb } from "./db";
 
 type CatalogInput = { query?: string; categoryId?: number; brandId?: number; favoritesOnly?: boolean };
@@ -107,7 +107,8 @@ export async function getRetailerCatalog(userId: number, accessId: number, input
   const rows = await db.select().from(products).where(and(...clauses)).orderBy(asc(products.name)).limit(200);
   return Promise.all(rows.map(async product => {
     const resolved = await resolveRetailerProduct(access, product.id);
-    return { id: product.id, name: product.name, nameAr: product.nameAr, nameFr: product.nameFr, nameEn: product.nameEn, sku: product.sku, imageUrl: product.imageUrl, categoryId: product.categoryId, brandId: product.brandId, salesUnit: product.salesUnit, unitsPerCarton: product.unitsPerCarton, unitPrice: resolved.unitPrice, currencyCode: resolved.currencyCode, pricingSource: resolved.pricingSource, promotionLabel: resolved.promotionLabel, availability: resolved.availability };
+    const packagingLevels = await db.select({ id: productPackagingLevels.id, code: productPackagingLevels.code, displayName: productPackagingLevels.displayName, factorToBase: productPackagingLevels.factorToBase, barcode: productPackagingLevels.barcode, isDefault: productPackagingLevels.isDefaultB2b }).from(productPackagingLevels).where(and(eq(productPackagingLevels.organizationId, access.access.organizationId), eq(productPackagingLevels.productId, product.id), eq(productPackagingLevels.allowedB2b, "yes"), eq(productPackagingLevels.status, "active"))).orderBy(asc(productPackagingLevels.factorToBase));
+    return { id: product.id, name: product.name, nameAr: product.nameAr, nameFr: product.nameFr, nameEn: product.nameEn, sku: product.sku, imageUrl: product.imageUrl, categoryId: product.categoryId, brandId: product.brandId, salesUnit: product.salesUnit, unitsPerCarton: product.unitsPerCarton, unitPrice: resolved.unitPrice, currencyCode: resolved.currencyCode, pricingSource: resolved.pricingSource, promotionLabel: resolved.promotionLabel, availability: resolved.availability, packagingLevels };
   }));
 }
 
