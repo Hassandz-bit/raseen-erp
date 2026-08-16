@@ -22,7 +22,7 @@ async function getTenantContext(userId: number) {
   return context;
 }
 
-async function requireModule(userId: number, moduleKey: ModuleKey) {
+export async function requireModule(userId: number, moduleKey: ModuleKey) {
   const context = await getTenantContext(userId);
   const module = context.modules.find(item => item.moduleKey === moduleKey);
   if (!canAccessTenantModule({ membershipStatus: context.membership.status, moduleStatus: module?.status })) {

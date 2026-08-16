@@ -7,7 +7,7 @@ vi.mock("./db", async importOriginal => ({
   getDefaultTenantContext,
 }));
 
-import { requireOrganizationOwner } from "./erp";
+import { requireModule, requireOrganizationOwner } from "./erp";
 
 describe("حراسة مالك المؤسسة لإجراءات الفروع", () => {
   it("تسمح للمالك وترفض العضو قبل الوصول إلى إجراءات الإعدادات", async () => {
@@ -17,5 +17,19 @@ describe("حراسة مالك المؤسسة لإجراءات الفروع", () 
 
     getDefaultTenantContext.mockResolvedValueOnce({ organization: { id: 71 }, membership: { roleKey: "member", status: "active" }, modules: [] });
     await expect(requireOrganizationOwner(11)).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+});
+
+describe("حراسة الوحدة التشغيلية", () => {
+  it("تسمح للوحدة المفعلة وترفض الوحدة المعلقة أو الغائبة", async () => {
+    const activeContext = { organization: { id: 72 }, membership: { roleKey: "owner", status: "active" }, modules: [{ moduleKey: "inventory", status: "active" }] };
+    getDefaultTenantContext.mockResolvedValueOnce(activeContext);
+    await expect(requireModule(12, "inventory")).resolves.toEqual(activeContext);
+
+    getDefaultTenantContext.mockResolvedValueOnce({ organization: { id: 72 }, membership: { roleKey: "owner", status: "active" }, modules: [{ moduleKey: "inventory", status: "suspended" }] });
+    await expect(requireModule(12, "inventory")).rejects.toMatchObject({ code: "FORBIDDEN" });
+
+    getDefaultTenantContext.mockResolvedValueOnce({ organization: { id: 72 }, membership: { roleKey: "owner", status: "active" }, modules: [] });
+    await expect(requireModule(12, "inventory")).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 });
