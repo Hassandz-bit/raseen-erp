@@ -2,7 +2,7 @@ import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm";
 import {
   auditLogs, branches, businessParties, distributionCollections, distributionDeliveries, distributionDeliveryItems, distributionDeliveryProofs, distributionGeofenceEvents, distributionIdempotencyKeys, distributionReturns, distributionRouteClosings, distributionRouteExpenses, distributionRouteStops, distributionRoutes, distributionSettings, distributionTerritories, employees, fleetFuelLogs, fleetGpsRecords, fleetMaintenanceRecords, fleetVehicleDocuments, fleetVehicles, inventoryBalances, organizationSettings, productBatches, products, salesInvoices, stockMovements, vehicleLoadItems, vehicleLoadOrders, warehouses,
 } from "../drizzle/schema";
-import { getDb } from "./db";
+import { createSalesInvoice, getDb, issueSalesInvoiceWithFefo, recordSalesInvoicePayment } from "./db";
 import { calculateLoadCapacity, canTransitionDistributionRoute, canTransitionRouteClosing, canTransitionVehicleLoad } from "./distributionPolicy";
 import { storagePut } from "./storage";
 
@@ -389,6 +389,28 @@ export async function getDriverRouteInventory(organizationId: number, routeId: n
   if (!route.vehicleId) throw new Error("لا توجد مركبة مسندة لهذه الجولة.");
   const vehicle = await assertVehicle(db, organizationId, route.vehicleId);
   return db.select({ batchId: productBatches.id, productId: products.id, productName: products.name, sku: products.sku, unit: products.salesUnit, lotNumber: productBatches.lotNumber, expiryDate: productBatches.expiryDate, loadedQuantity: productBatches.receivedQuantity, remainingQuantity: productBatches.currentQuantity, reservedQuantity: productBatches.reservedQuantity, batchStatus: productBatches.status }).from(productBatches).innerJoin(products, and(eq(products.id, productBatches.productId), eq(products.organizationId, productBatches.organizationId))).where(and(eq(productBatches.organizationId, organizationId), eq(productBatches.warehouseId, vehicle.mobileWarehouseId!))).orderBy(asc(productBatches.expiryDate), asc(products.name)).limit(300);
+}
+
+export async function createDriverVanSale(organizationId: number, actorUserId: number, input: { routeId: number; customerId?: number; productId: number; quantity: number; unit: string; currencyCode: string; idempotencyKey: string; paymentAmount?: number }) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const [route] = await db.select().from(distributionRoutes).where(and(eq(distributionRoutes.id, input.routeId), eq(distributionRoutes.organizationId, organizationId))).limit(1);
+  await assertOrganizationRecord(route, "الجولة");
+  if (!route.vehicleId) throw new Error("لا توجد مركبة مسندة لبيع المركبة.");
+  const vehicle = await assertVehicle(db, organizationId, route.vehicleId);
+  const stock = await db.select({ available: sql<string>`coalesce(sum(${productBatches.currentQuantity} - ${productBatches.reservedQuantity}), 0)` }).from(productBatches).where(and(eq(productBatches.organizationId, organizationId), eq(productBatches.productId, input.productId), eq(productBatches.warehouseId, vehicle.mobileWarehouseId!), eq(productBatches.status, "active"), sql`(${productBatches.expiryDate} IS NULL OR ${productBatches.expiryDate} > now())`));
+  if (Number(stock[0]?.available ?? 0) < input.quantity) throw new Error("لا تتوفر كمية صالحة كافية في مخزون المركبة.");
+  const invoiceNumber = `VAN-${input.idempotencyKey.slice(0, 48)}`;
+  let [invoice] = await db.select().from(salesInvoices).where(and(eq(salesInvoices.organizationId, organizationId), eq(salesInvoices.invoiceNumber, invoiceNumber))).limit(1);
+  if (!invoice) {
+    const created = await createSalesInvoice(organizationId, actorUserId, { invoiceNumber, customerId: input.customerId, currencyCode: input.currencyCode.toUpperCase(), baseCurrencyCode: input.currencyCode.toUpperCase(), lines: [{ productId: input.productId, warehouseId: vehicle.mobileWarehouseId!, quantity: input.quantity, unit: input.unit }] });
+    [invoice] = await db.select().from(salesInvoices).where(and(eq(salesInvoices.id, created.id), eq(salesInvoices.organizationId, organizationId))).limit(1);
+  }
+  if (!invoice) throw new Error("تعذر إنشاء فاتورة بيع المركبة.");
+  if (invoice.status === "draft") await issueSalesInvoiceWithFefo(organizationId, actorUserId, invoice.id);
+  if (input.paymentAmount && input.paymentAmount > 0 && input.customerId) await recordSalesInvoicePayment(organizationId, actorUserId, invoice.id, input.paymentAmount);
+  await db.insert(auditLogs).values({ organizationId, actorUserId, action: "distribution_driver.van_sale", entityType: "sales_invoice", entityId: String(invoice.id), metadata: { routeId: input.routeId, idempotencyKey: input.idempotencyKey } });
+  return { invoiceId: invoice.id, invoiceNumber, status: invoice.status === "draft" ? "issued" : invoice.status };
 }
 
 export async function addDistributionRouteExpense(organizationId: number, actorUserId: number, input: { routeId: number; vehicleId?: number; category: "fuel" | "toll" | "parking" | "minor"; amount: number; currencyCode: string; receiptUrl?: string; notes?: string }) {
