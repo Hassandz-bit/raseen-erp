@@ -35,10 +35,11 @@ export function ExchangeRatesPanel() {
     onError: error => toast.error(error.message),
   });
   const text = { title: t("exchangeHistoryTitle"), description: t("exchangeHistoryDescription"), add: t("addExchangeRate"), base: t("baseCurrency"), quote: t("quoteCurrency"), rate: t("exchangeRate"), excel: "Excel", pdf: "PDF", filter: t("filterExchangeRates"), currency: t("currency"), from: t("from"), to: t("to"), clear: t("clearFilters"), effective: t("effectiveDate"), source: t("rateSource"), empty: t("noMatchingExchangeRates"), retry: t("retry") };
+  const exportFormatting = { formatRate: (value: number) => formatOrganizationNumber(value, { ...formatSettings, decimalPlaces: 8 }), formatDate: (value: Date | string) => formatOrganizationDate(value, formatSettings) };
   const hasFilters = Boolean(currencyCode || startDate || endDate);
-  const exportExcel = () => downloadFile("nawa-exchange-rates.xls", "application/vnd.ms-excel;charset=utf-8", buildExchangeRateExcel(rates.data ?? []));
+  const exportExcel = () => downloadFile("nawa-exchange-rates.xls", "application/vnd.ms-excel;charset=utf-8", buildExchangeRateExcel(rates.data ?? [], exportFormatting));
   const exportPdf = async () => {
-    const bytes = await buildExchangeRatePdf(rates.data ?? []);
+    const bytes = await buildExchangeRatePdf(rates.data ?? [], exportFormatting);
     const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
     const url = URL.createObjectURL(new Blob([buffer], { type: "application/pdf" }));
     const anchor = document.createElement("a");

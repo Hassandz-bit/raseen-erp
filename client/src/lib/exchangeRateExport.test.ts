@@ -15,4 +15,12 @@ describe("تصدير أسعار الصرف", () => {
     const document = await PDFDocument.load(bytes);
     expect(document.getPageCount()).toBe(2);
   });
+
+  it("يقبل منسقات المؤسسة للنسبة والتاريخ في تصدير Excel", () => {
+    const content = buildExchangeRateExcel([{ baseCurrencyCode: "DZD", quoteCurrencyCode: "EUR", rate: "0.0062", effectiveAt: new Date("2026-03-15T00:00:00Z"), source: "manual" }], {
+      formatRate: value => `rate:${value.toFixed(4)}`,
+      formatDate: () => "15/03/2026 01:00",
+    });
+    expect(content).toContain("rate:0.0062\t15/03/2026 01:00");
+  });
 });
