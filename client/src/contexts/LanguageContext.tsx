@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { getDirection, type AppLanguage, translations, type TranslationKey } from "@/i18n/translations";
 import { formatOrganizationCurrency, formatOrganizationDate, formatOrganizationNumber, formatOrganizationTime, type OrganizationFormatSettings } from "@/lib/formatting";
 
