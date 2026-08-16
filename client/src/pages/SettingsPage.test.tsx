@@ -8,13 +8,13 @@ vi.mock("@/components/DashboardLayout", () => ({ default: ({ children }: { child
 vi.mock("@/components/ExchangeRatesPanel", () => ({ ExchangeRatesPanel: () => null }));
 vi.mock("@/components/DocumentPreviewActions", () => ({ DocumentPreviewActions: () => null }));
 vi.mock("@/contexts/ThemeContext", () => ({ useTheme: () => ({ preferences: { themeMode: "dark", numeralStyle: "western", sidebarMode: "expanded", density: "comfortable", fontFamily: "inter", fontScale: "medium", accentColor: "gold", radiusPreset: "large", moduleViewMode: "classic" }, updatePreferences: vi.fn(), resetPreferences: vi.fn() }) }));
-vi.mock("@/contexts/LanguageContext", () => ({ useLanguage: () => ({ language: "fr", setLanguage: vi.fn(), formatOrganizationDate: () => "16/08/2026", t: (key: string) => ({ settings: "Paramètres", preferences: "Préférences", branches: "Succursales", branchCode: "Code", branchName: "Nom", createBranch: "Ajouter", branchCreated: "Succursale ajoutée", active: "Actif", inactive: "Inactif", branchCodeConflict: "Code déjà utilisé", branchSaveError: "Échec de sauvegarde", error: "Erreur", empty: "Vide", saved: "Enregistré", organization: "Organisation", language: "Langue", currencies: "Devises", exchangeRates: "Taux", dateAndNumbers: "Dates", appearance: "Apparence", typography: "Typographie", moduleView: "Modules", printing: "Impression", notifications: "Notifications", noNotifications: "Aucune notification" })[key] ?? key }) }));
+vi.mock("@/contexts/LanguageContext", () => ({ useLanguage: () => ({ language: "fr", setLanguage: vi.fn(), formatOrganizationDate: () => "16/08/2026", t: (key: string) => ({ settings: "Paramètres", preferences: "Préférences", branches: "Succursales", branchCode: "Code", branchName: "Nom", createBranch: "Ajouter", branchCreated: "Succursale ajoutée", active: "Actif", inactive: "Inactif", branchCodeConflict: "Code déjà utilisé", branchSaveError: "Échec de sauvegarde", error: "Erreur", empty: "Vide", saved: "Enregistré", organization: "Organisation", language: "Langue", currencies: "Devises", exchangeRates: "Taux", dateAndNumbers: "Dates", appearance: "Apparence", typography: "Typographie", moduleView: "Modules", printing: "Impression", notifications: "Notifications", noNotifications: "Aucune notification", users: "Utilisateurs" })[key] ?? key }) }));
 vi.mock("sonner", () => ({ toast: { success: state.toastSuccess, error: state.toastError } }));
 vi.mock("@/lib/trpc", () => ({
   trpc: {
     erp: {
       preferences: {
-        user: { useQuery: () => ({ data: undefined }) }, organization: { useQuery: () => ({ data: undefined, refetch: vi.fn() }) }, currencyCatalog: { useQuery: () => ({ data: [] }) }, currencies: { useQuery: () => ({ data: [], refetch: vi.fn() }) }, branches: { useQuery: () => ({ data: [{ id: 1, name: "Alger", code: "ALG", status: "active" }], isLoading: false, isError: false, refetch: vi.fn() }) },
+        user: { useQuery: () => ({ data: undefined }) }, organization: { useQuery: () => ({ data: undefined, refetch: vi.fn() }) }, currencyCatalog: { useQuery: () => ({ data: [] }) }, currencies: { useQuery: () => ({ data: [], refetch: vi.fn() }) }, branches: { useQuery: () => ({ data: [{ id: 1, name: "Alger", code: "ALG", status: "active" }], isLoading: false, isError: false, refetch: vi.fn() }) }, members: { useQuery: () => ({ data: [{ id: 9, userId: 3, name: "Marie Exemple", email: "marie@example.com", roleKey: "owner", status: "active" }], isLoading: false, isError: false }) },
         saveUser: { useMutation: () => ({ mutate: vi.fn() }) }, saveOrganization: { useMutation: () => ({ mutate: vi.fn() }) }, saveCurrency: { useMutation: () => ({ mutate: vi.fn() }) }, createBranch: { useMutation: (options: { onError: (error: { data?: { code?: string } }) => void; onSuccess: () => void }) => ({ mutate: (...args: unknown[]) => { state.createBranch(...args); state.branchMode === "success" ? options.onSuccess() : options.onError({ data: { code: "CONFLICT" } }); }, isPending: false }) },
       },
       notifications: { list: { useQuery: () => ({ data: [{ id: 7, title: "Alerte stock", content: "Le niveau minimal est atteint.", isRead: "no", createdAt: new Date("2026-08-16T09:00:00Z") }], isLoading: false, isError: false, refetch: state.notificationRefetch }) }, markRead: { useMutation: (options: { onSuccess: () => void; onError: () => void }) => ({ mutate: (input: unknown) => { state.markRead(input); state.notificationMode === "success" ? options.onSuccess() : options.onError(); }, isPending: false }) } },
@@ -74,5 +74,16 @@ describe("قسم الإشعارات في الإعدادات", () => {
     fireEvent.click(screen.getByText("Notifications"));
     fireEvent.click(screen.getByText("Marquer comme lu"));
     expect(state.toastError).toHaveBeenCalledWith("Impossible de marquer la notification comme lue.");
+  });
+});
+
+describe("قسم المستخدمين في الإعدادات", () => {
+  it("يعرض عضوية المؤسسة ودورها وحالتها", () => {
+    render(<SettingsPage />);
+    fireEvent.click(screen.getByText("Utilisateurs"));
+    expect(screen.getByText("Marie Exemple")).toBeTruthy();
+    expect(screen.getByText("marie@example.com")).toBeTruthy();
+    expect(screen.getByText("Propriétaire")).toBeTruthy();
+    expect(screen.getByText("Actif")).toBeTruthy();
   });
 });
