@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { auditLogs, inventoryBalances, organizations, productBatches, products, stockMovements, warehouses } from "../drizzle/schema";
 import { manufacturingBomItems, manufacturingBoms, manufacturingProductProfiles, productionMaterialReservations, productionOrders, productionOutputs, productionQualityChecks, productionStages } from "../drizzle/manufacturingSchema";
 import { getDb } from "./db";
-import { closeProductionOrder, createProductionOrder, getProductionBatchGenealogy, getProductionTraceability, issueMaterialsForProduction, recordProductionOutput, recordProductionQualityCheck, recordProductionWaste, reserveProductionMaterials, saveManufacturingProductProfile, transitionProductionOrderStatus } from "./manufacturing";
+import { closeProductionOrder, createProductionOrder, getProductionBatchGenealogy, getProductionOrderOperationalDetails, getProductionTraceability, issueMaterialsForProduction, recordProductionOutput, recordProductionQualityCheck, recordProductionWaste, reserveProductionMaterials, saveManufacturingProductProfile, transitionProductionOrderStatus } from "./manufacturing";
 
 let organizationId: number | null = null;
 let auxiliaryOrganizationIds: number[] = [];
@@ -77,6 +77,7 @@ describe("تكامل دورة التصنيع", () => {
     const traceability = await getProductionTraceability(organizationId, order.id);
     const rawGenealogy = await getProductionBatchGenealogy(organizationId, earlierBatchId);
     const finishedGenealogy = await getProductionBatchGenealogy(organizationId, output.batchId);
+    const restrictedDetails = await getProductionOrderOperationalDetails(organizationId, order.id, false);
     const close = await closeProductionOrder(organizationId, 1, order.id);
 
     const [earlierAfter] = await db.select().from(productBatches).where(and(eq(productBatches.organizationId, organizationId), eq(productBatches.id, earlierBatchId))).limit(1);
@@ -94,6 +95,9 @@ describe("تكامل دورة التصنيع", () => {
     expect(traceability.outputs).toHaveLength(1);
     expect(rawGenealogy.usedAsRawMaterial[0]?.outputs[0]?.batch?.id).toBe(output.batchId);
     expect(finishedGenealogy.finishedFrom[0]?.rawMaterials.map(item => item.batch?.id)).toContain(earlierBatchId);
+    expect(restrictedDetails.canViewCosts).toBe(false);
+    expect(restrictedDetails.expenses).toHaveLength(0);
+    expect("unitCost" in restrictedDetails.outputs[0]!).toBe(false);
     expect(close.status).toBe("closed");
   });
 });
