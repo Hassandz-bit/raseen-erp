@@ -54,6 +54,12 @@ export const homeShellCopy = {
   en: { assistantQuestionRequired: "Enter a question first.", assistantQueryAdded: "The question was added to the organization demo context." },
 } as const;
 
+export const homeChromeCopy = {
+  ar: { mainNavigation: "القائمة الرئيسية", newBadge: "جديد" },
+  fr: { mainNavigation: "Navigation principale", newBadge: "Nouveau" },
+  en: { mainNavigation: "Main navigation", newBadge: "New" },
+} as const;
+
 const messages = {
   ar: {
     branchCode: "رمز الفرع", branchName: "اسم الفرع", createBranch: "إضافة فرع", branchCreated: "تمت إضافة الفرع", branchCodeConflict: "رمز الفرع مستخدم بالفعل داخل المؤسسة.", branchSaveError: "تعذر حفظ الفرع حالياً. حاول مرة أخرى.", createTransaction: "تسجيل معاملة", addEmployee: "إضافة موظف", customer: "العميل", recentInvoices: "الفواتير الأخيرة", recentCommercialActivity: "آخر الحركة التجارية المسجلة", viewAll: "عرض الكل", invoiceOptions: "خيارات الفاتورة", decisionAlerts: "تنبيهات تحتاج قراراً", todayPriority: "أولوية اليوم", criticalStockAlert: "مستوى مخزون حرج", criticalStockDetail: "سكر أبيض فاخر — 75 وحدة", dueInvoiceAlert: "فاتورة مستحقة", dueInvoiceDetail: "مؤسسة الربيع — 8,720 د.ج", purchaseReceiptAlert: "طلب استلام اليوم", purchaseReceiptDetail: "أمر شراء PO-1843", inventoryHealth: "صحة المخزون", inventoryDistribution: "توزيع الأصناف حسب الحالة", details: "التفاصيل", todayMovements: "حركات اليوم", safeStock: "آمن", monitoringStock: "مراقبة", lowStock: "منخفض", criticalStock: "حرج", collecting: "قيد التحصيل",
