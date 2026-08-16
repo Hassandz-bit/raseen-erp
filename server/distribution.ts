@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm";
 import {
   auditLogs, branches, businessParties, distributionCollections, distributionDeliveries, distributionDeliveryItems, distributionGeofenceEvents, distributionIdempotencyKeys, distributionReturns, distributionRouteClosings, distributionRouteExpenses, distributionRouteStops, distributionRoutes, distributionSettings, distributionTerritories, employees, fleetFuelLogs, fleetGpsRecords, fleetMaintenanceRecords, fleetVehicleDocuments, fleetVehicles, inventoryBalances, organizationSettings, productBatches, products, salesInvoices, stockMovements, vehicleLoadItems, vehicleLoadOrders, warehouses,
 } from "../drizzle/schema";
@@ -121,6 +121,17 @@ export async function listDistributionRoutes(organizationId: number) {
   const db = await getDb();
   if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
   return db.select().from(distributionRoutes).where(eq(distributionRoutes.organizationId, organizationId)).orderBy(desc(distributionRoutes.routeDate), desc(distributionRoutes.id)).limit(200);
+}
+
+export async function getDriverRouteFeed(organizationId: number, assignedRouteIds: number[]) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  if (!assignedRouteIds.length) return [];
+  const routes = await db.select({ id: distributionRoutes.id, routeNumber: distributionRoutes.routeNumber, routeDate: distributionRoutes.routeDate, status: distributionRoutes.status, vehicleId: distributionRoutes.vehicleId, plannedStartAt: distributionRoutes.plannedStartAt, plannedEndAt: distributionRoutes.plannedEndAt, actualStartAt: distributionRoutes.actualStartAt, vehicleCode: fleetVehicles.code, vehicleRegistration: fleetVehicles.registrationNumber }).from(distributionRoutes).leftJoin(fleetVehicles, and(eq(fleetVehicles.id, distributionRoutes.vehicleId), eq(fleetVehicles.organizationId, distributionRoutes.organizationId))).where(and(eq(distributionRoutes.organizationId, organizationId), inArray(distributionRoutes.id, assignedRouteIds), inArray(distributionRoutes.status, ["prepared", "loaded", "started", "in_progress", "returning"]))).orderBy(asc(distributionRoutes.routeDate), asc(distributionRoutes.id));
+  if (!routes.length) return [];
+  const routeIds = routes.map(route => route.id);
+  const stops = await db.select({ id: distributionRouteStops.id, routeId: distributionRouteStops.routeId, customerId: distributionRouteStops.customerId, sequence: distributionRouteStops.sequence, plannedAt: distributionRouteStops.plannedAt, arrivedAt: distributionRouteStops.arrivedAt, deliveryStatus: distributionRouteStops.deliveryStatus, notes: distributionRouteStops.notes, customerName: businessParties.name, customerAddress: businessParties.address, customerLatitude: businessParties.latitude, customerLongitude: businessParties.longitude, deliveryNotes: businessParties.deliveryNotes, receivingHours: businessParties.receivingHours, visitPriority: businessParties.visitPriority }).from(distributionRouteStops).innerJoin(businessParties, and(eq(businessParties.id, distributionRouteStops.customerId), eq(businessParties.organizationId, distributionRouteStops.organizationId))).where(and(eq(distributionRouteStops.organizationId, organizationId), inArray(distributionRouteStops.routeId, routeIds))).orderBy(asc(distributionRouteStops.routeId), asc(distributionRouteStops.sequence));
+  return routes.map(route => ({ ...route, stops: stops.filter(stop => stop.routeId === route.id) }));
 }
 
 export async function transitionDistributionRoute(organizationId: number, actorUserId: number, routeId: number, status: "prepared" | "loaded" | "started" | "in_progress" | "returning" | "closing" | "closed" | "cancelled") {
