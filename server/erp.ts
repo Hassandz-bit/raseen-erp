@@ -13,6 +13,7 @@ import { canUseDistributionPermission, isScopedIdAllowed, type DistributionPermi
 import { addDistributionRouteExpense, completeDriverStop, createDistributionRoute, createDistributionTerritory, createDriverVanSale, createFleetVehicle, createMaintenanceRecord, createVehicleDocument, createVehicleLoadOrder, getDistributionControlCenter, getDistributionOwnerAlertReasons, getDistributionSettings, getDriverRouteFeed, getDriverRouteInventory, getLatestFleetLocations, listDistributionRoutes, listDistributionTerritories, listFleetVehicles, listVehicleInventory, logFuel, recordDistributionCollection, recordDistributionDelivery, recordDistributionReturn, recordFleetGpsPoint, recordGeofenceEvent, returnVehicleStockToWarehouse, saveDistributionSettings, submitDistributionDeliveryProof, submitRouteClosing, transitionDistributionRoute, transitionRouteClosing, transitionVehicleLoadOrder } from "./distribution";
 import { cancelRetailerOrder, createB2bPromotion, createRetailerOrder, getRetailerCatalog, grantRetailerAccess, listManagedRetailerAccesses, listOrganizationB2bOrders, listRetailerAccesses, listRetailerDocuments, listRetailerOrders, reorderRetailerOrder, reviewAndConvertRetailerOrder, updateRetailerAccessStatus } from "./b2b";
 import { calculatePackagingLogistics, findSuitableVehicles, listProductPackaging, listUomCatalog } from "./uomPackaging";
+import { createManufacturingBom, createProductionOrder, reserveProductionMaterials } from "./manufacturing";
 
 type ModuleKey = "inventory" | "sales" | "purchases" | "finance" | "hr" | "reports" | "ai_assistant" | "distribution";
 const operationalModuleKeys = ["inventory", "sales", "purchases", "finance", "hr"] as const;
@@ -398,6 +399,20 @@ export const erpRouter = router({
       const summary = await calculatePackagingLogistics(context.organization.id, input.lines);
       const vehicles = await findSuitableVehicles(context.organization.id, summary);
       return { summary, vehicles };
+    }),
+  }),
+  manufacturing: router({
+    createBom: protectedProcedure.input(z.object({ code: z.string().trim().min(2).max(64), version: z.string().trim().min(1).max(32), productId: z.number().int().positive(), outputQuantity: z.number().positive(), outputUnit: z.string().trim().min(1).max(32), notes: z.string().trim().max(2000).optional(), items: z.array(z.object({ componentProductId: z.number().int().positive(), quantity: z.number().positive(), unit: z.string().trim().min(1).max(32), baseQuantity: z.number().positive(), wasteAllowance: z.number().min(0).max(100).optional(), stageCode: z.string().trim().max(64).optional(), required: z.enum(["yes", "no"]).optional() })).min(1).max(200) })).mutation(async ({ ctx, input }) => {
+      const context = await requireOrganizationOwner(ctx.user.id);
+      return createManufacturingBom(context.organization.id, ctx.user.id, input);
+    }),
+    createOrder: protectedProcedure.input(z.object({ bomId: z.number().int().positive(), plannedQuantity: z.number().positive(), plannedUnit: z.string().trim().min(1).max(32), baseQuantity: z.number().positive(), rawMaterialWarehouseId: z.number().int().positive(), finishedGoodsWarehouseId: z.number().int().positive(), branchId: z.number().int().positive().optional(), responsibleUserId: z.number().int().positive().optional() })).mutation(async ({ ctx, input }) => {
+      const context = await requireOrganizationOwner(ctx.user.id);
+      return createProductionOrder(context.organization.id, ctx.user.id, input);
+    }),
+    reserveMaterials: protectedProcedure.input(z.object({ productionOrderId: z.number().int().positive(), overrideReason: z.string().trim().min(3).max(1000).optional() })).mutation(async ({ ctx, input }) => {
+      const context = await requireOrganizationOwner(ctx.user.id);
+      return reserveProductionMaterials(context.organization.id, ctx.user.id, input.productionOrderId, input.overrideReason);
     }),
   }),
   b2b: router({
