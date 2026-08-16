@@ -187,6 +187,27 @@ export async function getProductionTraceability(organizationId: number, producti
   return { order, rawMaterials: reservations.map(reservation => ({ reservation, batch: rawBatches.find(batch => batch.id === reservation.batchId) ?? null })), outputs: outputs.map(output => ({ output, batch: finishedBatches.find(batch => batch.id === output.batchId) ?? null })) };
 }
 
+export async function getProductionBatchGenealogy(organizationId: number, batchId: number) {
+  const db = await getDb(); if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const [batch] = await db.select().from(productBatches).where(and(eq(productBatches.organizationId, organizationId), eq(productBatches.id, batchId))).limit(1);
+  if (!batch) throw new Error("الدفعة خارج نطاق المؤسسة.");
+  const [usedAsRawMaterial, finishedOutput] = await Promise.all([
+    db.select().from(productionMaterialReservations).where(and(eq(productionMaterialReservations.organizationId, organizationId), eq(productionMaterialReservations.batchId, batchId))),
+    db.select().from(productionOutputs).where(and(eq(productionOutputs.organizationId, organizationId), eq(productionOutputs.batchId, batchId))),
+  ]);
+  const rawOrderIds = usedAsRawMaterial.map(item => item.productionOrderId);
+  const finishedOrderIds = finishedOutput.map(item => item.productionOrderId);
+  const [rawOrders, downstreamOutputs, finishedOrders, upstreamReservations] = await Promise.all([
+    rawOrderIds.length ? db.select().from(productionOrders).where(and(eq(productionOrders.organizationId, organizationId), inArray(productionOrders.id, rawOrderIds))) : Promise.resolve([]),
+    rawOrderIds.length ? db.select().from(productionOutputs).where(and(eq(productionOutputs.organizationId, organizationId), inArray(productionOutputs.productionOrderId, rawOrderIds))) : Promise.resolve([]),
+    finishedOrderIds.length ? db.select().from(productionOrders).where(and(eq(productionOrders.organizationId, organizationId), inArray(productionOrders.id, finishedOrderIds))) : Promise.resolve([]),
+    finishedOrderIds.length ? db.select().from(productionMaterialReservations).where(and(eq(productionMaterialReservations.organizationId, organizationId), inArray(productionMaterialReservations.productionOrderId, finishedOrderIds))) : Promise.resolve([]),
+  ]);
+  const relatedBatchIds = [...downstreamOutputs.flatMap(item => item.batchId ? [item.batchId] : []), ...upstreamReservations.flatMap(item => item.batchId ? [item.batchId] : [])];
+  const relatedBatches = relatedBatchIds.length ? await db.select().from(productBatches).where(and(eq(productBatches.organizationId, organizationId), inArray(productBatches.id, relatedBatchIds))) : [];
+  return { batch, usedAsRawMaterial: rawOrders.map(order => ({ order, outputs: downstreamOutputs.filter(output => output.productionOrderId === order.id).map(output => ({ output, batch: relatedBatches.find(candidate => candidate.id === output.batchId) ?? null })) })), finishedFrom: finishedOrders.map(order => ({ order, rawMaterials: upstreamReservations.filter(reservation => reservation.productionOrderId === order.id).map(reservation => ({ reservation, batch: relatedBatches.find(candidate => candidate.id === reservation.batchId) ?? null })) })) };
+}
+
 export async function listProductionOrders(organizationId: number, scope?: ManufacturingDataScope) {
   const db = await getDb(); if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
   const orders = await db.select().from(productionOrders).where(eq(productionOrders.organizationId, organizationId)).orderBy(desc(productionOrders.updatedAt), desc(productionOrders.id)).limit(100);

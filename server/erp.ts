@@ -13,7 +13,7 @@ import { canUseDistributionPermission, isScopedIdAllowed, type DistributionPermi
 import { addDistributionRouteExpense, completeDriverStop, createDistributionRoute, createDistributionTerritory, createDriverVanSale, createFleetVehicle, createMaintenanceRecord, createVehicleDocument, createVehicleLoadOrder, getDistributionControlCenter, getDistributionOwnerAlertReasons, getDistributionSettings, getDriverRouteFeed, getDriverRouteInventory, getLatestFleetLocations, listDistributionRoutes, listDistributionTerritories, listFleetVehicles, listVehicleInventory, logFuel, recordDistributionCollection, recordDistributionDelivery, recordDistributionReturn, recordFleetGpsPoint, recordGeofenceEvent, returnVehicleStockToWarehouse, saveDistributionSettings, submitDistributionDeliveryProof, submitRouteClosing, transitionDistributionRoute, transitionRouteClosing, transitionVehicleLoadOrder } from "./distribution";
 import { cancelRetailerOrder, createB2bPromotion, createRetailerOrder, getRetailerCatalog, grantRetailerAccess, listManagedRetailerAccesses, listOrganizationB2bOrders, listRetailerAccesses, listRetailerDocuments, listRetailerOrders, reorderRetailerOrder, reviewAndConvertRetailerOrder, updateRetailerAccessStatus } from "./b2b";
 import { calculatePackagingLogistics, findSuitableVehicles, listProductPackaging, listUomCatalog } from "./uomPackaging";
-import { closeProductionOrder, createManufacturingBom, createProductionOrder, getManufacturingOperationalOptions, getManufacturingOverview, getProductionOrderOperationalDetails, getProductionOrderScope, getProductionTraceability, issueMaterialsForProduction, listProductionOrders, recordProductionExpense, recordProductionOutput, recordProductionQualityCheck, recordProductionWaste, reserveProductionMaterials, returnMaterialsFromProduction, saveManufacturingProductProfile, transitionProductionOrderStatus, updateProductionStage } from "./manufacturing";
+import { closeProductionOrder, createManufacturingBom, createProductionOrder, getManufacturingOperationalOptions, getManufacturingOverview, getProductionBatchGenealogy, getProductionOrderOperationalDetails, getProductionOrderScope, getProductionTraceability, issueMaterialsForProduction, listProductionOrders, recordProductionExpense, recordProductionOutput, recordProductionQualityCheck, recordProductionWaste, reserveProductionMaterials, returnMaterialsFromProduction, saveManufacturingProductProfile, transitionProductionOrderStatus, updateProductionStage } from "./manufacturing";
 import { canAccessManufacturingOrderScope, canUseManufacturingPermission, isManufacturingScopeAllowed, type ManufacturingPermission } from "./manufacturingPermissionPolicy";
 
 type ModuleKey = "inventory" | "sales" | "purchases" | "finance" | "hr" | "reports" | "ai_assistant" | "distribution" | "manufacturing";
@@ -511,6 +511,13 @@ export const erpRouter = router({
     traceability: protectedProcedure.input(z.object({ productionOrderId: z.number().int().positive() })).query(async ({ ctx, input }) => {
       const context = await requireManufacturingOrderPermission(ctx.user.id, "manufacturing.view", input.productionOrderId);
       return getProductionTraceability(context.organization.id, input.productionOrderId);
+    }),
+    batchGenealogy: protectedProcedure.input(z.object({ batchId: z.number().int().positive() })).query(async ({ ctx, input }) => {
+      const context = await requireManufacturingPermission(ctx.user.id, "manufacturing.view");
+      const genealogy = await getProductionBatchGenealogy(context.organization.id, input.batchId);
+      const relatedOrders = [...genealogy.usedAsRawMaterial.map(item => item.order), ...genealogy.finishedFrom.map(item => item.order)];
+      if (relatedOrders.some(order => !canAccessManufacturingOrderScope(context.membership.dataScope, order))) throw new TRPCError({ code: "FORBIDDEN", message: "التتبّع المطلوب يتضمن أمراً خارج نطاق بيانات عضويتك." });
+      return genealogy;
     }),
     transitionOrder: protectedProcedure.input(z.object({ productionOrderId: z.number().int().positive(), nextStatus: z.enum(["planned", "approved", "in_production", "quality_hold", "completed", "closed", "cancelled"]) })).mutation(async ({ ctx, input }) => {
       const permissionByStatus = { planned: "manufacturing.order.plan", approved: "manufacturing.order.approve", in_production: "manufacturing.order.start", quality_hold: "manufacturing.quality.inspect", completed: "manufacturing.order.complete", closed: "manufacturing.order.close", cancelled: "manufacturing.order.plan" } as const;

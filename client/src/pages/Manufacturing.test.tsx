@@ -14,6 +14,7 @@ vi.mock("@/lib/trpc", () => {
     orders: { useQuery: () => ({ data: [], isLoading: false, isError: false, refetch: refreshOrders }) },
     operationalOptions: { useQuery: () => ({ data: { boms: [], warehouses: [], productionLines: [] } }) },
     orderDetails: { useQuery: () => ({ data: undefined, isLoading: false, refetch: vi.fn() }) },
+    batchGenealogy: { useQuery: () => ({ data: undefined, isError: false }) },
     createOrder: mutation, transitionOrder: mutation, reserveMaterials: mutation, issueMaterials: mutation, returnMaterials: mutation, updateStage: mutation, recordOutput: mutation, recordWaste: mutation, qualityCheck: mutation, closeOrder: mutation, recordExpense: mutation,
   } } } };
 });

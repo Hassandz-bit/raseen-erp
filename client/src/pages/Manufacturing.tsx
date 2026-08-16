@@ -1,5 +1,6 @@
 import DashboardLayout from "@/components/DashboardLayout";
-import { ProductionOrderWorkspace } from "@/components/ProductionOrderWorkspace";
+import { ManufacturingBatchGenealogy } from "@/components/ManufacturingBatchGenealogy";
+import { ProductionOrderDocuments, ProductionOrderWorkspace } from "@/components/ProductionOrderWorkspace";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -63,5 +64,7 @@ export default function Manufacturing() {
 
     <Card><CardHeader className="pb-3"><CardTitle className="text-base">{copy.orderList}</CardTitle></CardHeader><CardContent>{isLoading ? <div className="space-y-2">{[1, 2, 3].map(item => <Skeleton key={item} className="h-12 w-full" />)}</div> : orders.data?.length ? <div className="overflow-x-auto"><table className="w-full min-w-[640px] text-sm"><thead className="border-b text-xs text-muted-foreground"><tr><th className="p-3 text-start">{copy.order}</th><th className="p-3 text-start">{copy.plannedQuantity}</th><th className="p-3 text-start">{t("status")}</th><th className="p-3 text-start">{copy.quality}</th></tr></thead><tbody>{orders.data.map(order => <tr key={order.id} className="cursor-pointer border-b transition-colors hover:bg-muted/40 last:border-0" onClick={() => setSelectedOrderId(order.id)}><td className="p-3 font-medium">{order.orderNumber}</td><td className="p-3 tabular-nums">{order.plannedQuantity} {order.plannedUnit}</td><td className="p-3"><Badge variant="outline">{copy[statusKey(order.status)]}</Badge></td><td className="p-3 text-muted-foreground">{order.status === "quality_hold" ? copy.qualityHold : "—"}</td></tr>)}</tbody></table></div> : <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">{copy.noOrders}</div>}</CardContent></Card>
     <ProductionOrderWorkspace selectedOrderId={selectedOrderId} onSelectedOrderIdChange={setSelectedOrderId} createOpen={createOpen} onCreateOpenChange={setCreateOpen} onChanged={refresh} />
+    {selectedOrderId ? <ProductionOrderDocuments productionOrderId={selectedOrderId} /> : null}
+    <ManufacturingBatchGenealogy />
   </div></DashboardLayout>;
 }
