@@ -10,12 +10,13 @@ import { LanguageProvider, useLanguage } from "./contexts/LanguageContext";
 import { ThemeProvider, useTheme } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
 import CommerceInventory from "./pages/CommerceInventory";
+import Distribution from "./pages/Distribution";
 import ModulesPage from "./pages/Modules";
 import SettingsPage from "./pages/Settings";
 import Workspace from "./pages/Workspace";
 
 function Router() {
-  return <Switch><Route path="/" component={Home} /><Route path="/workspace" component={Workspace} /><Route path="/commerce" component={CommerceInventory} /><Route path="/modules" component={ModulesPage} /><Route path="/settings" component={SettingsPage} /><Route path="/404" component={NotFound} /><Route component={NotFound} /></Switch>;
+  return <Switch><Route path="/" component={Home} /><Route path="/workspace" component={Workspace} /><Route path="/commerce" component={CommerceInventory} /><Route path="/distribution" component={Distribution} /><Route path="/modules" component={ModulesPage} /><Route path="/settings" component={SettingsPage} /><Route path="/404" component={NotFound} /><Route component={NotFound} /></Switch>;
 }
 
 function PreferencesHydrator({ children }: { children: React.ReactNode }) {

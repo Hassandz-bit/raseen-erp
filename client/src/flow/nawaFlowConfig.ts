@@ -23,7 +23,7 @@ export const nawaFlowNodes: FlowNodeConfig[] = [
   { id: "commerce", labelKey: "commerceInventory", descriptionKey: "flowOverview", icon: Boxes, moduleRequirements: ["purchases", "inventory", "sales"], route: "/workspace", position: { x: 50, y: 44 }, internalNodes: [{ key: "purchases", icon: ShoppingCart, module: "purchases" }, { key: "inventory", icon: Package, module: "inventory" }, { key: "sales", icon: ReceiptText, module: "sales" }] },
   { id: "finance", labelKey: "financialAccounting", descriptionKey: "flowOverview", icon: Landmark, moduleRequirements: ["finance"], route: "/workspace", position: { x: 83, y: 72 } },
   { id: "hr", labelKey: "humanResources", descriptionKey: "flowOverview", icon: UsersRound, moduleRequirements: ["hr"], route: "/workspace", position: { x: 18, y: 76 } },
-  { id: "distribution", labelKey: "distributionFleet", descriptionKey: "flowLockedDescription", icon: Truck, moduleRequirements: ["distribution"], position: { x: 84, y: 17 } },
+  { id: "distribution", labelKey: "distributionFleet", descriptionKey: "flowLockedDescription", icon: Truck, moduleRequirements: ["distribution"], route: "/distribution", position: { x: 84, y: 17 }, internalNodes: [{ key: "inventory", icon: Package, module: "inventory" }, { key: "sales", icon: ReceiptText, module: "sales" }, { key: "finance", icon: Landmark, module: "finance" }] },
   { id: "manufacturing", labelKey: "manufacturingProduction", descriptionKey: "flowLockedDescription", icon: Factory, moduleRequirements: ["manufacturing"], position: { x: 17, y: 18 } },
 ];
 
@@ -31,6 +31,7 @@ export const nawaFlowEdges: FlowEdgeConfig[] = [
   { id: "manufacturing-commerce", source: "manufacturing", target: "commerce" },
   { id: "commerce-distribution", source: "commerce", target: "distribution" },
   { id: "commerce-finance", source: "commerce", target: "finance" },
+  { id: "distribution-finance", source: "distribution", target: "finance" },
   { id: "hr-commerce", source: "hr", target: "commerce" },
 ];
 

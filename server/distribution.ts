@@ -170,6 +170,8 @@ export async function transitionVehicleLoadOrder(organizationId: number, actorUs
     const load = await assertOrganizationRecord((await tx.select().from(vehicleLoadOrders).where(and(eq(vehicleLoadOrders.id, loadOrderId), eq(vehicleLoadOrders.organizationId, organizationId))).limit(1))[0], "أمر التحميل");
     if (!canTransitionVehicleLoad(load.status, status)) throw new Error("لا يسمح انتقال حالة أمر التحميل من وضعه الحالي.");
     if (status === "dispatched") {
+      const claimed = await tx.update(vehicleLoadOrders).set({ status: "loading" }).where(and(eq(vehicleLoadOrders.id, loadOrderId), eq(vehicleLoadOrders.organizationId, organizationId), eq(vehicleLoadOrders.status, load.status)));
+      if (!Number(claimed[0]?.affectedRows ?? 0)) throw new Error("أمر التحميل قيد المعالجة أو تم إرساله بالفعل.");
       const vehicle = await assertOrganizationRecord((await tx.select().from(fleetVehicles).where(and(eq(fleetVehicles.id, load.vehicleId), eq(fleetVehicles.organizationId, organizationId))).limit(1))[0], "المركبة");
       const items = await tx.select().from(vehicleLoadItems).where(and(eq(vehicleLoadItems.organizationId, organizationId), eq(vehicleLoadItems.loadOrderId, loadOrderId)));
       for (const item of items) {
@@ -178,15 +180,23 @@ export async function transitionVehicleLoadOrder(organizationId: number, actorUs
         const quantity = base(item.quantity);
         const sourceUpdated = await tx.update(productBatches).set({ currentQuantity: sql`${productBatches.currentQuantity} - ${quantity}` }).where(and(eq(productBatches.id, sourceBatch.id), eq(productBatches.organizationId, organizationId), sql`${productBatches.currentQuantity} - ${productBatches.reservedQuantity} >= ${quantity}`));
         if (!Number(sourceUpdated[0]?.affectedRows ?? 0)) throw new Error("تعذر صرف كمية التحميل بأمان.");
-        const destination = await tx.insert(productBatches).values({ organizationId, productId: item.productId, warehouseId: vehicle.mobileWarehouseId!, lotNumber: `${sourceBatch.lotNumber}-V${loadOrderId}`, sourcePartyId: sourceBatch.sourcePartyId, receivedQuantity: String(quantity), currentQuantity: String(quantity), reservedQuantity: "0", cost: sourceBatch.cost, manufacturingDate: sourceBatch.manufacturingDate, expiryDate: sourceBatch.expiryDate, status: "active" });
-        const vehicleBatchId = Number(destination[0].insertId);
+        const vehicleLotNumber = `${sourceBatch.lotNumber}-V`;
+        const existingVehicleBatch = await tx.select().from(productBatches).where(and(eq(productBatches.organizationId, organizationId), eq(productBatches.warehouseId, vehicle.mobileWarehouseId!), eq(productBatches.productId, item.productId), eq(productBatches.lotNumber, vehicleLotNumber))).limit(1);
+        let vehicleBatchId: number;
+        if (existingVehicleBatch[0]) {
+          vehicleBatchId = existingVehicleBatch[0].id;
+          await tx.update(productBatches).set({ currentQuantity: sql`${productBatches.currentQuantity} + ${quantity}`, receivedQuantity: sql`${productBatches.receivedQuantity} + ${quantity}` }).where(and(eq(productBatches.id, vehicleBatchId), eq(productBatches.organizationId, organizationId)));
+        } else {
+          const destination = await tx.insert(productBatches).values({ organizationId, productId: item.productId, warehouseId: vehicle.mobileWarehouseId!, lotNumber: vehicleLotNumber, sourcePartyId: sourceBatch.sourcePartyId, receivedQuantity: String(quantity), currentQuantity: String(quantity), reservedQuantity: "0", cost: sourceBatch.cost, manufacturingDate: sourceBatch.manufacturingDate, expiryDate: sourceBatch.expiryDate, status: "active" });
+          vehicleBatchId = Number(destination[0].insertId);
+        }
         await tx.update(vehicleLoadItems).set({ vehicleBatchId }).where(and(eq(vehicleLoadItems.id, item.id), eq(vehicleLoadItems.organizationId, organizationId)));
         await tx.insert(stockMovements).values([{ organizationId, warehouseId: load.sourceWarehouseId, productId: item.productId, batchId: sourceBatch.id, movementType: "vehicle_load_out", quantity: String(-quantity), unit: item.unit, sourceDocumentType: "vehicle_load", sourceDocumentId: loadOrderId, occurredAt: new Date(), actorUserId, auditReference: `LOAD-${loadOrderId}` }, { organizationId, warehouseId: vehicle.mobileWarehouseId!, productId: item.productId, batchId: vehicleBatchId, movementType: "vehicle_load_in", quantity: String(quantity), unit: item.unit, sourceDocumentType: "vehicle_load", sourceDocumentId: loadOrderId, occurredAt: new Date(), actorUserId, auditReference: `LOAD-${loadOrderId}` }]);
         await tx.insert(inventoryBalances).values({ organizationId, warehouseId: load.sourceWarehouseId, productId: item.productId, quantity: String(-quantity), reservedQuantity: "0" }).onDuplicateKeyUpdate({ set: { quantity: sql`${inventoryBalances.quantity} - ${quantity}` } });
         await tx.insert(inventoryBalances).values({ organizationId, warehouseId: vehicle.mobileWarehouseId!, productId: item.productId, quantity: String(quantity), reservedQuantity: "0" }).onDuplicateKeyUpdate({ set: { quantity: sql`${inventoryBalances.quantity} + ${quantity}` } });
       }
     }
-    await tx.update(vehicleLoadOrders).set({ status, loadDate: status === "dispatched" ? new Date() : undefined, approvedByUserId: status === "approved" ? actorUserId : undefined }).where(and(eq(vehicleLoadOrders.id, loadOrderId), eq(vehicleLoadOrders.organizationId, organizationId), eq(vehicleLoadOrders.status, load.status)));
+    await tx.update(vehicleLoadOrders).set({ status, loadDate: status === "dispatched" ? new Date() : undefined, approvedByUserId: status === "approved" ? actorUserId : undefined }).where(and(eq(vehicleLoadOrders.id, loadOrderId), eq(vehicleLoadOrders.organizationId, organizationId), eq(vehicleLoadOrders.status, status === "dispatched" ? "loading" : load.status)));
     if (status === "dispatched" && load.routeId) await tx.update(distributionRoutes).set({ loadOrderId, status: "loaded" }).where(and(eq(distributionRoutes.id, load.routeId), eq(distributionRoutes.organizationId, organizationId), eq(distributionRoutes.status, "prepared")));
     await tx.insert(auditLogs).values({ organizationId, actorUserId, action: `vehicle_load.${status}`, entityType: "vehicle_load_order", entityId: String(loadOrderId), metadata: null });
     return { id: loadOrderId, status };
@@ -201,6 +211,12 @@ export async function recordDistributionDelivery(organizationId: number, actorUs
     if (duplicate[0]) return { id: duplicate[0].id, status: duplicate[0].status, replayed: true as const };
     const route = await assertOrganizationRecord((await tx.select().from(distributionRoutes).where(and(eq(distributionRoutes.id, input.routeId), eq(distributionRoutes.organizationId, organizationId))).limit(1))[0], "الجولة");
     if (!route.vehicleId || !["started", "in_progress", "returning"].includes(route.status)) throw new Error("لا يمكن تسجيل تسليم خارج جولة بدأت ومركبة مسندة.");
+    const customer = await assertOrganizationRecord((await tx.select().from(businessParties).where(and(eq(businessParties.id, input.customerId), eq(businessParties.organizationId, organizationId))).limit(1))[0], "العميل");
+    if (input.salesInvoiceId) {
+      const invoice = await assertOrganizationRecord((await tx.select().from(salesInvoices).where(and(eq(salesInvoices.id, input.salesInvoiceId), eq(salesInvoices.organizationId, organizationId))).limit(1))[0], "فاتورة المبيعات");
+      if (invoice.customerId !== customer.id) throw new Error("لا تطابق الفاتورة العميل المحدد للتسليم.");
+    }
+    if (input.stopId) await assertOrganizationRecord((await tx.select().from(distributionRouteStops).where(and(eq(distributionRouteStops.id, input.stopId), eq(distributionRouteStops.organizationId, organizationId), eq(distributionRouteStops.routeId, input.routeId), eq(distributionRouteStops.customerId, input.customerId))).limit(1))[0], "محطة الجولة");
     const statuses = input.items.map(item => item.deliveredQuantity > 0 ? "full" : "failed");
     const status = statuses.every(item => item === "full") ? "full" : statuses.some(item => item === "full") ? "partial" : "failed" as const;
     const inserted = await tx.insert(distributionDeliveries).values({ organizationId, deliveryNumber: number("DLV"), routeId: input.routeId, stopId: input.stopId, vehicleId: route.vehicleId, customerId: input.customerId, salesInvoiceId: input.salesInvoiceId, status, deliveredAt: new Date(), notes: input.notes?.trim(), idempotencyKey: input.idempotencyKey.trim(), createdByUserId: actorUserId });
@@ -228,6 +244,11 @@ export async function recordDistributionCollection(organizationId: number, actor
   const duplicate = await db.select().from(distributionCollections).where(and(eq(distributionCollections.organizationId, organizationId), eq(distributionCollections.idempotencyKey, input.idempotencyKey))).limit(1);
   if (duplicate[0]) return { id: duplicate[0].id, replayed: true as const };
   const route = await assertOrganizationRecord((await db.select().from(distributionRoutes).where(and(eq(distributionRoutes.id, input.routeId), eq(distributionRoutes.organizationId, organizationId))).limit(1))[0], "الجولة");
+  const customer = await assertOrganizationRecord((await db.select().from(businessParties).where(and(eq(businessParties.id, input.customerId), eq(businessParties.organizationId, organizationId))).limit(1))[0], "العميل");
+  if (input.salesInvoiceId) {
+    const invoice = await assertOrganizationRecord((await db.select().from(salesInvoices).where(and(eq(salesInvoices.id, input.salesInvoiceId), eq(salesInvoices.organizationId, organizationId))).limit(1))[0], "فاتورة المبيعات");
+    if (invoice.customerId !== customer.id) throw new Error("لا تطابق الفاتورة العميل المحدد للتحصيل.");
+  }
   const result = await db.insert(distributionCollections).values({ organizationId, receiptNumber: number("COL"), routeId: input.routeId, vehicleId: route.vehicleId, customerId: input.customerId, salesInvoiceId: input.salesInvoiceId, representativeEmployeeId: input.representativeEmployeeId, driverEmployeeId: input.driverEmployeeId, collectionType: input.collectionType, amount: String(input.amount), currencyCode: input.currencyCode.toUpperCase(), exchangeRateUsed: String(input.exchangeRateUsed ?? 1), paymentMethod: input.paymentMethod ?? "cash", idempotencyKey: input.idempotencyKey.trim(), createdByUserId: actorUserId });
   const id = Number(result[0].insertId);
   if (input.salesInvoiceId) await db.update(salesInvoices).set({ amountPaid: sql`${salesInvoices.amountPaid} + ${input.amount}`, status: "partial" }).where(and(eq(salesInvoices.id, input.salesInvoiceId), eq(salesInvoices.organizationId, organizationId)));
@@ -249,4 +270,178 @@ export async function getDistributionControlCenter(organizationId: number) {
   const [returnTotal] = await db.select({ total: sql<string>`coalesce(sum(${distributionReturns.quantity}), 0)` }).from(distributionReturns).where(eq(distributionReturns.organizationId, organizationId));
   const [capacity] = await db.select({ total: sql<string>`coalesce(avg(${vehicleLoadOrders.payloadUtilization}), 0)` }).from(vehicleLoadOrders).where(and(eq(vehicleLoadOrders.organizationId, organizationId), sql`${vehicleLoadOrders.status} in ('loaded','dispatched')`));
   return { routesToday: Number(routesToday.total), activeRoutes: Number(activeRoutes.total), vehiclesLoaded: Number(loadedVehicles.total), pendingDeliveries: Number(pendingDeliveries.total), completedDeliveries: Number(completedDeliveries.total), collections: Number(collectionTotal.total), returns: Number(returnTotal.total), capacityUtilization: Number(capacity.total) };
+}
+
+export async function recordDistributionReturn(organizationId: number, actorUserId: number, input: { routeId: number; customerId?: number; deliveryId?: number; salesInvoiceId?: number; productId: number; vehicleBatchId: number; quantity: number; unit: string; reason?: string; condition: "resalable" | "damaged" | "quarantined"; idempotencyKey: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  return db.transaction(async tx => {
+    const duplicate = await tx.select().from(distributionReturns).where(and(eq(distributionReturns.organizationId, organizationId), eq(distributionReturns.idempotencyKey, input.idempotencyKey))).limit(1);
+    if (duplicate[0]) return { id: duplicate[0].id, replayed: true as const };
+    const route = await assertOrganizationRecord((await tx.select().from(distributionRoutes).where(and(eq(distributionRoutes.id, input.routeId), eq(distributionRoutes.organizationId, organizationId))).limit(1))[0], "الجولة");
+    if (!route.vehicleId) throw new Error("لا يمكن تسجيل مرتجع بلا مركبة مسندة للجولة.");
+    if (input.customerId) await assertOrganizationRecord((await tx.select().from(businessParties).where(and(eq(businessParties.id, input.customerId), eq(businessParties.organizationId, organizationId))).limit(1))[0], "العميل");
+    if (input.salesInvoiceId) await assertOrganizationRecord((await tx.select().from(salesInvoices).where(and(eq(salesInvoices.id, input.salesInvoiceId), eq(salesInvoices.organizationId, organizationId))).limit(1))[0], "فاتورة المبيعات");
+    if (input.deliveryId) await assertOrganizationRecord((await tx.select().from(distributionDeliveries).where(and(eq(distributionDeliveries.id, input.deliveryId), eq(distributionDeliveries.organizationId, organizationId), eq(distributionDeliveries.routeId, input.routeId))).limit(1))[0], "مستند التسليم");
+    const vehicle = await assertOrganizationRecord((await tx.select().from(fleetVehicles).where(and(eq(fleetVehicles.id, route.vehicleId), eq(fleetVehicles.organizationId, organizationId))).limit(1))[0], "المركبة");
+    const batch = await assertOrganizationRecord((await tx.select().from(productBatches).where(and(eq(productBatches.id, input.vehicleBatchId), eq(productBatches.organizationId, organizationId), eq(productBatches.warehouseId, vehicle.mobileWarehouseId!), eq(productBatches.productId, input.productId))).limit(1))[0], "دفعة المركبة");
+    const result = await tx.insert(distributionReturns).values({ organizationId, returnNumber: number("RET"), routeId: input.routeId, vehicleId: route.vehicleId, customerId: input.customerId, deliveryId: input.deliveryId, salesInvoiceId: input.salesInvoiceId, productId: input.productId, vehicleBatchId: input.vehicleBatchId, quantity: String(input.quantity), unit: input.unit, reason: input.reason?.trim(), condition: input.condition, status: input.condition === "resalable" ? "recorded" : "damaged", idempotencyKey: input.idempotencyKey.trim(), createdByUserId: actorUserId });
+    const id = Number(result[0].insertId);
+    if (input.condition === "resalable") {
+      await tx.update(productBatches).set({ currentQuantity: sql`${productBatches.currentQuantity} + ${input.quantity}` }).where(and(eq(productBatches.id, batch.id), eq(productBatches.organizationId, organizationId)));
+      await tx.insert(inventoryBalances).values({ organizationId, warehouseId: vehicle.mobileWarehouseId!, productId: input.productId, quantity: String(input.quantity), reservedQuantity: "0" }).onDuplicateKeyUpdate({ set: { quantity: sql`${inventoryBalances.quantity} + ${input.quantity}` } });
+    } else {
+      const quarantine = await tx.insert(productBatches).values({ organizationId, productId: input.productId, warehouseId: vehicle.mobileWarehouseId!, lotNumber: `RET-${id}`, receivedQuantity: String(input.quantity), currentQuantity: String(input.quantity), reservedQuantity: "0", cost: batch.cost, status: "quarantined" });
+      await tx.update(distributionReturns).set({ vehicleBatchId: Number(quarantine[0].insertId) }).where(and(eq(distributionReturns.id, id), eq(distributionReturns.organizationId, organizationId)));
+      await tx.insert(inventoryBalances).values({ organizationId, warehouseId: vehicle.mobileWarehouseId!, productId: input.productId, quantity: String(input.quantity), reservedQuantity: "0" }).onDuplicateKeyUpdate({ set: { quantity: sql`${inventoryBalances.quantity} + ${input.quantity}` } });
+    }
+    await tx.insert(stockMovements).values({ organizationId, warehouseId: vehicle.mobileWarehouseId!, productId: input.productId, batchId: input.condition === "resalable" ? batch.id : undefined, movementType: "vehicle_return", quantity: String(input.quantity), unit: input.unit, sourceDocumentType: "distribution_return", sourceDocumentId: id, occurredAt: new Date(), actorUserId, auditReference: `RET-${id}` });
+    await tx.insert(distributionIdempotencyKeys).values({ organizationId, operation: "return", idempotencyKey: input.idempotencyKey.trim(), entityType: "distribution_return", entityId: id });
+    await tx.insert(auditLogs).values({ organizationId, actorUserId, action: "distribution_return.recorded", entityType: "distribution_return", entityId: String(id), metadata: { routeId: input.routeId, condition: input.condition } });
+    return { id, replayed: false as const };
+  });
+}
+
+export async function returnVehicleStockToWarehouse(organizationId: number, actorUserId: number, input: { vehicleId: number; destinationWarehouseId: number; vehicleBatchId: number; quantity: number; unit: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  return db.transaction(async tx => {
+    const vehicle = await assertOrganizationRecord((await tx.select().from(fleetVehicles).where(and(eq(fleetVehicles.id, input.vehicleId), eq(fleetVehicles.organizationId, organizationId))).limit(1))[0], "المركبة");
+    await assertOrganizationRecord((await tx.select().from(warehouses).where(and(eq(warehouses.id, input.destinationWarehouseId), eq(warehouses.organizationId, organizationId), eq(warehouses.status, "active"))).limit(1))[0], "مخزن الوجهة");
+    const vehicleBatch = await assertOrganizationRecord((await tx.select().from(productBatches).where(and(eq(productBatches.id, input.vehicleBatchId), eq(productBatches.organizationId, organizationId), eq(productBatches.warehouseId, vehicle.mobileWarehouseId!))).limit(1))[0], "دفعة المركبة");
+    if (base(vehicleBatch.currentQuantity) < input.quantity) throw new Error("كمية مركبة غير كافية للترجيع إلى المخزن.");
+    await tx.update(productBatches).set({ currentQuantity: sql`${productBatches.currentQuantity} - ${input.quantity}` }).where(and(eq(productBatches.id, vehicleBatch.id), eq(productBatches.organizationId, organizationId), sql`${productBatches.currentQuantity} >= ${input.quantity}`));
+    const existing = await tx.select().from(productBatches).where(and(eq(productBatches.organizationId, organizationId), eq(productBatches.warehouseId, input.destinationWarehouseId), eq(productBatches.productId, vehicleBatch.productId), eq(productBatches.lotNumber, vehicleBatch.lotNumber))).limit(1);
+    let destinationBatchId: number;
+    if (existing[0]) {
+      destinationBatchId = existing[0].id;
+      await tx.update(productBatches).set({ currentQuantity: sql`${productBatches.currentQuantity} + ${input.quantity}`, receivedQuantity: sql`${productBatches.receivedQuantity} + ${input.quantity}` }).where(and(eq(productBatches.id, destinationBatchId), eq(productBatches.organizationId, organizationId)));
+    } else {
+      const inserted = await tx.insert(productBatches).values({ organizationId, productId: vehicleBatch.productId, warehouseId: input.destinationWarehouseId, lotNumber: vehicleBatch.lotNumber, sourcePartyId: vehicleBatch.sourcePartyId, receivedQuantity: String(input.quantity), currentQuantity: String(input.quantity), reservedQuantity: "0", cost: vehicleBatch.cost, manufacturingDate: vehicleBatch.manufacturingDate, expiryDate: vehicleBatch.expiryDate, status: vehicleBatch.status });
+      destinationBatchId = Number(inserted[0].insertId);
+    }
+    await tx.insert(stockMovements).values([{ organizationId, warehouseId: vehicle.mobileWarehouseId!, productId: vehicleBatch.productId, batchId: vehicleBatch.id, movementType: "vehicle_return", quantity: String(-input.quantity), unit: input.unit, sourceDocumentType: "vehicle_return_to_warehouse", sourceDocumentId: input.vehicleBatchId, occurredAt: new Date(), actorUserId, auditReference: `VRET-${input.vehicleBatchId}` }, { organizationId, warehouseId: input.destinationWarehouseId, productId: vehicleBatch.productId, batchId: destinationBatchId, movementType: "vehicle_load_in", quantity: String(input.quantity), unit: input.unit, sourceDocumentType: "vehicle_return_to_warehouse", sourceDocumentId: input.vehicleBatchId, occurredAt: new Date(), actorUserId, auditReference: `VRET-${input.vehicleBatchId}` }]);
+    await tx.insert(inventoryBalances).values({ organizationId, warehouseId: vehicle.mobileWarehouseId!, productId: vehicleBatch.productId, quantity: String(-input.quantity), reservedQuantity: "0" }).onDuplicateKeyUpdate({ set: { quantity: sql`${inventoryBalances.quantity} - ${input.quantity}` } });
+    await tx.insert(inventoryBalances).values({ organizationId, warehouseId: input.destinationWarehouseId, productId: vehicleBatch.productId, quantity: String(input.quantity), reservedQuantity: "0" }).onDuplicateKeyUpdate({ set: { quantity: sql`${inventoryBalances.quantity} + ${input.quantity}` } });
+    await tx.insert(auditLogs).values({ organizationId, actorUserId, action: "vehicle_stock.returned_to_warehouse", entityType: "product_batch", entityId: String(input.vehicleBatchId), metadata: { destinationWarehouseId: input.destinationWarehouseId, quantity: input.quantity } });
+    return { destinationBatchId };
+  });
+}
+
+export async function listVehicleInventory(organizationId: number, vehicleId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const vehicle = await assertVehicle(db, organizationId, vehicleId);
+  return db.select().from(productBatches).where(and(eq(productBatches.organizationId, organizationId), eq(productBatches.warehouseId, vehicle.mobileWarehouseId!))).orderBy(asc(productBatches.expiryDate), desc(productBatches.createdAt)).limit(300);
+}
+
+export async function addDistributionRouteExpense(organizationId: number, actorUserId: number, input: { routeId: number; vehicleId?: number; category: "fuel" | "toll" | "parking" | "minor"; amount: number; currencyCode: string; receiptUrl?: string; notes?: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const route = await assertOrganizationRecord((await db.select().from(distributionRoutes).where(and(eq(distributionRoutes.id, input.routeId), eq(distributionRoutes.organizationId, organizationId))).limit(1))[0], "الجولة");
+  if (input.vehicleId && route.vehicleId !== input.vehicleId) throw new Error("لا تتبع المركبة المحددة لهذه الجولة.");
+  const result = await db.insert(distributionRouteExpenses).values({ organizationId, routeId: input.routeId, vehicleId: route.vehicleId, category: input.category, amount: String(input.amount), currencyCode: input.currencyCode.toUpperCase(), receiptUrl: input.receiptUrl, notes: input.notes?.trim(), createdByUserId: actorUserId });
+  const id = Number(result[0].insertId);
+  await db.insert(auditLogs).values({ organizationId, actorUserId, action: "distribution_route.expense_recorded", entityType: "distribution_route_expense", entityId: String(id), metadata: { routeId: input.routeId, amount: input.amount } });
+  return { id };
+}
+
+async function calculateRouteValue(tx: { select: (...args: any[]) => any }, organizationId: number, rows: Array<{ productId: number; quantity: unknown }>) {
+  let value = 0;
+  for (const row of rows) {
+    const product = (await tx.select({ salePrice: products.salePrice }).from(products).where(and(eq(products.id, row.productId), eq(products.organizationId, organizationId))).limit(1))[0];
+    value += base(product?.salePrice) * base(row.quantity);
+  }
+  return value;
+}
+
+export async function submitRouteClosing(organizationId: number, actorUserId: number, input: { routeId: number; actualCash: number; stockDifference?: number }) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  return db.transaction(async tx => {
+    const route = await assertOrganizationRecord((await tx.select().from(distributionRoutes).where(and(eq(distributionRoutes.id, input.routeId), eq(distributionRoutes.organizationId, organizationId))).limit(1))[0], "الجولة");
+    if (!["returning", "closing"].includes(route.status)) throw new Error("لا يمكن تسوية جولة لم تعد من التوزيع.");
+    const previous = await tx.select().from(distributionRouteClosings).where(and(eq(distributionRouteClosings.organizationId, organizationId), eq(distributionRouteClosings.routeId, input.routeId))).limit(1);
+    if (previous[0] && previous[0].status !== "reopened") throw new Error("توجد تسوية نشطة لهذه الجولة.");
+    const loadItems = route.loadOrderId ? await tx.select({ productId: vehicleLoadItems.productId, quantity: vehicleLoadItems.quantity }).from(vehicleLoadItems).where(and(eq(vehicleLoadItems.organizationId, organizationId), eq(vehicleLoadItems.loadOrderId, route.loadOrderId))) : [];
+    const deliveryRows = await tx.select({ productId: distributionDeliveryItems.productId, quantity: distributionDeliveryItems.deliveredQuantity }).from(distributionDeliveryItems).innerJoin(distributionDeliveries, eq(distributionDeliveries.id, distributionDeliveryItems.deliveryId)).where(and(eq(distributionDeliveryItems.organizationId, organizationId), eq(distributionDeliveries.organizationId, organizationId), eq(distributionDeliveries.routeId, input.routeId)));
+    const returnRows = await tx.select({ productId: distributionReturns.productId, quantity: distributionReturns.quantity, condition: distributionReturns.condition }).from(distributionReturns).where(and(eq(distributionReturns.organizationId, organizationId), eq(distributionReturns.routeId, input.routeId)));
+    const collections = await tx.select({ amount: distributionCollections.amount }).from(distributionCollections).where(and(eq(distributionCollections.organizationId, organizationId), eq(distributionCollections.routeId, input.routeId), eq(distributionCollections.paymentMethod, "cash")));
+    const loadedValue = await calculateRouteValue(tx, organizationId, loadItems);
+    const deliveredValue = await calculateRouteValue(tx, organizationId, deliveryRows);
+    const returnedValue = await calculateRouteValue(tx, organizationId, returnRows.filter(row => row.condition === "resalable"));
+    const damagedValue = await calculateRouteValue(tx, organizationId, returnRows.filter(row => row.condition !== "resalable"));
+    const expectedCash = collections.reduce((total, row) => total + base(row.amount), 0);
+    const values = { loadedValue: String(loadedValue), deliveredValue: String(deliveredValue), returnedValue: String(returnedValue), damagedValue: String(damagedValue), expectedCash: String(expectedCash), actualCash: String(input.actualCash), cashDifference: String(input.actualCash - expectedCash), stockDifference: String(input.stockDifference ?? 0), status: "submitted" as const, submittedByUserId: actorUserId, reopenReason: undefined };
+    let id: number;
+    if (previous[0]) {
+      id = previous[0].id;
+      await tx.update(distributionRouteClosings).set(values).where(and(eq(distributionRouteClosings.id, id), eq(distributionRouteClosings.organizationId, organizationId), eq(distributionRouteClosings.status, "reopened")));
+    } else {
+      const created = await tx.insert(distributionRouteClosings).values({ organizationId, routeId: input.routeId, ...values });
+      id = Number(created[0].insertId);
+    }
+    await tx.update(distributionRoutes).set({ status: "closing" }).where(and(eq(distributionRoutes.id, input.routeId), eq(distributionRoutes.organizationId, organizationId), sql`${distributionRoutes.status} in ('returning','closing')`));
+    await tx.insert(auditLogs).values({ organizationId, actorUserId, action: "distribution_route.closing_submitted", entityType: "distribution_route_closing", entityId: String(id), metadata: { routeId: input.routeId, expectedCash, actualCash: input.actualCash } });
+    return { id, expectedCash, cashDifference: input.actualCash - expectedCash };
+  });
+}
+
+export async function transitionRouteClosing(organizationId: number, actorUserId: number, input: { closingId: number; status: "reviewed" | "approved" | "closed" | "reopened"; reopenReason?: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  return db.transaction(async tx => {
+    const closing = await assertOrganizationRecord((await tx.select().from(distributionRouteClosings).where(and(eq(distributionRouteClosings.id, input.closingId), eq(distributionRouteClosings.organizationId, organizationId))).limit(1))[0], "تسوية الجولة");
+    if (!canTransitionRouteClosing(closing.status, input.status)) throw new Error("لا يسمح انتقال حالة التسوية من وضعها الحالي.");
+    if (input.status === "reopened" && !input.reopenReason?.trim()) throw new Error("تتطلب إعادة فتح الجولة سبباً موثقاً.");
+    const actorField = input.status === "reviewed" ? { reviewedByUserId: actorUserId } : input.status === "approved" ? { approvedByUserId: actorUserId } : input.status === "closed" ? { closedByUserId: actorUserId } : {};
+    await tx.update(distributionRouteClosings).set({ status: input.status, reopenReason: input.status === "reopened" ? input.reopenReason?.trim() : undefined, ...actorField }).where(and(eq(distributionRouteClosings.id, input.closingId), eq(distributionRouteClosings.organizationId, organizationId), eq(distributionRouteClosings.status, closing.status)));
+    if (input.status === "closed") await tx.update(distributionRoutes).set({ status: "closed", actualEndAt: new Date() }).where(and(eq(distributionRoutes.id, closing.routeId), eq(distributionRoutes.organizationId, organizationId), eq(distributionRoutes.status, "closing")));
+    if (input.status === "reopened") await tx.update(distributionRoutes).set({ status: "returning" }).where(and(eq(distributionRoutes.id, closing.routeId), eq(distributionRoutes.organizationId, organizationId), eq(distributionRoutes.status, "closing")));
+    await tx.insert(auditLogs).values({ organizationId, actorUserId, action: `distribution_route_closing.${input.status}`, entityType: "distribution_route_closing", entityId: String(input.closingId), metadata: { routeId: closing.routeId, reopenReason: input.reopenReason?.trim() ?? null } });
+    return { id: input.closingId, status: input.status };
+  });
+}
+
+export async function recordFleetGpsPoint(organizationId: number, actorUserId: number, input: { vehicleId: number; routeId?: number; latitude: number; longitude: number; accuracy?: number; recordedAt: Date; source: "driver_app" | "vehicle_tracker" }) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  await assertVehicle(db, organizationId, input.vehicleId);
+  if (input.routeId) {
+    const route = await assertOrganizationRecord((await db.select().from(distributionRoutes).where(and(eq(distributionRoutes.id, input.routeId), eq(distributionRoutes.organizationId, organizationId), eq(distributionRoutes.vehicleId, input.vehicleId))).limit(1))[0], "جولة المركبة");
+    if (!["started", "in_progress", "returning"].includes(route.status)) throw new Error("لا يمكن حفظ موقع لجولة غير نشطة.");
+  }
+  const result = await db.insert(fleetGpsRecords).values({ organizationId, userId: actorUserId, vehicleId: input.vehicleId, routeId: input.routeId, latitude: String(input.latitude), longitude: String(input.longitude), accuracy: input.accuracy === undefined ? undefined : String(input.accuracy), recordedAt: input.recordedAt, source: input.source });
+  return { id: Number(result[0].insertId) };
+}
+
+export async function recordGeofenceEvent(organizationId: number, actorUserId: number, input: { routeId: number; stopId: number; vehicleId?: number; eventType: "arrival" | "departure"; distanceMeters?: number; recordedAt: Date }) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const route = await assertOrganizationRecord((await db.select().from(distributionRoutes).where(and(eq(distributionRoutes.id, input.routeId), eq(distributionRoutes.organizationId, organizationId))).limit(1))[0], "الجولة");
+  if (input.vehicleId && route.vehicleId !== input.vehicleId) throw new Error("لا تتبع المركبة المحددة لهذه الجولة.");
+  await assertOrganizationRecord((await db.select().from(distributionRouteStops).where(and(eq(distributionRouteStops.id, input.stopId), eq(distributionRouteStops.organizationId, organizationId), eq(distributionRouteStops.routeId, input.routeId))).limit(1))[0], "محطة الجولة");
+  const result = await db.insert(distributionGeofenceEvents).values({ organizationId, routeId: input.routeId, stopId: input.stopId, vehicleId: route.vehicleId, eventType: input.eventType, distanceMeters: input.distanceMeters === undefined ? undefined : String(input.distanceMeters), recordedAt: input.recordedAt });
+  if (input.eventType === "arrival") await db.update(distributionRouteStops).set({ arrivedAt: input.recordedAt, deliveryStatus: "arrived" }).where(and(eq(distributionRouteStops.id, input.stopId), eq(distributionRouteStops.organizationId, organizationId), eq(distributionRouteStops.routeId, input.routeId), eq(distributionRouteStops.deliveryStatus, "pending")));
+  await db.insert(auditLogs).values({ organizationId, actorUserId, action: `distribution_geofence.${input.eventType}`, entityType: "distribution_route_stop", entityId: String(input.stopId), metadata: { routeId: input.routeId, distanceMeters: input.distanceMeters ?? null } });
+  return { id: Number(result[0].insertId) };
+}
+
+export async function getLatestFleetLocations(organizationId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  return db.select().from(fleetGpsRecords).where(eq(fleetGpsRecords.organizationId, organizationId)).orderBy(desc(fleetGpsRecords.recordedAt), desc(fleetGpsRecords.id)).limit(200);
+}
+
+export async function getDistributionOwnerAlertReasons(organizationId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const threshold = new Date();
+  threshold.setDate(threshold.getDate() + 30);
+  const documents = await db.select({ documentType: fleetVehicleDocuments.documentType, expiresAt: fleetVehicleDocuments.expiresAt, vehicleCode: fleetVehicles.code }).from(fleetVehicleDocuments).innerJoin(fleetVehicles, and(eq(fleetVehicles.id, fleetVehicleDocuments.vehicleId), eq(fleetVehicles.organizationId, fleetVehicleDocuments.organizationId))).where(and(eq(fleetVehicleDocuments.organizationId, organizationId), sql`${fleetVehicleDocuments.expiresAt} IS NOT NULL AND ${fleetVehicleDocuments.expiresAt} <= ${threshold}`)).limit(20);
+  const maintenance = await db.select({ vehicleCode: fleetVehicles.code, nextDueAt: fleetMaintenanceRecords.nextDueAt }).from(fleetMaintenanceRecords).innerJoin(fleetVehicles, and(eq(fleetVehicles.id, fleetMaintenanceRecords.vehicleId), eq(fleetVehicles.organizationId, fleetMaintenanceRecords.organizationId))).where(and(eq(fleetMaintenanceRecords.organizationId, organizationId), sql`${fleetMaintenanceRecords.nextDueAt} IS NOT NULL AND ${fleetMaintenanceRecords.nextDueAt} <= ${threshold}`, sql`${fleetMaintenanceRecords.status} not in ('completed','cancelled')`)).limit(20);
+  return [
+    ...documents.map(item => `وثيقة ${item.documentType} للمركبة ${item.vehicleCode} تنتهي أو انتهت في ${item.expiresAt?.toISOString().slice(0, 10)}.`),
+    ...maintenance.map(item => `صيانة المركبة ${item.vehicleCode} مستحقة في ${item.nextDueAt?.toISOString().slice(0, 10)}.`),
+  ];
 }
