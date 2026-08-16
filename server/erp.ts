@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { addOrganizationExchangeRate, adjustProductBatchQuantity, approveInventoryCount, approveStockTransfer, createBusinessParty, createInventoryCount, createOperationalNotifications, createOperationalRecord, createOrganizationForUser, createProductBatch, createProductMaster, createPurchaseOrder, createSalesInvoice, createStockTransfer, createWarehouseForOrganization, dispatchStockTransfer, getCommerceReportSummary, getDashboardMetrics, getDefaultTenantContext, getFinancialReportSummary, getOrCreateOrganizationSettings, getOrCreateUserPreferences, issueSalesInvoiceWithFefo, issueStockByFefo, listInventoryCountsForOrganization, listNotificationsForOrganization, listOperationalRecords, listOrganizationCurrencies, listOrganizationExchangeRates, listProductBatchesForOrganization, listProductsForOrganization, listPurchaseOrdersForOrganization, listSalesInvoicesForOrganization, listStockMovementsForOrganization, listStockTransfersForOrganization, listWarehousesForOrganization, markNotificationRead, previewFefoAllocation, receivePurchaseOrder, receiveStockTransfer, recordSalesInvoicePayment, recordStockMovement, saveOrganizationCurrency, sendPurchaseOrder, startInventoryCount, submitInventoryCount, updateOrganizationSettings, updateProductBatchStatus, updateUserPreferences, type OperationalModule } from "./db";
+import { addOrganizationExchangeRate, adjustProductBatchQuantity, approveInventoryCount, approveStockTransfer, createBusinessParty, createInventoryCount, createOperationalNotifications, createOperationalRecord, createOrganizationForUser, createProductBatch, createProductMaster, createPurchaseOrder, createSalesInvoice, createStockTransfer, createWarehouseForOrganization, dispatchStockTransfer, getCommerceReportSummary, getDashboardMetrics, getDefaultTenantContext, getFinancialReportSummary, getOrCreateOrganizationSettings, getOrCreateUserPreferences, getOrganizationRolePermissions, issueSalesInvoiceWithFefo, issueStockByFefo, listInventoryCountsForOrganization, listNotificationsForOrganization, listOperationalRecords, listOrganizationCurrencies, listOrganizationExchangeRates, listProductBatchesForOrganization, listProductsForOrganization, listPurchaseOrdersForOrganization, listSalesInvoicesForOrganization, listStockMovementsForOrganization, listStockTransfersForOrganization, listWarehousesForOrganization, markNotificationRead, previewFefoAllocation, receivePurchaseOrder, receiveStockTransfer, recordSalesInvoicePayment, recordStockMovement, saveOrganizationCurrency, sendPurchaseOrder, startInventoryCount, submitInventoryCount, updateOrganizationSettings, updateProductBatchStatus, updateUserPreferences, type OperationalModule } from "./db";
 import { createBranchForOrganization, listBranchesForOrganization, listOrganizationMembersForOrganization } from "./db";
 import { currencyCatalog } from "../shared/currencyCatalog";
 import { invokeLLM } from "./_core/llm";
@@ -10,8 +10,10 @@ import { buildOwnerAlertReasons, canAccessTenantModule, hasActiveMembership, isO
 import { hasValidExchangeRateDateRange, normalizeExchangeRateFilters } from "./exchangeRateFilters";
 import { isValidTextBarcode } from "./barcodePolicy";
 import { classifyBranchPersistenceError } from "./branchPolicy";
+import { canUseDistributionPermission, type DistributionPermission } from "./distributionPolicy";
+import { createDistributionRoute, createDistributionTerritory, createFleetVehicle, createMaintenanceRecord, createVehicleDocument, createVehicleLoadOrder, getDistributionControlCenter, getDistributionSettings, listDistributionRoutes, listDistributionTerritories, listFleetVehicles, logFuel, recordDistributionCollection, recordDistributionDelivery, saveDistributionSettings, transitionDistributionRoute, transitionVehicleLoadOrder } from "./distribution";
 
-type ModuleKey = "inventory" | "sales" | "purchases" | "finance" | "hr" | "reports" | "ai_assistant";
+type ModuleKey = "inventory" | "sales" | "purchases" | "finance" | "hr" | "reports" | "ai_assistant" | "distribution";
 const operationalModuleKeys = ["inventory", "sales", "purchases", "finance", "hr"] as const;
 
 async function getTenantContext(userId: number) {
@@ -39,6 +41,13 @@ export async function requireOrganizationOwner(userId: number) {
   if (!isOrganizationOwner(context.membership.roleKey)) {
     throw new TRPCError({ code: "FORBIDDEN", message: "يلزم دور مالك المؤسسة لتعديل هذه الإعدادات." });
   }
+  return context;
+}
+
+export async function requireDistributionPermission(userId: number, permission: DistributionPermission) {
+  const context = await requireModule(userId, "distribution");
+  const permissions = await getOrganizationRolePermissions(context.organization.id, context.membership.roleKey);
+  if (!canUseDistributionPermission(context.membership.roleKey, permissions, permission)) throw new TRPCError({ code: "FORBIDDEN", message: "لا تملك صلاحية التوزيع أو الأسطول المطلوبة." });
   return context;
 }
 
@@ -369,6 +378,92 @@ export const erpRouter = router({
       const context = await requireModule(ctx.user.id, "reports");
       await requireModule(ctx.user.id, "inventory");
       return getCommerceReportSummary(context.organization.id);
+    }),
+  }),
+
+  distribution: router({
+    controlCenter: protectedProcedure.query(async ({ ctx }) => {
+      const context = await requireDistributionPermission(ctx.user.id, "distribution.view");
+      return getDistributionControlCenter(context.organization.id);
+    }),
+    settings: router({
+      get: protectedProcedure.query(async ({ ctx }) => {
+        const context = await requireDistributionPermission(ctx.user.id, "distribution.view");
+        return getDistributionSettings(context.organization.id);
+      }),
+      save: protectedProcedure.input(z.object({ overloadPolicy: z.enum(["warning", "hard_block", "manager_override"]).optional(), visitRadiusMeters: z.number().int().min(10).max(5000).optional() })).mutation(async ({ ctx, input }) => {
+        const context = await requireDistributionPermission(ctx.user.id, "distribution.editRoute");
+        return saveDistributionSettings(context.organization.id, input);
+      }),
+    }),
+    vehicles: router({
+      list: protectedProcedure.query(async ({ ctx }) => {
+        const context = await requireDistributionPermission(ctx.user.id, "fleet.view");
+        return listFleetVehicles(context.organization.id);
+      }),
+      create: protectedProcedure.input(z.object({ code: z.string().trim().min(2).max(48), registrationNumber: z.string().trim().min(2).max(96), type: z.string().trim().min(2).max(80), brand: z.string().trim().max(80).optional(), model: z.string().trim().max(80).optional(), modelYear: z.number().int().min(1900).max(2100).optional(), branchId: z.number().int().positive().optional(), ownerPartyId: z.number().int().positive().optional(), ownershipType: z.enum(["owned", "leased", "external"]), driverEmployeeId: z.number().int().positive().optional(), representativeEmployeeId: z.number().int().positive().optional(), maximumPayloadWeight: z.number().nonnegative(), maximumVolume: z.number().nonnegative(), palletCapacity: z.number().int().nonnegative().optional() })).mutation(async ({ ctx, input }) => {
+        const context = await requireDistributionPermission(ctx.user.id, "fleet.editVehicle");
+        return createFleetVehicle(context.organization.id, ctx.user.id, input);
+      }),
+      document: protectedProcedure.input(z.object({ vehicleId: z.number().int().positive(), documentType: z.enum(["insurance", "technical_inspection", "registration", "other"]), referenceNumber: z.string().trim().max(96).optional(), expiresAt: z.coerce.date().optional(), attachmentUrl: z.string().url().max(1024).optional() })).mutation(async ({ ctx, input }) => {
+        const context = await requireDistributionPermission(ctx.user.id, "fleet.documents");
+        return createVehicleDocument(context.organization.id, ctx.user.id, input);
+      }),
+      fuel: protectedProcedure.input(z.object({ vehicleId: z.number().int().positive(), routeId: z.number().int().positive().optional(), driverEmployeeId: z.number().int().positive().optional(), odometer: z.number().nonnegative(), fuelQuantity: z.number().positive(), fuelType: z.string().trim().min(2).max(48), unitPrice: z.number().nonnegative(), currencyCode: z.string().trim().length(3), vendor: z.string().trim().max(180).optional(), attachmentUrl: z.string().url().max(1024).optional(), occurredAt: z.coerce.date().optional() })).mutation(async ({ ctx, input }) => {
+        const context = await requireDistributionPermission(ctx.user.id, "fleet.fuel");
+        return logFuel(context.organization.id, ctx.user.id, input);
+      }),
+      maintenance: protectedProcedure.input(z.object({ vehicleId: z.number().int().positive(), maintenanceType: z.enum(["preventive", "corrective", "oil", "tires", "technical_inspection", "other"]), occurredAt: z.coerce.date(), currencyCode: z.string().trim().length(3), status: z.enum(["planned", "in_progress", "completed", "cancelled"]).optional(), odometer: z.number().nonnegative().optional(), cost: z.number().nonnegative().optional(), supplierPartyId: z.number().int().positive().optional(), description: z.string().trim().max(2000).optional(), nextDueAt: z.coerce.date().optional(), nextDueOdometer: z.number().nonnegative().optional(), attachmentUrl: z.string().url().max(1024).optional() })).mutation(async ({ ctx, input }) => {
+        const context = await requireDistributionPermission(ctx.user.id, "fleet.maintenance");
+        return createMaintenanceRecord(context.organization.id, ctx.user.id, input);
+      }),
+    }),
+    territories: router({
+      list: protectedProcedure.query(async ({ ctx }) => {
+        const context = await requireDistributionPermission(ctx.user.id, "distribution.view");
+        return listDistributionTerritories(context.organization.id);
+      }),
+      create: protectedProcedure.input(z.object({ code: z.string().trim().min(2).max(48), name: z.string().trim().min(2).max(160), branchId: z.number().int().positive().optional(), representativeEmployeeId: z.number().int().positive().optional(), defaultVehicleId: z.number().int().positive().optional() })).mutation(async ({ ctx, input }) => {
+        const context = await requireDistributionPermission(ctx.user.id, "distribution.editRoute");
+        return createDistributionTerritory(context.organization.id, ctx.user.id, input);
+      }),
+    }),
+    routes: router({
+      list: protectedProcedure.query(async ({ ctx }) => {
+        const context = await requireDistributionPermission(ctx.user.id, "distribution.view");
+        return listDistributionRoutes(context.organization.id);
+      }),
+      create: protectedProcedure.input(z.object({ routeNumber: z.string().trim().max(64).optional(), routeDate: z.coerce.date(), branchId: z.number().int().positive().optional(), territoryId: z.number().int().positive().optional(), vehicleId: z.number().int().positive().optional(), driverEmployeeId: z.number().int().positive().optional(), representativeEmployeeId: z.number().int().positive().optional(), plannedStartAt: z.coerce.date().optional(), plannedEndAt: z.coerce.date().optional(), stops: z.array(z.object({ customerId: z.number().int().positive(), salesInvoiceId: z.number().int().positive().optional(), salesOrderReference: z.string().trim().max(96).optional(), plannedAt: z.coerce.date().optional(), notes: z.string().trim().max(1000).optional() })).max(100) })).mutation(async ({ ctx, input }) => {
+        const context = await requireDistributionPermission(ctx.user.id, "distribution.createRoute");
+        return createDistributionRoute(context.organization.id, ctx.user.id, input);
+      }),
+      transition: protectedProcedure.input(z.object({ routeId: z.number().int().positive(), status: z.enum(["prepared", "loaded", "started", "in_progress", "returning", "closing", "closed", "cancelled"]) })).mutation(async ({ ctx, input }) => {
+        const context = await requireDistributionPermission(ctx.user.id, input.status === "closed" ? "distribution.closeRoute" : "distribution.editRoute");
+        return transitionDistributionRoute(context.organization.id, ctx.user.id, input.routeId, input.status);
+      }),
+    }),
+    loads: router({
+      create: protectedProcedure.input(z.object({ loadNumber: z.string().trim().max(64).optional(), sourceWarehouseId: z.number().int().positive(), vehicleId: z.number().int().positive(), routeId: z.number().int().positive().optional(), overrideReason: z.string().trim().max(1000).optional(), lines: z.array(z.object({ productId: z.number().int().positive(), batchId: z.number().int().positive(), quantity: z.number().positive(), unit: z.string().trim().min(1).max(32) })).min(1).max(200) })).mutation(async ({ ctx, input }) => {
+        const context = await requireDistributionPermission(ctx.user.id, "distribution.createLoad");
+        return createVehicleLoadOrder(context.organization.id, ctx.user.id, input);
+      }),
+      transition: protectedProcedure.input(z.object({ loadOrderId: z.number().int().positive(), status: z.enum(["prepared", "approved", "loading", "loaded", "dispatched", "closed", "cancelled"]) })).mutation(async ({ ctx, input }) => {
+        const permission = input.status === "approved" ? "distribution.approveLoad" : "distribution.createLoad" as const;
+        const context = await requireDistributionPermission(ctx.user.id, permission);
+        return transitionVehicleLoadOrder(context.organization.id, ctx.user.id, input.loadOrderId, input.status);
+      }),
+    }),
+    deliveries: router({
+      record: protectedProcedure.input(z.object({ routeId: z.number().int().positive(), stopId: z.number().int().positive().optional(), customerId: z.number().int().positive(), salesInvoiceId: z.number().int().positive().optional(), idempotencyKey: z.string().trim().min(8).max(128), notes: z.string().trim().max(2000).optional(), items: z.array(z.object({ productId: z.number().int().positive(), vehicleBatchId: z.number().int().positive(), expectedQuantity: z.number().nonnegative().optional(), deliveredQuantity: z.number().nonnegative(), rejectedQuantity: z.number().nonnegative().optional(), returnedQuantity: z.number().nonnegative().optional(), unit: z.string().trim().min(1).max(32) })).min(1).max(200) })).mutation(async ({ ctx, input }) => {
+        const context = await requireDistributionPermission(ctx.user.id, "distribution.deliver");
+        return recordDistributionDelivery(context.organization.id, ctx.user.id, input);
+      }),
+    }),
+    collections: router({
+      record: protectedProcedure.input(z.object({ routeId: z.number().int().positive(), customerId: z.number().int().positive(), salesInvoiceId: z.number().int().positive().optional(), representativeEmployeeId: z.number().int().positive().optional(), driverEmployeeId: z.number().int().positive().optional(), collectionType: z.enum(["cash_sale", "current_invoice", "previous_debt"]), amount: z.number().positive(), currencyCode: z.string().trim().length(3), exchangeRateUsed: z.number().positive().optional(), paymentMethod: z.enum(["cash", "card", "transfer", "check", "other"]).optional(), idempotencyKey: z.string().trim().min(8).max(128) })).mutation(async ({ ctx, input }) => {
+        const context = await requireDistributionPermission(ctx.user.id, "distribution.collect");
+        return recordDistributionCollection(context.organization.id, ctx.user.id, input);
+      }),
     }),
   }),
 

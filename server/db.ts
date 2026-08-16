@@ -158,11 +158,18 @@ export async function addOrganizationExchangeRate(organizationId: number, userId
   return { id: Number(result[0].insertId) };
 }
 
+export async function getOrganizationRolePermissions(organizationId: number, roleKey: string) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const result = await db.select({ permissions: organizationRoles.permissions }).from(organizationRoles).where(and(eq(organizationRoles.organizationId, organizationId), eq(organizationRoles.key, roleKey))).limit(1);
+  return result[0]?.permissions ?? [];
+}
+
 export async function createOrganizationForUser({ userId, name }: { userId: number; name: string }) {
   const db = await getDb();
   if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
   const slug = `org-${userId}-${Date.now()}`;
-  const moduleKeys = ["inventory", "sales", "purchases", "finance", "hr", "reports", "ai_assistant"];
+  const moduleKeys = ["inventory", "sales", "purchases", "finance", "hr", "reports", "ai_assistant", "distribution"];
 
   return db.transaction(async tx => {
     const inserted = await tx.insert(organizations).values({
