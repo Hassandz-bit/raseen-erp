@@ -11,7 +11,7 @@ import { hasValidExchangeRateDateRange, normalizeExchangeRateFilters } from "./e
 import { isValidTextBarcode } from "./barcodePolicy";
 import { classifyBranchPersistenceError } from "./branchPolicy";
 import { canUseDistributionPermission, isScopedIdAllowed, type DistributionPermission } from "./distributionPolicy";
-import { addDistributionRouteExpense, createDistributionRoute, createDistributionTerritory, createFleetVehicle, createMaintenanceRecord, createVehicleDocument, createVehicleLoadOrder, getDistributionControlCenter, getDistributionOwnerAlertReasons, getDistributionSettings, getDriverRouteFeed, getLatestFleetLocations, listDistributionRoutes, listDistributionTerritories, listFleetVehicles, listVehicleInventory, logFuel, recordDistributionCollection, recordDistributionDelivery, recordDistributionReturn, recordFleetGpsPoint, recordGeofenceEvent, returnVehicleStockToWarehouse, saveDistributionSettings, submitRouteClosing, transitionDistributionRoute, transitionRouteClosing, transitionVehicleLoadOrder } from "./distribution";
+import { addDistributionRouteExpense, createDistributionRoute, createDistributionTerritory, createFleetVehicle, createMaintenanceRecord, createVehicleDocument, createVehicleLoadOrder, getDistributionControlCenter, getDistributionOwnerAlertReasons, getDistributionSettings, getDriverRouteFeed, getLatestFleetLocations, listDistributionRoutes, listDistributionTerritories, listFleetVehicles, listVehicleInventory, logFuel, recordDistributionCollection, recordDistributionDelivery, recordDistributionReturn, recordFleetGpsPoint, recordGeofenceEvent, returnVehicleStockToWarehouse, saveDistributionSettings, submitDistributionDeliveryProof, submitRouteClosing, transitionDistributionRoute, transitionRouteClosing, transitionVehicleLoadOrder } from "./distribution";
 
 type ModuleKey = "inventory" | "sales" | "purchases" | "finance" | "hr" | "reports" | "ai_assistant" | "distribution";
 const operationalModuleKeys = ["inventory", "sales", "purchases", "finance", "hr"] as const;
@@ -466,6 +466,12 @@ export const erpRouter = router({
         assertDistributionScope(context, { routeId: input.routeId });
         if (!context.membership.dataScope?.assignedRouteIds?.includes(input.routeId)) throw new TRPCError({ code: "FORBIDDEN", message: "لا يمكنك تغيير حالة جولة غير مسندة إليك." });
         return transitionDistributionRoute(context.organization.id, ctx.user.id, input.routeId, input.status);
+      }),
+      submitProof: protectedProcedure.input(z.object({ routeId: z.number().int().positive(), stopId: z.number().int().positive(), customerId: z.number().int().positive(), deliveryId: z.number().int().positive().optional(), signerName: z.string().trim().min(2).max(180), signedAt: z.coerce.date(), signatureDataUrl: z.string().min(64).max(8_000_000), photoDataUrl: z.string().min(64).max(8_000_000).optional() })).mutation(async ({ ctx, input }) => {
+        const context = await requireDistributionPermission(ctx.user.id, "distribution.deliver");
+        assertDistributionScope(context, { routeId: input.routeId });
+        if (!context.membership.dataScope?.assignedRouteIds?.includes(input.routeId)) throw new TRPCError({ code: "FORBIDDEN", message: "لا يمكنك إضافة إثبات لتسليم خارج جولتك المسندة." });
+        return submitDistributionDeliveryProof(context.organization.id, ctx.user.id, input);
       }),
     }),
     loads: router({

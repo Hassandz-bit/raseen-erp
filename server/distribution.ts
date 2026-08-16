@@ -1,12 +1,23 @@
 import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm";
 import {
-  auditLogs, branches, businessParties, distributionCollections, distributionDeliveries, distributionDeliveryItems, distributionGeofenceEvents, distributionIdempotencyKeys, distributionReturns, distributionRouteClosings, distributionRouteExpenses, distributionRouteStops, distributionRoutes, distributionSettings, distributionTerritories, employees, fleetFuelLogs, fleetGpsRecords, fleetMaintenanceRecords, fleetVehicleDocuments, fleetVehicles, inventoryBalances, organizationSettings, productBatches, products, salesInvoices, stockMovements, vehicleLoadItems, vehicleLoadOrders, warehouses,
+  auditLogs, branches, businessParties, distributionCollections, distributionDeliveries, distributionDeliveryItems, distributionDeliveryProofs, distributionGeofenceEvents, distributionIdempotencyKeys, distributionReturns, distributionRouteClosings, distributionRouteExpenses, distributionRouteStops, distributionRoutes, distributionSettings, distributionTerritories, employees, fleetFuelLogs, fleetGpsRecords, fleetMaintenanceRecords, fleetVehicleDocuments, fleetVehicles, inventoryBalances, organizationSettings, productBatches, products, salesInvoices, stockMovements, vehicleLoadItems, vehicleLoadOrders, warehouses,
 } from "../drizzle/schema";
 import { getDb } from "./db";
 import { calculateLoadCapacity, canTransitionDistributionRoute, canTransitionRouteClosing, canTransitionVehicleLoad } from "./distributionPolicy";
+import { storagePut } from "./storage";
 
 const number = (prefix: string) => `${prefix}-${Date.now().toString(36).toUpperCase()}`;
 const base = (value: unknown) => Number(value ?? 0);
+const maxProofUploadBytes = 5 * 1024 * 1024;
+
+function decodeProofDataUrl(value: string, kind: "photo" | "signature") {
+  const match = /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/.exec(value);
+  if (!match) throw new Error("ملف إثبات التسليم يجب أن يكون صورة PNG أو JPEG أو WebP صالحة.");
+  const bytes = Buffer.from(match[2], "base64");
+  if (!bytes.length || bytes.length > maxProofUploadBytes) throw new Error(`حجم ${kind === "photo" ? "صورة" : "توقيع"} الإثبات غير مسموح به.`);
+  const extension = match[1] === "image/png" ? "png" : match[1] === "image/webp" ? "webp" : "jpg";
+  return { bytes, contentType: match[1], extension };
+}
 
 async function assertOrganizationRecord<T extends { organizationId: number }>(row: T | undefined, entity: string) {
   if (!row) throw new Error(`${entity} غير متاح ضمن المؤسسة الحالية.`);
@@ -130,7 +141,7 @@ export async function getDriverRouteFeed(organizationId: number, assignedRouteId
   const routes = await db.select({ id: distributionRoutes.id, routeNumber: distributionRoutes.routeNumber, routeDate: distributionRoutes.routeDate, status: distributionRoutes.status, vehicleId: distributionRoutes.vehicleId, plannedStartAt: distributionRoutes.plannedStartAt, plannedEndAt: distributionRoutes.plannedEndAt, actualStartAt: distributionRoutes.actualStartAt, vehicleCode: fleetVehicles.code, vehicleRegistration: fleetVehicles.registrationNumber }).from(distributionRoutes).leftJoin(fleetVehicles, and(eq(fleetVehicles.id, distributionRoutes.vehicleId), eq(fleetVehicles.organizationId, distributionRoutes.organizationId))).where(and(eq(distributionRoutes.organizationId, organizationId), inArray(distributionRoutes.id, assignedRouteIds), inArray(distributionRoutes.status, ["prepared", "loaded", "started", "in_progress", "returning"]))).orderBy(asc(distributionRoutes.routeDate), asc(distributionRoutes.id));
   if (!routes.length) return [];
   const routeIds = routes.map(route => route.id);
-  const stops = await db.select({ id: distributionRouteStops.id, routeId: distributionRouteStops.routeId, customerId: distributionRouteStops.customerId, sequence: distributionRouteStops.sequence, plannedAt: distributionRouteStops.plannedAt, arrivedAt: distributionRouteStops.arrivedAt, deliveryStatus: distributionRouteStops.deliveryStatus, notes: distributionRouteStops.notes, customerName: businessParties.name, customerAddress: businessParties.address, customerLatitude: businessParties.latitude, customerLongitude: businessParties.longitude, deliveryNotes: businessParties.deliveryNotes, receivingHours: businessParties.receivingHours, visitPriority: businessParties.visitPriority }).from(distributionRouteStops).innerJoin(businessParties, and(eq(businessParties.id, distributionRouteStops.customerId), eq(businessParties.organizationId, distributionRouteStops.organizationId))).where(and(eq(distributionRouteStops.organizationId, organizationId), inArray(distributionRouteStops.routeId, routeIds))).orderBy(asc(distributionRouteStops.routeId), asc(distributionRouteStops.sequence));
+  const stops = await db.select({ id: distributionRouteStops.id, routeId: distributionRouteStops.routeId, customerId: distributionRouteStops.customerId, sequence: distributionRouteStops.sequence, plannedAt: distributionRouteStops.plannedAt, arrivedAt: distributionRouteStops.arrivedAt, deliveryStatus: distributionRouteStops.deliveryStatus, notes: distributionRouteStops.notes, customerName: businessParties.name, customerAddress: businessParties.address, customerLatitude: businessParties.latitude, customerLongitude: businessParties.longitude, deliveryNotes: businessParties.deliveryNotes, receivingHours: businessParties.receivingHours, visitPriority: businessParties.visitPriority, proofId: distributionDeliveryProofs.id, proofPhotoUrl: distributionDeliveryProofs.photoUrl, proofSignatureUrl: distributionDeliveryProofs.signatureUrl, proofSignerName: distributionDeliveryProofs.signerName }).from(distributionRouteStops).innerJoin(businessParties, and(eq(businessParties.id, distributionRouteStops.customerId), eq(businessParties.organizationId, distributionRouteStops.organizationId))).leftJoin(distributionDeliveryProofs, and(eq(distributionDeliveryProofs.stopId, distributionRouteStops.id), eq(distributionDeliveryProofs.organizationId, distributionRouteStops.organizationId))).where(and(eq(distributionRouteStops.organizationId, organizationId), inArray(distributionRouteStops.routeId, routeIds))).orderBy(asc(distributionRouteStops.routeId), asc(distributionRouteStops.sequence));
   return routes.map(route => ({ ...route, stops: stops.filter(stop => stop.routeId === route.id) }));
 }
 
@@ -247,6 +258,30 @@ export async function recordDistributionDelivery(organizationId: number, actorUs
     await tx.insert(auditLogs).values({ organizationId, actorUserId, action: "distribution_delivery.recorded", entityType: "distribution_delivery", entityId: String(deliveryId), metadata: { routeId: input.routeId, status } });
     return { id: deliveryId, status, replayed: false as const };
   });
+}
+
+export async function submitDistributionDeliveryProof(organizationId: number, actorUserId: number, input: { routeId: number; stopId: number; customerId: number; deliveryId?: number; signerName: string; signedAt: Date; signatureDataUrl: string; photoDataUrl?: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const [route] = await db.select().from(distributionRoutes).where(and(eq(distributionRoutes.id, input.routeId), eq(distributionRoutes.organizationId, organizationId))).limit(1);
+  await assertOrganizationRecord(route, "الجولة");
+  const [stop] = await db.select().from(distributionRouteStops).where(and(eq(distributionRouteStops.id, input.stopId), eq(distributionRouteStops.organizationId, organizationId), eq(distributionRouteStops.routeId, input.routeId), eq(distributionRouteStops.customerId, input.customerId))).limit(1);
+  await assertOrganizationRecord(stop, "محطة الجولة");
+  if (input.deliveryId) {
+    const [delivery] = await db.select().from(distributionDeliveries).where(and(eq(distributionDeliveries.id, input.deliveryId), eq(distributionDeliveries.organizationId, organizationId), eq(distributionDeliveries.routeId, input.routeId), eq(distributionDeliveries.customerId, input.customerId))).limit(1);
+    await assertOrganizationRecord(delivery, "التسليم");
+  }
+  const [existing] = await db.select().from(distributionDeliveryProofs).where(and(eq(distributionDeliveryProofs.organizationId, organizationId), eq(distributionDeliveryProofs.stopId, input.stopId))).limit(1);
+  if (existing) throw new Error("تم تسجيل إثبات تسليم لهذه المحطة بالفعل.");
+  const signature = decodeProofDataUrl(input.signatureDataUrl, "signature");
+  const photo = input.photoDataUrl ? decodeProofDataUrl(input.photoDataUrl, "photo") : null;
+  const prefix = `distribution/${organizationId}/routes/${input.routeId}/stops/${input.stopId}`;
+  const signatureStored = await storagePut(`${prefix}/signature.${signature.extension}`, signature.bytes, signature.contentType);
+  const photoStored = photo ? await storagePut(`${prefix}/photo.${photo.extension}`, photo.bytes, photo.contentType) : null;
+  const result = await db.insert(distributionDeliveryProofs).values({ organizationId, routeId: input.routeId, stopId: input.stopId, deliveryId: input.deliveryId, customerId: input.customerId, photoStorageKey: photoStored?.key, photoUrl: photoStored?.url, signatureStorageKey: signatureStored.key, signatureUrl: signatureStored.url, signerName: input.signerName.trim(), signedAt: input.signedAt, createdByUserId: actorUserId });
+  const id = Number(result[0].insertId);
+  await db.insert(auditLogs).values({ organizationId, actorUserId, action: "distribution_delivery.proof_submitted", entityType: "distribution_delivery_proof", entityId: String(id), metadata: { routeId: input.routeId, stopId: input.stopId, deliveryId: input.deliveryId ?? null, hasPhoto: Boolean(photoStored) } });
+  return { id, signatureUrl: signatureStored.url, photoUrl: photoStored?.url ?? null };
 }
 
 export async function recordDistributionCollection(organizationId: number, actorUserId: number, input: { routeId: number; customerId: number; salesInvoiceId?: number; representativeEmployeeId?: number; driverEmployeeId?: number; collectionType: "cash_sale" | "current_invoice" | "previous_debt"; amount: number; currencyCode: string; exchangeRateUsed?: number; paymentMethod?: "cash" | "card" | "transfer" | "check" | "other"; idempotencyKey: string }) {
