@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { getDb } from "./db";
-import { organizationCustomPackages, productPackagingLevels, products, uomAliases, uomCatalog } from "../drizzle/schema";
-import { calculateLogistics, type LogisticsSummary } from "./uomLogisticsPolicy";
+import { fleetVehicles, organizationCustomPackages, productPackagingLevels, products, uomAliases, uomCatalog } from "../drizzle/schema";
+import { assessVehicleCapacity, calculateLogistics, type LogisticsSummary } from "./uomLogisticsPolicy";
 
 export async function listUomCatalog() {
   const db = await getDb();
@@ -37,4 +37,11 @@ export async function calculatePackagingLogistics(organizationId: number, lines:
     inputs.push({ label: level.displayName ?? level.code, quantity: line.quantity, grossWeightKg: level.grossWeightKg, actualVolumeM3: level.actualVolumeM3, lengthMm: level.lengthMm, widthMm: level.widthMm, heightMm: level.heightMm, palletCount: level.uomId ? undefined : level.cartonsPerPallet ? "1" : undefined });
   }
   return calculateLogistics(inputs);
+}
+
+export async function findSuitableVehicles(organizationId: number, summary: LogisticsSummary) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const vehicles = await db.select().from(fleetVehicles).where(and(eq(fleetVehicles.organizationId, organizationId), eq(fleetVehicles.status, "active")));
+  return vehicles.map(vehicle => ({ vehicle, assessment: assessVehicleCapacity(summary, { maximumPayloadWeight: vehicle.maximumPayloadWeight, maximumVolume: vehicle.maximumVolume, palletCapacity: vehicle.palletCapacity }) })).sort((left, right) => Number(right.assessment.suitable) - Number(left.assessment.suitable) || Number(left.assessment.volumeUtilization ?? "999999") - Number(right.assessment.volumeUtilization ?? "999999") || Number(left.assessment.weightUtilization ?? "999999") - Number(right.assessment.weightUtilization ?? "999999"));
 }
