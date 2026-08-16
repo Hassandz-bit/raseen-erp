@@ -81,7 +81,9 @@ async function resolveRetailerProduct(access: Awaited<ReturnType<typeof requireR
   const basePrice = Number(matchingItem?.price ?? product.salePrice);
   const now = new Date();
   const promotions = await db.select().from(b2bPromotions).where(and(eq(b2bPromotions.organizationId, access.access.organizationId), eq(b2bPromotions.productId, productId), eq(b2bPromotions.status, "active"), eq(b2bPromotions.visibleToB2b, "yes"), sql`${b2bPromotions.startsAt} <= ${now}`, sql`${b2bPromotions.endsAt} >= ${now}`));
-  const promotion = promotions.filter(item => (!item.customerId || item.customerId === access.customer.id) && (!item.customerSegment || item.customerSegment === access.access.customerSegment) && (!item.territoryId || item.territoryId === access.access.territoryId) && Number(item.minimumQuantity) <= quantity).sort((a, b) => Number(b.minimumQuantity) - Number(a.minimumQuantity))[0];
+  const batchIds = promotions.flatMap(item => item.batchId ? [item.batchId] : []);
+  const promotionBatches = batchIds.length ? await db.select({ id: productBatches.id, expiryDate: productBatches.expiryDate, currentQuantity: productBatches.currentQuantity, reservedQuantity: productBatches.reservedQuantity, status: productBatches.status }).from(productBatches).where(and(eq(productBatches.organizationId, access.access.organizationId), eq(productBatches.productId, productId), inArray(productBatches.id, batchIds))) : [];
+  const promotion = promotions.filter(item => (!item.customerId || item.customerId === access.customer.id) && (!item.customerSegment || item.customerSegment === access.access.customerSegment) && (!item.territoryId || item.territoryId === access.access.territoryId) && Number(item.minimumQuantity) <= quantity && (!item.batchId || promotionBatches.some(batch => batch.id === item.batchId && batch.status === "active" && Number(batch.currentQuantity) > Number(batch.reservedQuantity) && (!batch.expiryDate || batch.expiryDate > now)))).sort((a, b) => Number(b.minimumQuantity) - Number(a.minimumQuantity))[0];
   let unitPrice = basePrice;
   let paidQuantity = quantity;
   let freeQuantity = 0;
