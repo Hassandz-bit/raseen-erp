@@ -25,9 +25,9 @@ export const glossary = {
 } as const;
 
 export const documentPreviewActionLabels = {
-  ar: { download: "تنزيل ملف HTML", print: "طباعة أو حفظ PDF" },
-  fr: { download: "Télécharger le fichier HTML", print: "Imprimer ou enregistrer en PDF" },
-  en: { download: "Download HTML file", print: "Print or save as PDF" },
+  ar: { download: "تنزيل ملف HTML", pdf: "تنزيل PDF", print: "طباعة أو حفظ PDF" },
+  fr: { download: "Télécharger le fichier HTML", pdf: "Télécharger le PDF", print: "Imprimer ou enregistrer en PDF" },
+  en: { download: "Download HTML file", pdf: "Download PDF", print: "Print or save as PDF" },
 } as const;
 
 export const workspaceAssistantCopy = {

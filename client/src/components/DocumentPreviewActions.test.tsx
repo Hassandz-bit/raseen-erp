@@ -4,15 +4,18 @@ import { describe, expect, it, vi } from "vitest";
 import { DocumentPreviewActions } from "./DocumentPreviewActions";
 
 describe("DocumentPreviewActions", () => {
-  it("يعرض تسميات الإجراءات المترجمة ويستدعي التنزيل والطباعة بصورة مستقلة", () => {
+  it("يعرض تسميات الإجراءات المترجمة ويستدعي تنزيل HTML وPDF والطباعة بصورة مستقلة", () => {
     const onDownload = vi.fn();
+    const onDownloadPdf = vi.fn();
     const onPrint = vi.fn();
-    render(<DocumentPreviewActions onDownload={onDownload} onPrint={onPrint} downloadLabel="تنزيل ملف HTML" printLabel="طباعة أو حفظ PDF" />);
+    render(<DocumentPreviewActions onDownload={onDownload} onDownloadPdf={onDownloadPdf} onPrint={onPrint} downloadLabel="تنزيل ملف HTML" pdfLabel="تنزيل PDF" printLabel="طباعة أو حفظ PDF" />);
 
     fireEvent.click(screen.getByRole("button", { name: "تنزيل ملف HTML" }));
+    fireEvent.click(screen.getByRole("button", { name: "تنزيل PDF" }));
     fireEvent.click(screen.getByRole("button", { name: "طباعة أو حفظ PDF" }));
 
     expect(onDownload).toHaveBeenCalledTimes(1);
+    expect(onDownloadPdf).toHaveBeenCalledTimes(1);
     expect(onPrint).toHaveBeenCalledTimes(1);
   });
 });

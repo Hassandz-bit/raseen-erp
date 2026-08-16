@@ -44,6 +44,8 @@ export const defaultDocumentSettings = {
   headerText: "",
   footerText: "",
   showSignature: true,
+  fontFamily: "noto-arabic" as const,
+  fontSize: "normal" as const,
 };
 
 export async function getDb() {

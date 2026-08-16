@@ -109,6 +109,8 @@ export const erpRouter = router({
         headerText: z.string().max(180).optional(),
         footerText: z.string().max(300).optional(),
         showSignature: z.boolean().optional(),
+        fontFamily: z.enum(["ibm-plex", "tajawal", "noto-arabic", "inter", "system"]).optional(),
+        fontSize: z.enum(["small", "normal", "large"]).optional(),
       }).optional(),
     })).mutation(async ({ ctx, input }) => {
       const context = await requireOrganizationOwner(ctx.user.id);
