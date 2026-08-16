@@ -65,3 +65,4 @@ const messages = {
 export type TranslationKey = keyof typeof messages.ar;
 export const translations = messages;
 export function getDirection(language: AppLanguage): "rtl" | "ltr" { return language === "ar" ? "rtl" : "ltr"; }
+export { moduleViewCopy, moduleViewUiCopy } from "./moduleViewCopy";

@@ -2,8 +2,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { dashboardHeroCopy } from "@/i18n/translations";
-import { moduleViewCopy, moduleViewUiCopy } from "@/i18n/moduleViewCopy";
+import { dashboardHeroCopy, moduleViewCopy, moduleViewUiCopy } from "@/i18n/translations";
 import { cn } from "@/lib/utils";
 import {
   ArrowUpLeft,
