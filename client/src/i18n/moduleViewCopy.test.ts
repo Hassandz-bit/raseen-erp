@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { moduleViewCopy } from "./moduleViewCopy";
+import { moduleViewCopy } from "./translations";
 
 describe("moduleViewCopy", () => {
   it("يحافظ على مفاتيح ومحتوى الوحدات التفصيلية في اللغات الثلاث", () => {

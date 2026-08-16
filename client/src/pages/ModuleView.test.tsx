@@ -23,6 +23,8 @@ describe("ModuleView", () => {
     expect(screen.getByText("Une vision instantanée du stock")).toBeTruthy();
     expect(screen.getByText("Retour au tableau de bord")).toBeTruthy();
     expect(screen.getAllByText("Disponible").length).toBeGreaterThan(0);
+    expect(screen.getByText("Produit d’exemple 01")).toBeTruthy();
+    expect(screen.queryByText("قهوة عربية محمصة")).toBeNull();
     expect(screen.queryByText("رؤية لحظية للمخزون")).toBeNull();
   });
 
@@ -32,6 +34,15 @@ describe("ModuleView", () => {
     expect(screen.getByText("Instant inventory visibility")).toBeTruthy();
     expect(screen.getByText("Back to dashboard")).toBeTruthy();
     expect(screen.getAllByText("Available").length).toBeGreaterThan(0);
+    expect(screen.getByText("Sample product 01")).toBeTruthy();
+    expect(screen.queryByText("قهوة عربية محمصة")).toBeNull();
     expect(screen.queryByText("رؤية لحظية للمخزون")).toBeNull();
+  });
+
+  it("renders translated sample customers in the French sales module", () => {
+    languageState.value = "fr";
+    render(<ModuleView section="sales" onBack={() => undefined} />);
+    expect(screen.getByText("Client d’exemple 01")).toBeTruthy();
+    expect(screen.queryByText("أسواق الندى")).toBeNull();
   });
 });
