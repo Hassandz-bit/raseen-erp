@@ -7,7 +7,7 @@ vi.mock("./db", async importOriginal => ({
   getDefaultTenantContext,
 }));
 
-import { requireModule, requireOrganizationOwner } from "./erp";
+import { requireManufacturingOwner, requireModule, requireOrganizationOwner } from "./erp";
 
 describe("حراسة مالك المؤسسة لإجراءات الفروع", () => {
   it("تسمح للمالك وترفض العضو قبل الوصول إلى إجراءات الإعدادات", async () => {
@@ -31,5 +31,19 @@ describe("حراسة الوحدة التشغيلية", () => {
 
     getDefaultTenantContext.mockResolvedValueOnce({ organization: { id: 72 }, membership: { roleKey: "owner", status: "active" }, modules: [] });
     await expect(requireModule(12, "inventory")).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+});
+
+describe("حراسة التصنيع", () => {
+  it("تتطلب اشتراك التصنيع المفعّل ودور مالك المؤسسة", async () => {
+    const allowedContext = { organization: { id: 73 }, membership: { roleKey: "owner", status: "active" }, modules: [{ moduleKey: "manufacturing", status: "active" }] };
+    getDefaultTenantContext.mockResolvedValueOnce(allowedContext);
+    await expect(requireManufacturingOwner(13)).resolves.toEqual(allowedContext);
+
+    getDefaultTenantContext.mockResolvedValueOnce({ organization: { id: 73 }, membership: { roleKey: "owner", status: "active" }, modules: [{ moduleKey: "manufacturing", status: "suspended" }] });
+    await expect(requireManufacturingOwner(13)).rejects.toMatchObject({ code: "FORBIDDEN" });
+
+    getDefaultTenantContext.mockResolvedValueOnce({ organization: { id: 73 }, membership: { roleKey: "member", status: "active" }, modules: [{ moduleKey: "manufacturing", status: "active" }] });
+    await expect(requireManufacturingOwner(13)).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 });

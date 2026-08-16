@@ -169,7 +169,7 @@ export async function createOrganizationForUser({ userId, name }: { userId: numb
   const db = await getDb();
   if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
   const slug = `org-${userId}-${Date.now()}`;
-  const moduleKeys = ["inventory", "sales", "purchases", "finance", "hr", "reports", "ai_assistant", "distribution"];
+  const moduleKeys = ["inventory", "sales", "purchases", "finance", "hr", "reports", "ai_assistant", "distribution", "manufacturing"];
 
   return db.transaction(async tx => {
     const inserted = await tx.insert(organizations).values({
