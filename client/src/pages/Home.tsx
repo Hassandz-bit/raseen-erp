@@ -3,7 +3,7 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { dashboardHeroCopy, moduleViewCopy, moduleViewUiCopy } from "@/i18n/translations";
+import { dashboardHeroCopy, homeShellCopy, moduleViewCopy, moduleViewUiCopy } from "@/i18n/translations";
 import { cn } from "@/lib/utils";
 import {
   ArrowUpLeft,
@@ -210,7 +210,8 @@ export function ModuleView({ section, onBack }: { section: Exclude<SectionKey, "
 }
 
 export default function Home() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const shellCopy = homeShellCopy[language];
   const [section, setSection] = useState<SectionKey>("dashboard");
   const [isSidebarOpen, setSidebarOpen] = useState(false);
   const [assistantOpen, setAssistantOpen] = useState(false);
@@ -219,8 +220,8 @@ export default function Home() {
 
   const changeSection = (key: SectionKey) => { setSection(key); setSidebarOpen(false); };
   const submitAssistant = () => {
-    if (!query.trim()) return toast.error("اكتب استفسارك أولاً.");
-    toast.success("تمت إضافة الاستفسار إلى سياق المؤسسة التجريبي.");
+    if (!query.trim()) return toast.error(shellCopy.assistantQuestionRequired);
+    toast.success(shellCopy.assistantQueryAdded);
     setQuery("");
   };
 

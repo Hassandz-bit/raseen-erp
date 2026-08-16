@@ -48,6 +48,12 @@ export const modulesPageCopy = {
   en: { heroTitle: "Choose the space that drives your business", heroDescription: "All modules remain visible. Modules outside your plan stay in a secure preview with no data or operational access.", activeDescription: "This module is active in your subscription and ready for operations.", upgradeRequested: "The upgrade request path is ready for your administrator.", titles: { commerce: "Commerce & inventory", distribution: "Distribution & fleet", manufacturing: "Manufacturing & production", finance: "Finance & accounting", hr: "Human resources" } },
 } as const;
 
+export const homeShellCopy = {
+  ar: { assistantQuestionRequired: "اكتب استفسارك أولاً.", assistantQueryAdded: "تمت إضافة الاستفسار إلى سياق المؤسسة التجريبي." },
+  fr: { assistantQuestionRequired: "Saisissez d’abord une question.", assistantQueryAdded: "La question a été ajoutée au contexte de démonstration de l’organisation." },
+  en: { assistantQuestionRequired: "Enter a question first.", assistantQueryAdded: "The question was added to the organization demo context." },
+} as const;
+
 const messages = {
   ar: {
     branchCode: "رمز الفرع", branchName: "اسم الفرع", createBranch: "إضافة فرع", branchCreated: "تمت إضافة الفرع", branchCodeConflict: "رمز الفرع مستخدم بالفعل داخل المؤسسة.", branchSaveError: "تعذر حفظ الفرع حالياً. حاول مرة أخرى.", createTransaction: "تسجيل معاملة", addEmployee: "إضافة موظف", customer: "العميل", recentInvoices: "الفواتير الأخيرة", recentCommercialActivity: "آخر الحركة التجارية المسجلة", viewAll: "عرض الكل", invoiceOptions: "خيارات الفاتورة", decisionAlerts: "تنبيهات تحتاج قراراً", todayPriority: "أولوية اليوم", criticalStockAlert: "مستوى مخزون حرج", criticalStockDetail: "سكر أبيض فاخر — 75 وحدة", dueInvoiceAlert: "فاتورة مستحقة", dueInvoiceDetail: "مؤسسة الربيع — 8,720 د.ج", purchaseReceiptAlert: "طلب استلام اليوم", purchaseReceiptDetail: "أمر شراء PO-1843", inventoryHealth: "صحة المخزون", inventoryDistribution: "توزيع الأصناف حسب الحالة", details: "التفاصيل", todayMovements: "حركات اليوم", safeStock: "آمن", monitoringStock: "مراقبة", lowStock: "منخفض", criticalStock: "حرج", collecting: "قيد التحصيل",
