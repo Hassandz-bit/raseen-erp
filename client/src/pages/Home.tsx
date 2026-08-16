@@ -3,7 +3,7 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { dashboardHeroCopy, homeChromeCopy, homeShellCopy, moduleViewCopy, moduleViewUiCopy } from "@/i18n/translations";
+import { dashboardHeroCopy, dashboardSampleCopy, homeChromeCopy, homeShellCopy, moduleViewCopy, moduleViewUiCopy } from "@/i18n/translations";
 import { cn } from "@/lib/utils";
 import {
   ArrowUpLeft,
@@ -130,6 +130,7 @@ function MetricCard({ label, value, trend, icon: Icon, tone }: { label: string; 
 function DashboardContent({ onOpenModule }: { onOpenModule: (key: SectionKey) => void }) {
   const { language, t, formatCurrency, formatNumber } = useLanguage();
   const dashboardHero = dashboardHeroCopy[language];
+  const dashboardInvoices = invoices.map((invoice, index) => ({ ...invoice, customer: dashboardSampleCopy[language].customers[index] ?? invoice.customer }));
   const salesChartData = salesData.map(point => ({ ...point, month: new Intl.DateTimeFormat(language === "ar" ? "ar-DZ" : language === "fr" ? "fr-FR" : "en-US", { month: "short" }).format(new Date(2026, point.monthIndex, 1)) }));
   const inventoryChartData = inventoryData.map(point => ({ ...point, label: t(point.labelKey as never) }));
   const inventoryLabelWidth = language === "ar" ? 55 : 96;
@@ -186,7 +187,7 @@ function DashboardContent({ onOpenModule }: { onOpenModule: (key: SectionKey) =>
       <section className="grid gap-5 xl:grid-cols-[minmax(0,1.4fr)_minmax(300px,0.85fr)]">
         <article className="surface overflow-hidden rounded-3xl border">
           <div className="flex items-center justify-between border-b border-white/8 px-5 py-5"><div><p className="text-sm font-semibold text-white">{t("recentInvoices")}</p><p className="mt-1 text-xs text-muted-foreground">{t("recentCommercialActivity")}</p></div><button onClick={() => onOpenModule("sales")} className="flex items-center gap-1 text-xs font-semibold text-primary hover:text-[#f4d58e]">{t("viewAll")}<ChevronLeft className="h-3.5 w-3.5" /></button></div>
-          <div className="thin-scrollbar overflow-x-auto"><table className="w-full min-w-[620px] text-right"><thead className="bg-white/[.025] text-[11px] text-muted-foreground"><tr><th className="px-5 py-3 font-medium">{t("invoiceNumber")}</th><th className="px-5 py-3 font-medium">{t("customer")}</th><th className="px-5 py-3 font-medium">{t("issuedValue")}</th><th className="px-5 py-3 font-medium">{t("status")}</th><th className="px-5 py-3" /></tr></thead><tbody>{invoices.map(invoice => <tr key={invoice.no} className="border-t border-white/[.055] transition-colors hover:bg-white/[.025]"><td className="latin px-5 py-4 text-xs font-semibold text-slate-200">{invoice.no}</td><td className="px-5 py-4 text-sm text-white">{invoice.customer}</td><td className="px-5 py-4 text-sm text-slate-300">{formatCurrency(invoice.value)}</td><td className="px-5 py-4"><StatusPill tone={invoice.tone}>{t(invoice.statusKey as never)}</StatusPill></td><td className="px-5 py-4"><button className="text-muted-foreground hover:text-white" aria-label={t("invoiceOptions")}><MoreHorizontal className="h-4 w-4" /></button></td></tr>)}</tbody></table></div>
+          <div className="thin-scrollbar overflow-x-auto"><table className="w-full min-w-[620px] text-right"><thead className="bg-white/[.025] text-[11px] text-muted-foreground"><tr><th className="px-5 py-3 font-medium">{t("invoiceNumber")}</th><th className="px-5 py-3 font-medium">{t("customer")}</th><th className="px-5 py-3 font-medium">{t("issuedValue")}</th><th className="px-5 py-3 font-medium">{t("status")}</th><th className="px-5 py-3" /></tr></thead><tbody>{dashboardInvoices.map(invoice => <tr key={invoice.no} className="border-t border-white/[.055] transition-colors hover:bg-white/[.025]"><td className="latin px-5 py-4 text-xs font-semibold text-slate-200">{invoice.no}</td><td className="px-5 py-4 text-sm text-white">{invoice.customer}</td><td className="px-5 py-4 text-sm text-slate-300">{formatCurrency(invoice.value)}</td><td className="px-5 py-4"><StatusPill tone={invoice.tone}>{t(invoice.statusKey as never)}</StatusPill></td><td className="px-5 py-4"><button className="text-muted-foreground hover:text-white" aria-label={t("invoiceOptions")}><MoreHorizontal className="h-4 w-4" /></button></td></tr>)}</tbody></table></div>
         </article>
 
         <article className="surface rounded-3xl border p-5">

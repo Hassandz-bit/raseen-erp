@@ -42,6 +42,12 @@ export const dashboardHeroCopy = {
   en: { welcome: "Welcome, Nawa team", title: "Your organization’s pulse in one place", description: "Monitor performance, resolve alerts, and go directly to today’s priority decisions.", salesTrend: "Sales trend", weeklyUpdate: "Weekly update", interfacePreview: "Interface preview", currentYear: "This year", periodHint: "You can change the period from the reports interface." },
 } as const;
 
+export const dashboardSampleCopy = {
+  ar: { customers: ["عميل تجريبي 01", "عميل تجريبي 02", "عميل تجريبي 03", "عميل تجريبي 04"] },
+  fr: { customers: ["Client d’exemple 01", "Client d’exemple 02", "Client d’exemple 03", "Client d’exemple 04"] },
+  en: { customers: ["Sample customer 01", "Sample customer 02", "Sample customer 03", "Sample customer 04"] },
+} as const;
+
 export const modulesPageCopy = {
   ar: { heroTitle: "اختر المساحة التي تقود أعمالك", heroDescription: "تظهر جميع الوحدات المتاحة لخطة مؤسستك، بينما تبقى الوحدات غير المشترك بها في وضع معاينة آمن من دون وصول إلى بيانات أو إجراءات تشغيلية.", activeDescription: "الوحدة مفعلة في اشتراك مؤسستك ويمكنك الانتقال إلى مساحة العمل لإدارة سجلاتها.", upgradeRequested: "تم فتح مسار طلب الترقية لمسؤول المؤسسة.", titles: { commerce: "التجارة والمخزون", distribution: "التوزيع والأسطول", manufacturing: "التصنيع والإنتاج", finance: "المالية والمحاسبة", hr: "الموارد البشرية" } },
   fr: { heroTitle: "Choisissez l’espace qui pilote votre activité", heroDescription: "Tous les modules sont visibles. Les modules non inclus restent dans un aperçu sécurisé, sans accès aux données ni aux opérations.", activeDescription: "Ce module est actif dans votre abonnement et prêt pour les opérations.", upgradeRequested: "La demande de mise à niveau est prête pour l’administrateur.", titles: { commerce: "Commerce et stocks", distribution: "Distribution et flotte", manufacturing: "Fabrication et production", finance: "Finance et comptabilité", hr: "Ressources humaines" } },
