@@ -6,8 +6,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { manufacturingCenterCopy } from "@/i18n/translations";
+import { downloadManufacturingExcel, downloadManufacturingPdf, type ManufacturingReportRow } from "@/lib/manufacturingReportExport";
 import { trpc } from "@/lib/trpc";
-import { Boxes, Factory, FlaskConical, RefreshCw, ShieldCheck, TriangleAlert } from "lucide-react";
+import { Boxes, Download, Factory, FileText, FlaskConical, RefreshCw, ShieldCheck, TriangleAlert } from "lucide-react";
 import React, { useState } from "react";
 
 const statusKey = (status: string) => ({ draft: "draft", planned: "planned", approved: "approved", materials_reserved: "materialsReserved", in_production: "activeProduction", quality_hold: "qualityHoldStatus", completed: "completedStatus", closed: "closed", cancelled: "cancelled" }[status] ?? "draft") as keyof typeof manufacturingCenterCopy.ar;
@@ -26,13 +27,27 @@ export default function Manufacturing() {
     { label: copy.qualityHold, value: overview.data?.qualityHold ?? 0, icon: FlaskConical, tone: "text-amber-500" },
     { label: copy.shortages, value: overview.data?.materialShortages ?? 0, icon: TriangleAlert, tone: "text-rose-500" },
   ];
+  const reportRows: ManufacturingReportRow[] = [
+    { label: copy.planning, value: String(overview.data?.planned ?? 0) },
+    { label: copy.inProduction, value: String(overview.data?.inProduction ?? 0) },
+    { label: copy.completed, value: String(overview.data?.completed ?? 0) },
+    { label: copy.qualityHold, value: String(overview.data?.qualityHold ?? 0) },
+    { label: copy.shortages, value: String(overview.data?.materialShortages ?? 0) },
+    { label: copy.goodOutput, value: String(overview.data?.goodOutputQuantity ?? 0) },
+    { label: copy.waste, value: String(overview.data?.wasteQuantity ?? 0) },
+    { label: copy.averageUnitCost, value: String(overview.data?.averageUnitCost ?? 0) },
+  ];
+  const reportDate = () => new Date().toLocaleString(language === "ar" ? "ar-SA" : language === "fr" ? "fr-FR" : "en-US");
+  const reportName = () => `nawa-manufacturing-${new Date().toISOString().slice(0, 10)}`;
+  const exportExcel = () => downloadManufacturingExcel(copy.title, reportDate(), reportRows, reportName());
+  const exportPdf = () => void downloadManufacturingPdf({ direction, title: copy.title, date: reportDate(), documentLabel: copy.operationalView, amount: `${copy.goodOutput}: ${overview.data?.goodOutputQuantity ?? 0}`, rows: reportRows, footer: copy.dataScope, fontFamily: language === "ar" ? "noto-arabic" : "inter", paperSize: "A4" }, `${reportName()}.pdf`);
 
   return <DashboardLayout><div className="space-y-5" dir={direction}>
     <section className="relative overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/15 via-background to-background p-6 shadow-sm">
       <div className="absolute -top-16 -end-12 h-48 w-48 rounded-full bg-primary/10 blur-3xl" />
       <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div className="max-w-2xl space-y-2"><div className="flex items-center gap-2 text-primary"><Factory className="h-5 w-5" /><span className="text-sm font-medium">Nawa ERP</span></div><h1 className="text-2xl font-bold tracking-tight md:text-3xl">{copy.title}</h1><p className="text-sm leading-6 text-muted-foreground">{copy.description}</p></div>
-        <Button onClick={refresh} disabled={isLoading} className="gap-2 self-start lg:self-auto"><RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin motion-reduce:animate-none" : ""}`} />{copy.refresh}</Button>
+        <div className="flex flex-wrap gap-2 self-start lg:self-auto"><Button variant="outline" onClick={exportExcel} disabled={isLoading} className="gap-2"><Download className="h-4 w-4" />{t("exportSpreadsheet")}</Button><Button variant="outline" onClick={exportPdf} disabled={isLoading} className="gap-2"><FileText className="h-4 w-4" />{t("downloadPdf")}</Button><Button onClick={refresh} disabled={isLoading} className="gap-2"><RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin motion-reduce:animate-none" : ""}`} />{copy.refresh}</Button></div>
       </div>
     </section>
 
