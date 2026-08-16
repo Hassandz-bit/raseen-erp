@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { dashboardHeroCopy } from "@/i18n/translations";
+import { moduleViewCopy } from "@/i18n/moduleViewCopy";
 import { cn } from "@/lib/utils";
 import {
   ArrowUpLeft,
@@ -74,14 +75,8 @@ const invoices = [
   { no: "INV-24078", customer: "متاجر أجيال", value: 21340, statusKey: "paid", tone: "green" },
 ];
 
-const sectionCopy: Record<Exclude<SectionKey, "dashboard">, { eyebrow: string; title: string; detail: string; icon: typeof Package; stat: string; action: string }> = {
-  inventory: { eyebrow: "المخزون", title: "رؤية لحظية للمخزون", detail: "راقب مستويات الأصناف، التنبيهات، والمخزون المحجوز من مساحة واحدة.", icon: Package, stat: "14 تنبيهاً تتطلب الإجراء", action: "إضافة صنف" },
-  sales: { eyebrow: "المبيعات", title: "دورة مبيعات أكثر وضوحاً", detail: "أنشئ الفواتير وتابع العملاء والطلبات والتحصيلات بصورة منظمة.", icon: ReceiptText, stat: "6 فواتير قيد التحصيل", action: "إنشاء فاتورة" },
-  purchases: { eyebrow: "المشتريات", title: "إمداد مضبوط منذ الطلب", detail: "نسّق الموردين وأوامر الشراء والاستلام قبل أن تؤثر الفجوات على البيع.", icon: ShoppingCart, stat: "3 أوامر بانتظار الاستلام", action: "طلب شراء" },
-  finance: { eyebrow: "المالية", title: "الصورة المالية للمؤسسة", detail: "تابع التدفقات والمعاملات والأرباح والخسائر بصلاحيات واضحة.", icon: WalletCards, stat: "هامش الربح 31.8%", action: "تسجيل معاملة" },
-  hr: { eyebrow: "الموارد البشرية", title: "إدارة فريقك بثقة", detail: "نظّم الموظفين والحضور وكشوف الرواتب ضمن منظومة المؤسسة.", icon: UsersRound, stat: "96.4% معدل الحضور", action: "إضافة موظف" },
-  reports: { eyebrow: "التحليلات", title: "تقارير تصنع القرار", detail: "استخدم فلاتر زمنية ورسومات قابلة للتصدير ضمن نطاق البيانات المصرح به.", icon: FileBarChart2, stat: "12 تقريراً محفوظاً", action: "إنشاء تقرير" },
-  settings: { eyebrow: "الإعدادات", title: "الحوكمة والصلاحيات", detail: "تحكم بالمؤسسة والوحدات والأدوار مع سجل تدقيق قابل للمراجعة.", icon: Settings2, stat: "7 وحدات ضمن الاشتراك", action: "إدارة الأدوار" },
+const sectionIcons: Record<Exclude<SectionKey, "dashboard">, typeof Package> = {
+  inventory: Package, sales: ReceiptText, purchases: ShoppingCart, finance: WalletCards, hr: UsersRound, reports: FileBarChart2, settings: Settings2,
 };
 
 function NawaMark({ compact = false }: { compact?: boolean }) {
@@ -206,9 +201,9 @@ function DashboardContent({ onOpenModule }: { onOpenModule: (key: SectionKey) =>
 }
 
 function ModuleView({ section, onBack }: { section: Exclude<SectionKey, "dashboard">; onBack: () => void }) {
-  const { t } = useLanguage();
-  const info = sectionCopy[section];
-  const Icon = info.icon;
+  const { t, language } = useLanguage();
+  const info = { ...moduleViewCopy[language][section], eyebrow: t(section as never) };
+  const Icon = sectionIcons[section];
   const rows = section === "inventory" ? products : section === "sales" ? invoices.map(i => ({ name: i.customer, sku: i.no, stock: i.value, status: t(i.statusKey as never), tone: i.tone })) : products.map((p, index) => ({ ...p, name: ["عملية تشغيلية", "سجل مراجع", "طلب قيد المعالجة", "تقرير دوري"][index], sku: ["اليوم", "أمس", "هذا الأسبوع", "هذا الشهر"][index] }));
   return <div className="enter space-y-6"><section className="surface relative overflow-hidden rounded-3xl border p-6 md:p-8"><div className="absolute -left-14 -top-14 h-48 w-48 rounded-full bg-primary/10 blur-3xl" /><div className="relative flex flex-col justify-between gap-6 md:flex-row md:items-end"><div className="flex items-start gap-4"><div className="grid h-14 w-14 place-items-center rounded-2xl bg-primary/10 text-primary ring-1 ring-primary/20"><Icon className="h-6 w-6" /></div><div><p className="text-sm text-primary">{info.eyebrow}</p><h1 className="mt-1 text-2xl font-bold text-white">{info.title}</h1><p className="mt-2 max-w-2xl text-sm leading-7 text-muted-foreground">{info.detail}</p></div></div><div className="flex items-center gap-2"><Button variant="outline" onClick={onBack} className="rounded-xl border-white/10 bg-white/[.03] text-slate-200">{t("dashboard")}</Button><Button onClick={() => toast.success(`تم فتح نموذج: ${info.action}`)} className="gap-2 rounded-xl bg-primary text-primary-foreground"><Plus className="h-4 w-4" />{info.action}</Button></div></div></section><section className="grid gap-5 lg:grid-cols-[minmax(0,1.4fr)_330px]"><article className="surface overflow-hidden rounded-3xl border"><div className="flex items-center justify-between border-b border-white/8 px-5 py-5"><div><p className="text-sm font-semibold text-white">{t("recentDocuments")}</p><p className="mt-1 text-xs text-muted-foreground">{t("moduleView")}</p></div><Button variant="outline" onClick={() => toast.info("تم تطبيق الفلتر الافتراضي.")} className="h-9 rounded-xl border-white/10 bg-white/[.03] text-xs text-slate-300">{t("filterExchangeRates")}</Button></div><div className="thin-scrollbar overflow-x-auto"><table className="w-full min-w-[600px] text-right"><thead className="bg-white/[.025] text-[11px] text-muted-foreground"><tr><th className="px-5 py-3 font-medium">{t("product")}</th><th className="px-5 py-3 font-medium">{t("barcode")}</th><th className="px-5 py-3 font-medium">{t("value")} / {t("quantity")}</th><th className="px-5 py-3 font-medium">{t("status")}</th></tr></thead><tbody>{rows.map((row, index) => <tr key={`${row.name}-${index}`} className="border-t border-white/[.055] hover:bg-white/[.025]"><td className="px-5 py-4 text-sm text-white">{row.name}</td><td className="latin px-5 py-4 text-xs text-muted-foreground">{row.sku}</td><td className="px-5 py-4 text-sm text-slate-300">{row.stock}</td><td className="px-5 py-4"><StatusPill tone={row.tone}>{row.status}</StatusPill></td></tr>)}</tbody></table></div></article><article className="surface rounded-3xl border p-5"><p className="text-sm font-semibold text-white">{t("financialSummary")}</p><div className="mt-5 rounded-2xl border border-primary/15 bg-primary/[.07] p-4"><p className="text-xs text-primary">{t("metric")}</p><p className="mt-2 text-lg font-bold text-white">{info.stat}</p><p className="mt-2 text-xs leading-6 text-muted-foreground">ستظهر الأرقام الفعلية هنا من بيانات المؤسسة بعد الدخول وربط الوحدة بسياق الاشتراك.</p></div><button onClick={() => toast.info("يمكن تخصيص هذه المساحة لكل دور وظيفي.")} className="mt-5 flex w-full items-center justify-between rounded-2xl bg-white/[.04] p-4 text-sm text-slate-200 hover:bg-white/[.07]"><span>{t("preferences")}</span><Settings2 className="h-4 w-4 text-primary" /></button></article></section></div>;
 }
