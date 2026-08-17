@@ -24,6 +24,9 @@ import { approveBudget, createBudget, createCostCenter, getBudgetVsActual, listB
 import { approveOvertimeEntry, createDepartment, createEmployeeContract, createEmployeeProfile, createLeaveType, createOvertimeEntry, createPosition, createWorkSchedule, decideLeaveRequest, getHrDashboard, listHrDirectory, listHrOperations, recordAttendance, submitLeaveRequest } from "./hr";
 import { approvePayroll, assignAllowance, calculatePayroll, createAllowanceType, createCommissionEntry, createCommissionRule, createEmployeeAdvance, createPayrollAdjustment, createPayrollPeriod, getPayrollDashboard, reopenPayroll } from "./payroll";
 import { payPayrollPeriod, postEmployeeAdvance, postPayrollPeriod } from "./payrollPostingRules";
+import { exportPaidPayrollBankFile } from "./payrollBankExport";
+import { canUseHrPermission, type HrPermission } from "./hrPermissionPolicy";
+import { decideTeamAdvanceRequest, decideTeamLeaveRequest, getEmployeeSelfService, submitSelfAdvanceRequest, submitSelfLeaveRequest } from "./hrSelfService";
 
 type ModuleKey = "inventory" | "sales" | "purchases" | "finance" | "hr" | "reports" | "ai_assistant" | "distribution" | "manufacturing";
 const operationalModuleKeys = ["inventory", "sales", "purchases", "finance", "hr"] as const;
@@ -65,6 +68,13 @@ export async function requireFinanceOwner(userId: number) {
 export async function requireHrOwner(userId: number) {
   const context = await requireModule(userId, "hr");
   if (!isOrganizationOwner(context.membership.roleKey)) throw new TRPCError({ code: "FORBIDDEN", message: "يلزم دور مالك المؤسسة لإدارة الموارد البشرية والرواتب." });
+  return context;
+}
+
+export async function requireHrPermission(userId: number, permission: HrPermission) {
+  const context = await requireModule(userId, "hr");
+  const permissions = await getOrganizationRolePermissions(context.organization.id, context.membership.roleKey);
+  if (!canUseHrPermission(context.membership.roleKey, permissions, permission)) throw new TRPCError({ code: "FORBIDDEN", message: "لا تملك صلاحية الموارد البشرية المطلوبة لهذه العملية." });
   return context;
 }
 
@@ -440,10 +450,20 @@ export const erpRouter = router({
   }),
 
   hr: router({
+    self: router({
+      profile: protectedProcedure.query(async ({ ctx }) => { const context = await requireHrPermission(ctx.user.id, "hr.self.view"); return getEmployeeSelfService(context.organization.id, ctx.user.id); }),
+      submitLeave: protectedProcedure.input(z.object({ leaveTypeId: z.number().int().positive(), startsAt: z.coerce.date(), endsAt: z.coerce.date(), days: z.number().positive(), reason: z.string().trim().max(2000).optional() })).mutation(async ({ ctx, input }) => { const context = await requireHrPermission(ctx.user.id, "hr.self.leave.request"); return submitSelfLeaveRequest(context.organization.id, ctx.user.id, input); }),
+      submitAdvance: protectedProcedure.input(z.object({ occurredAt: z.coerce.date(), amount: z.number().positive(), currencyCode: z.string().trim().length(3), reason: z.string().trim().min(3).max(2000), recoveryMethod: z.enum(["one_payroll", "multiple_payrolls"]), idempotencyKey: z.string().trim().min(8).max(128) })).mutation(async ({ ctx, input }) => { const context = await requireHrPermission(ctx.user.id, "hr.self.advance.request"); return submitSelfAdvanceRequest(context.organization.id, ctx.user.id, input); }),
+    }),
+    team: router({
+      decideLeave: protectedProcedure.input(z.object({ leaveRequestId: z.number().int().positive(), decision: z.enum(["approved", "rejected"]) })).mutation(async ({ ctx, input }) => { const context = await requireHrPermission(ctx.user.id, "hr.leave.approve_team"); return decideTeamLeaveRequest(context.organization.id, ctx.user.id, input.leaveRequestId, input.decision); }),
+      decideAdvance: protectedProcedure.input(z.object({ advanceId: z.number().int().positive(), approved: z.boolean() })).mutation(async ({ ctx, input }) => { const context = await requireHrPermission(ctx.user.id, "hr.advance.approve_team"); return decideTeamAdvanceRequest(context.organization.id, ctx.user.id, input.advanceId, input.approved); }),
+    }),
     dashboard: protectedProcedure.query(async ({ ctx }) => { const context = await requireModule(ctx.user.id, "hr"); return getHrDashboard(context.organization.id); }),
     directory: protectedProcedure.query(async ({ ctx }) => { const context = await requireModule(ctx.user.id, "hr"); return listHrDirectory(context.organization.id); }),
     operations: protectedProcedure.query(async ({ ctx }) => { const context = await requireModule(ctx.user.id, "hr"); return listHrOperations(context.organization.id); }),
     payrollDashboard: protectedProcedure.query(async ({ ctx }) => { const context = await requireHrOwner(ctx.user.id); return getPayrollDashboard(context.organization.id); }),
+    exportBankFile: protectedProcedure.input(z.object({ payrollPeriodId: z.number().int().positive(), delimiter: z.enum([",", ";"]).optional() })).query(async ({ ctx, input }) => { const context = await requireHrPermission(ctx.user.id, "hr.payroll.export_bank"); return exportPaidPayrollBankFile(context.organization.id, input.payrollPeriodId, input.delimiter); }),
     createDepartment: protectedProcedure.input(z.object({ code: z.string().trim().min(2).max(48), name: z.string().trim().min(2).max(160), branchId: z.number().int().positive().optional() })).mutation(async ({ ctx, input }) => { const context = await requireOrganizationOwner(ctx.user.id); return createDepartment(context.organization.id, ctx.user.id, input); }),
     createPosition: protectedProcedure.input(z.object({ code: z.string().trim().min(2).max(48), name: z.string().trim().min(2).max(160), departmentId: z.number().int().positive().optional() })).mutation(async ({ ctx, input }) => { const context = await requireOrganizationOwner(ctx.user.id); return createPosition(context.organization.id, ctx.user.id, input); }),
     createEmployeeProfile: protectedProcedure.input(z.object({ employeeId: z.number().int().positive(), userId: z.number().int().positive().optional(), branchId: z.number().int().positive().optional(), departmentId: z.number().int().positive().optional(), positionId: z.number().int().positive().optional(), managerEmployeeId: z.number().int().positive().optional(), fullNameAr: z.string().trim().max(180).optional(), fullNameLatin: z.string().trim().max(180).optional(), payrollCurrency: z.string().trim().length(3), phone: z.string().trim().max(48).optional(), email: z.string().trim().email().max(320).optional(), workLocation: z.string().trim().max(180).optional(), notes: z.string().trim().max(2000).optional() })).mutation(async ({ ctx, input }) => { const context = await requireOrganizationOwner(ctx.user.id); return createEmployeeProfile(context.organization.id, ctx.user.id, input); }),

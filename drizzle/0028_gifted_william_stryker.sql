@@ -1,0 +1,1 @@
+ALTER TABLE `employee_advances` MODIFY COLUMN `status` enum('draft','submitted','approved','rejected','paid','recovered','cancelled') NOT NULL DEFAULT 'draft';

@@ -197,6 +197,13 @@
       "when": 1786963068405,
       "tag": "0027_stormy_prowler",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "5",
+      "when": 1786964830205,
+      "tag": "0028_gifted_william_stryker",
+      "breakpoints": true
     }
   ]
 }

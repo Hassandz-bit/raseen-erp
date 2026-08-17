@@ -1,0 +1,31 @@
+import { and, eq } from "drizzle-orm";
+import { auditLogs, employees } from "../drizzle/schema";
+import { employeeAdvances, employeeProfiles, leaveRequests, leaveTypes } from "../drizzle/hrPayrollSchema";
+import { getDb } from "./db";
+import { decideLeaveRequest, submitLeaveRequest } from "./hr";
+
+async function resolveEmployeeProfile(organizationId: number, userId: number) {
+  const db = await getDb(); if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const [profile] = await db.select().from(employeeProfiles).where(and(eq(employeeProfiles.organizationId, organizationId), eq(employeeProfiles.userId, userId), eq(employeeProfiles.status, "active"))).limit(1);
+  if (!profile) throw new Error("لا يرتبط حسابك بملف موظف نشط ضمن المؤسسة.");
+  return profile;
+}
+
+export async function getEmployeeSelfService(organizationId: number, userId: number) {
+  const db = await getDb(); if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً."); const profile = await resolveEmployeeProfile(organizationId, userId);
+  const [employee] = await db.select({ id: employees.id, employeeNumber: employees.employeeNumber, fullName: employees.fullName, department: employees.department, jobTitle: employees.jobTitle, status: employees.status }).from(employees).where(and(eq(employees.organizationId, organizationId), eq(employees.id, profile.employeeId))).limit(1);
+  const [leaves, advances, leaveTypesData] = await Promise.all([db.select().from(leaveRequests).where(and(eq(leaveRequests.organizationId, organizationId), eq(leaveRequests.employeeId, profile.employeeId))), db.select().from(employeeAdvances).where(and(eq(employeeAdvances.organizationId, organizationId), eq(employeeAdvances.employeeId, profile.employeeId))), db.select().from(leaveTypes).where(and(eq(leaveTypes.organizationId, organizationId), eq(leaveTypes.status, "active")))]);
+  return { employee, profile: { fullNameAr: profile.fullNameAr, fullNameLatin: profile.fullNameLatin, workLocation: profile.workLocation, phone: profile.phone, email: profile.email }, leaves, advances, leaveTypes: leaveTypesData };
+}
+
+export async function submitSelfLeaveRequest(organizationId: number, userId: number, input: { leaveTypeId: number; startsAt: Date; endsAt: Date; days: number; reason?: string }) { const profile = await resolveEmployeeProfile(organizationId, userId); return submitLeaveRequest(organizationId, userId, { ...input, employeeId: profile.employeeId }); }
+
+export async function submitSelfAdvanceRequest(organizationId: number, userId: number, input: { occurredAt: Date; amount: number; currencyCode: string; reason: string; recoveryMethod: "one_payroll" | "multiple_payrolls"; idempotencyKey: string }) {
+  if (input.amount <= 0 || input.reason.trim().length < 3) throw new Error("تتطلب السلفة مبلغاً موجباً وسبباً واضحاً."); const db = await getDb(); if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً."); const profile = await resolveEmployeeProfile(organizationId, userId);
+  const result = await db.insert(employeeAdvances).values({ organizationId, employeeId: profile.employeeId, occurredAt: input.occurredAt, amount: String(input.amount), currencyCode: input.currencyCode, reason: input.reason.trim(), recoveryMethod: input.recoveryMethod, idempotencyKey: input.idempotencyKey, status: "submitted", createdByUserId: userId }); const id = Number(result[0].insertId);
+  await db.insert(auditLogs).values({ organizationId, actorUserId: userId, action: "hr.self_advance_submitted", entityType: "employee_advance", entityId: String(id), metadata: { employeeId: profile.employeeId } }); return { id, status: "submitted" as const };
+}
+
+async function assertDirectManager(organizationId: number, managerUserId: number, employeeId: number) { const manager = await resolveEmployeeProfile(organizationId, managerUserId); const db = await getDb(); if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً."); const [employee] = await db.select({ managerEmployeeId: employeeProfiles.managerEmployeeId }).from(employeeProfiles).where(and(eq(employeeProfiles.organizationId, organizationId), eq(employeeProfiles.employeeId, employeeId))).limit(1); if (!employee || employee.managerEmployeeId !== manager.employeeId) throw new Error("الموظف ليس ضمن فريقك المباشر."); }
+export async function decideTeamLeaveRequest(organizationId: number, managerUserId: number, leaveRequestId: number, decision: "approved" | "rejected") { const db = await getDb(); if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً."); const [request] = await db.select().from(leaveRequests).where(and(eq(leaveRequests.organizationId, organizationId), eq(leaveRequests.id, leaveRequestId))).limit(1); if (!request) throw new Error("طلب الإجازة غير موجود ضمن المؤسسة."); await assertDirectManager(organizationId, managerUserId, request.employeeId); return decideLeaveRequest(organizationId, managerUserId, leaveRequestId, decision); }
+export async function decideTeamAdvanceRequest(organizationId: number, managerUserId: number, advanceId: number, approved: boolean) { const db = await getDb(); if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً."); const [advance] = await db.select().from(employeeAdvances).where(and(eq(employeeAdvances.organizationId, organizationId), eq(employeeAdvances.id, advanceId))).limit(1); if (!advance || advance.status !== "submitted") throw new Error("السلفة غير متاحة للقرار."); await assertDirectManager(organizationId, managerUserId, advance.employeeId); const status = approved ? "approved" : "rejected"; await db.update(employeeAdvances).set({ status, approvedByUserId: managerUserId }).where(and(eq(employeeAdvances.organizationId, organizationId), eq(employeeAdvances.id, advanceId))); await db.insert(auditLogs).values({ organizationId, actorUserId: managerUserId, action: `hr.team_advance_${status}`, entityType: "employee_advance", entityId: String(advanceId), metadata: { employeeId: advance.employeeId } }); return { id: advanceId, status }; }
