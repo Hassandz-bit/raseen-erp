@@ -26,6 +26,7 @@ import {
   ShieldCheck,
   ShoppingCart,
   Sparkles,
+  Store,
   TrendingUp,
   Truck,
   UsersRound,
@@ -38,9 +39,12 @@ import { toast } from "sonner";
 import { useLocation } from "wouter";
 
 type SectionKey = "dashboard" | "inventory" | "sales" | "purchases" | "finance" | "hr" | "reports" | "settings";
+type NavigationKey = SectionKey | "nawaAI" | "nawaRetail";
 
-const navItems: { key: SectionKey; label: string; icon: typeof Grid2X2; module?: string }[] = [
+const navItems: { key: NavigationKey; label: string; icon: typeof Grid2X2; module?: string; path?: string }[] = [
   { key: "dashboard", label: "dashboard", icon: Grid2X2 },
+  { key: "nawaAI", label: "Nawa AI", icon: Bot, path: "/workspace" },
+  { key: "nawaRetail", label: "Nawa Retail", icon: Store, path: "/retailer" },
   { key: "inventory", label: "inventory", icon: Package, module: "inventory" },
   { key: "sales", label: "sales", icon: ReceiptText, module: "sales" },
   { key: "purchases", label: "purchases", icon: ShoppingCart, module: "purchases" },
@@ -242,7 +246,7 @@ export default function Home() {
       <aside className={cn("fixed inset-y-0 z-40 flex w-[278px] flex-col border-white/[.07] bg-[#10141d]/95 p-4 backdrop-blur-xl transition-transform duration-300 lg:translate-x-0", language === "ar" ? "right-0 border-l" : "left-0 border-r", isSidebarOpen ? "translate-x-0" : language === "ar" ? "translate-x-full" : "-translate-x-full")}>
         <div className="flex items-center justify-between px-2 pt-2"><NawaMark /><button onClick={() => setSidebarOpen(false)} className="grid h-9 w-9 place-items-center rounded-xl text-muted-foreground hover:bg-white/[.05] lg:hidden"><X className="h-5 w-5" /></button></div>
         <div className="mt-8 px-2"><p className="text-[10px] font-semibold tracking-[.18em] text-[#777f90]">{chromeCopy.mainNavigation}</p></div>
-        <nav className="mt-3 flex-1 space-y-1 overflow-y-auto thin-scrollbar">{navItems.map(item => { const Icon = item.icon; const active = item.key === section; return <button key={item.key} onClick={() => changeSection(item.key)} className={cn("group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm transition-all", active ? "bg-primary text-primary-foreground shadow-[0_12px_22px_rgba(217,180,107,.12)]" : "text-[#afb7c4] hover:bg-white/[.045] hover:text-white")}><Icon className={cn("h-[18px] w-[18px]", active ? "" : "text-[#7e899b] group-hover:text-primary")} /><span className="flex-1 text-right font-medium">{t(item.label as never)}</span>{item.module === "reports" && <span className={cn("rounded-md px-1.5 py-0.5 text-[9px]", active ? "bg-black/10" : "bg-primary/10 text-primary")}>{chromeCopy.newBadge}</span>}</button>})}</nav>
+        <nav className="mt-3 flex-1 space-y-1 overflow-y-auto thin-scrollbar">{navItems.map(item => { const Icon = item.icon; const active = item.key === section; return <button key={item.key} onClick={() => item.path ? setLocation(item.path) : changeSection(item.key as SectionKey)} className={cn("group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm transition-all", active ? "bg-primary text-primary-foreground shadow-[0_12px_22px_rgba(217,180,107,.12)]" : "text-[#afb7c4] hover:bg-white/[.045] hover:text-white")}><Icon className={cn("h-[18px] w-[18px]", active ? "" : "text-[#7e899b] group-hover:text-primary")} /><span className="flex-1 text-right font-medium">{item.path ? item.label : t(item.label as never)}</span>{item.module === "reports" && <span className={cn("rounded-md px-1.5 py-0.5 text-[9px]", active ? "bg-black/10" : "bg-primary/10 text-primary")}>{chromeCopy.newBadge}</span>}</button>})}</nav>
         <div className="mt-4 rounded-2xl border border-primary/15 bg-gradient-to-br from-primary/[.12] to-primary/[.025] p-4"><div className="flex items-center gap-2 text-primary"><Zap className="h-4 w-4" /><p className="text-xs font-bold">{chromeCopy.assistantTitle}</p></div><p className="mt-2 text-[11px] leading-6 text-[#b4b9c4]">{chromeCopy.assistantDescription}</p><button onClick={() => setAssistantOpen(true)} className="mt-3 text-xs font-semibold text-[#e8c87f] hover:text-[#f5dc9e]">{chromeCopy.startConversation} ←</button></div>
         <div className="mt-4 flex items-center gap-3 rounded-2xl border border-white/[.07] bg-white/[.025] p-3"><Avatar className="h-9 w-9 border border-primary/20"><AvatarFallback className="bg-primary/10 text-xs text-primary">{chromeCopy.teamName.slice(0, 1)}</AvatarFallback></Avatar><div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold text-white">{chromeCopy.teamName}</p><p className="mt-1 text-[10px] text-muted-foreground">{chromeCopy.organizationManager}</p></div><MoreHorizontal className="h-4 w-4 text-muted-foreground" /></div>
       </aside>
