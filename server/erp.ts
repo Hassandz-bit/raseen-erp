@@ -12,7 +12,7 @@ import { isValidTextBarcode } from "./barcodePolicy";
 import { classifyBranchPersistenceError } from "./branchPolicy";
 import { canUseDistributionPermission, isScopedIdAllowed, type DistributionPermission } from "./distributionPolicy";
 import { addDistributionRouteExpense, completeDriverStop, createDistributionRoute, createDistributionTerritory, createDriverVanSale, createFleetVehicle, createMaintenanceRecord, createVehicleDocument, createVehicleLoadOrder, getDistributionControlCenter, getDistributionOwnerAlertReasons, getDistributionSettings, getDriverRouteFeed, getDriverRouteInventory, getLatestFleetLocations, listDistributionRoutes, listDistributionTerritories, listFleetVehicleDocumentAlerts, listFleetVehicles, listVehicleInventory, logFuel, recordDistributionCollection, recordDistributionDelivery, recordDistributionReturn, recordFleetGpsPoint, recordGeofenceEvent, returnVehicleStockToWarehouse, saveDistributionSettings, submitDistributionDeliveryProof, submitRouteClosing, transitionDistributionRoute, transitionRouteClosing, transitionVehicleLoadOrder } from "./distribution";
-import { cancelRetailerOrder, createB2bPromotion, createRetailerOrder, createRetailerOutlet, createSavedRetailerOrderList, getRetailerCatalog, getRetailerFrequentProducts, getRetailerMonthlyReport, getRetailerSummary, grantRetailerAccess, inviteRetailerAccess, listManagedRetailerAccesses, listOrganizationB2bOrders, listRetailerAccesses, listRetailerDocuments, listRetailerFavorites, listRetailerNotifications, listRetailerOrders, listRetailerOutlets, listRetailerOutletsForAccess, listRetailerPromotions, listSavedRetailerOrderLists, reorderRetailerOrder, resendRetailerAccessInvite, reviewAndConvertRetailerOrder, submitSavedRetailerOrderList, toggleRetailerFavorite, updateRetailerAccessStatus, updateRetailerVisibilityPolicy } from "./b2b";
+import { cancelRetailerOrder, createB2bPromotion, createRetailerOrder, createRetailerOutlet, createRetailerReturnRequest, createSavedRetailerOrderList, getRetailerCatalog, getRetailerFrequentProducts, getRetailerMonthlyReport, getRetailerSummary, grantRetailerAccess, inviteRetailerAccess, listManagedRetailerAccesses, listOrganizationB2bOrders, listOrganizationRetailerPromotions, listOrganizationRetailerReturnRequests, listRetailerAccesses, listRetailerDocuments, listRetailerFavorites, listRetailerNotifications, listRetailerOrders, listRetailerOutlets, listRetailerOutletsForAccess, listRetailerPromotions, listRetailerReturnRequests, listSavedRetailerOrderLists, lookupRetailerUserByEmail, markRetailerNotificationRead, reorderRetailerOrder, resendRetailerAccessInvite, reviewAndConvertRetailerOrder, reviewRetailerReturnRequest, submitSavedRetailerOrderList, toggleRetailerFavorite, updateRetailerAccessStatus, updateRetailerVisibilityPolicy } from "./b2b";
 import { calculatePackagingLogistics, findSuitableVehicles, listProductPackaging, listUomCatalog } from "./uomPackaging";
 import { closeProductionOrder, createManufacturingBom, createProductionOrder, getManufacturingOperationalOptions, getManufacturingOverview, getProductionBatchGenealogy, getProductionOrderOperationalDetails, getProductionOrderScope, getProductionTraceability, issueMaterialsForProduction, listProductionOrders, recordProductionExpense, recordProductionOutput, recordProductionQualityCheck, recordProductionWaste, reserveProductionMaterials, returnMaterialsFromProduction, saveManufacturingProductProfile, transitionProductionOrderStatus, updateProductionStage } from "./manufacturing";
 import { canAccessManufacturingOrderScope, canUseManufacturingPermission, isManufacturingScopeAllowed, type ManufacturingPermission } from "./manufacturingPermissionPolicy";
@@ -823,9 +823,25 @@ export const erpRouter = router({
         const context = await requireRetailPermission(ctx.user.id, "retail.admin.view");
         return listManagedRetailerAccesses(context.organization.id);
       }),
+      lookupUser: protectedProcedure.input(z.object({ email: z.string().trim().email().max(320) })).query(async ({ ctx, input }) => {
+        await requireRetailPermission(ctx.user.id, "retail.access.manage");
+        return lookupRetailerUserByEmail(input.email);
+      }),
       orders: protectedProcedure.query(async ({ ctx }) => {
         const context = await requireRetailPermission(ctx.user.id, "retail.orders.manage");
         return listOrganizationB2bOrders(context.organization.id);
+      }),
+      returns: protectedProcedure.query(async ({ ctx }) => {
+        const context = await requireRetailPermission(ctx.user.id, "retail.orders.manage");
+        return listOrganizationRetailerReturnRequests(context.organization.id);
+      }),
+      reviewReturn: protectedProcedure.input(z.object({ requestId: z.number().int().positive(), action: z.enum(["under_review", "approved", "rejected"]), note: z.string().trim().max(2000).optional() })).mutation(async ({ ctx, input }) => {
+        const context = await requireRetailPermission(ctx.user.id, "retail.orders.manage");
+        return reviewRetailerReturnRequest(context.organization.id, ctx.user.id, input);
+      }),
+      promotions: protectedProcedure.query(async ({ ctx }) => {
+        const context = await requireRetailPermission(ctx.user.id, "retail.visibility.manage");
+        return listOrganizationRetailerPromotions(context.organization.id);
       }),
       grant: protectedProcedure.input(z.object({ customerId: z.number().int().positive(), userId: z.number().int().positive(), retailerRole: z.enum(["owner", "buyer", "accountant", "store_manager", "viewer"]).optional(), outletIds: z.array(z.number().int().positive()).max(100).optional(), priceListId: z.number().int().positive().optional(), customerSegment: z.string().trim().max(96).optional(), territoryId: z.number().int().positive().optional(), deliveryTrackingPolicy: z.enum(["off", "status_only", "eta_only", "limited_live"]).optional(), availabilityDisclosure: z.enum(["available", "low", "request"]).optional(), permissions: z.record(z.string(), z.boolean()).optional() })).mutation(async ({ ctx, input }) => {
         const context = await requireRetailPermission(ctx.user.id, "retail.access.manage");
@@ -880,6 +896,10 @@ export const erpRouter = router({
       reorder: protectedProcedure.input(z.object({ accessId: z.number().int().positive(), orderId: z.number().int().positive() })).mutation(({ ctx, input }) => reorderRetailerOrder(ctx.user.id, input.accessId, input.orderId)),
       cancel: protectedProcedure.input(z.object({ accessId: z.number().int().positive(), orderId: z.number().int().positive(), reason: z.string().trim().max(1000).optional() })).mutation(({ ctx, input }) => cancelRetailerOrder(ctx.user.id, input.accessId, input.orderId, input.reason)),
     }),
+    returns: router({
+      list: protectedProcedure.input(z.object({ accessId: z.number().int().positive() })).query(({ ctx, input }) => listRetailerReturnRequests(ctx.user.id, input.accessId)),
+      create: protectedProcedure.input(z.object({ accessId: z.number().int().positive(), orderId: z.number().int().positive(), reason: z.string().trim().min(3).max(2000) })).mutation(({ ctx, input }) => createRetailerReturnRequest(ctx.user.id, input.accessId, input)),
+    }),
     savedLists: router({
       list: protectedProcedure.input(z.object({ accessId: z.number().int().positive() })).query(({ ctx, input }) => listSavedRetailerOrderLists(ctx.user.id, input.accessId)),
       create: protectedProcedure.input(z.object({ accessId: z.number().int().positive(), name: z.string().trim().min(1).max(160), lines: z.array(z.object({ productId: z.number().int().positive(), quantity: z.number().positive(), unit: z.string().trim().min(1).max(32).optional() })).min(1).max(100) })).mutation(({ ctx, input }) => createSavedRetailerOrderList(ctx.user.id, input.accessId, input)),
@@ -891,6 +911,7 @@ export const erpRouter = router({
     }),
     documents: protectedProcedure.input(z.object({ accessId: z.number().int().positive() })).query(({ ctx, input }) => listRetailerDocuments(ctx.user.id, input.accessId)),
     notifications: protectedProcedure.input(z.object({ accessId: z.number().int().positive() })).query(({ ctx, input }) => listRetailerNotifications(ctx.user.id, input.accessId)),
+    markNotificationRead: protectedProcedure.input(z.object({ accessId: z.number().int().positive(), notificationId: z.number().int().positive() })).mutation(({ ctx, input }) => markRetailerNotificationRead(ctx.user.id, input.accessId, input.notificationId)),
   }),
 
   distribution: router({

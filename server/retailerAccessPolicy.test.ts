@@ -4,6 +4,7 @@ import { canUseRetailerPermission, isOutletAllowedForRetailer } from "./retailer
 describe("Retailer roles and outlet scope", () => {
   it("يحصر المشتري في الكتالوج والطلب ولا يمنحه الذمم أو كشف الحساب", () => {
     expect(canUseRetailerPermission("buyer", null, "retail.orders.create")).toBe(true);
+    expect(canUseRetailerPermission("buyer", null, "retail.returns.create")).toBe(true);
     expect(canUseRetailerPermission("buyer", null, "retail.debt.view")).toBe(false);
     expect(canUseRetailerPermission("buyer", null, "retail.statement.view")).toBe(false);
   });
@@ -11,6 +12,7 @@ describe("Retailer roles and outlet scope", () => {
   it("يمنح المحاسب الوثائق والذمم ولا يمنحه إنشاء الطلب", () => {
     expect(canUseRetailerPermission("accountant", null, "retail.invoices.view")).toBe(true);
     expect(canUseRetailerPermission("accountant", null, "retail.orders.create")).toBe(false);
+    expect(canUseRetailerPermission("accountant", null, "retail.returns.create")).toBe(false);
   });
 
   it("يمنع مدير المتجر من استخدام Outlet خارج نطاقه ويبقي المالك غير مقيد", () => {

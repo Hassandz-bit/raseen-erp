@@ -8,7 +8,7 @@
 |---|---|---|
 | `pnpm check` | PASS | لا توجد أخطاء TypeScript. |
 | `pnpm lint` | PASS with warnings | 12 تحذيراً موروثاً خارج Nawa Retail، بلا أخطاء. |
-| `pnpm test` | PASS | 72 ملف اختبار و149 اختباراً ناجحاً. |
+| `pnpm test` | PASS | 76 ملف اختبار و160 اختباراً ناجحاً. |
 | `pnpm build` | PASS | اكتمل البناء؛ توجد تحذيرات حجم chunks فقط. |
 
 ## مصفوفة الجاهزية الفعلية
@@ -16,25 +16,25 @@
 | المجال | الحالة | الدليل والفجوة التشغيلية |
 |---|---|---|
 | Access وMulti-Supplier | DONE | علاقة وصول نشطة محروسة خادمياً بـ`requireRetailerAccess` ومبدّل موردين آمن. |
-| Supplier Management | PARTIAL | توجد أوامر وعلاقات وصول منفصلة، لكن لا يوجد مركز إدارة موحد أو تفويض إداري دقيق. |
-| Retailer Users وRoles | MISSING | العلاقة الحالية تربط مستخدماً واحداً بالعميل ولا توجد أدوار تاجر أو نطاق منفذ. |
-| Outlets | PARTIAL | الجدول والإنشاء موجودان، لكن حقول الموقع التشغيلي وربط المنفذ بالطلب ونطاق المستخدمين غير مكتملة. |
+| Supplier Management | DONE | مركز إدارة موحد يعرض العلاقات والحالات والأسعار والسياسات والمنافذ ودعوات المستخدمين والطلبات والعروض والإرجاعات. |
+| Retailer Users وRoles | DONE | أدوار owner/buyer/accountant/store_manager/viewer ونطاق outlets مفروضان خادمياً، مع دعوة مستخدم موجود بالبريد الدقيق فقط. |
+| Outlets | DONE | بيانات موقع تشغيلية، تحقق إحداثيات، نطاق مستخدم، اختيار checkout، ولقطة وجهة في Sales Order. |
 | Catalog وPackaging وPricing | DONE | حل الكتالوج والتغليف والسعر والعروض متحقق خادمياً. |
-| Availability وPromotions | PARTIAL | إتاحة آمنة وعروض مستهدفة موجودة، لكن سياسات الظهور التفصيلية ومركز عروض المستهلك وصفقات قرب الانتهاء غير مكتملة. |
+| Availability وPromotions | DONE | سياسات ظهور محكومة بالعلاقة، عروض موجهة فقط، بطاقات قرب انتهاء العرض، وقائمة عروض للمورد. |
 | Favorites وFrequently Ordered وReorder | DONE | مفضلة ومنتجات متكررة وإعادة تسعير عند إعادة الطلب عبر محرك الخادم. |
-| Quick Order وSaved Lists | MISSING | البحث الحالي يدعم الإضافة، لكنه ليس تدفق طلب سريع متعدد الأسطر ولا توجد قوالب محفوظة. |
-| Cart وCheckout | PARTIAL | السلة مفصولة بالمورد والتحقق السعري خادمي، لكنها بلا اختيار outlet أو idempotency أو قواعد حد/ائتمان/تاريخ محكومة. |
-| Supplier Review وConversion | PARTIAL | اعتماد وتحويل exactly-once موجودان، والمراجعة حالياً مقيدة بالمالك ولا تعرض سياق outlet/credit الكامل. |
-| Timeline وDistribution وPartial Delivery | PARTIAL | حالات الطلب مرتبطة بمسار المبيعات والتوزيع، لكن التجميع الجزئي سطراً بسطر ولقطة outlet لم يكتمل. |
-| Documents وDebt | PARTIAL | فواتير ورصيد متبقٍ مقيدان بالعلاقة، بلا سند تسليم أو كشف حساب أو تحصيلات أو سياسة إفصاح للذمم. |
-| Notifications وAnnouncements | MISSING | أساس الإشعارات عام، لكنه غير موجه لعلاقة Retail ولا توجد إعلانات المورد. |
-| PWA وOffline Cart | PARTIAL | manifest وservice worker shell موجودان ولا يخزنان API، لكن لا توجد أيقونات/تنظيف logout أو سياسة تحديث ظاهرة. |
-| Analytics وAI readiness | PARTIAL | ملخص وتقرير شهري للتاجر موجودان؛ تحليلات المورد وتهيئة AI Retail المقيدة غير موجودة. |
-| Add-on وPermissions | MISSING | لا يوجد entitlement `nawa_retail` أو صلاحيات مورد/تاجر الدقيقة في العقود. |
-| Security وAudit | PARTIAL | عزل الوصول والتسعير الخادمي والتدقيق الأساسي موجود؛ أدوار التاجر والتلاعب بالـoutlet والائتمان وسياسات الظهور تحتاج فرضاً واختباراً. |
-| i18n وVisual QA | PARTIAL | الواجهة الأساسية AR/FR/EN، لكن الصفحات والخصائص الناقصة تحتاج مراجعة RTL/LTR بعد التنفيذ. |
-| Performance | PARTIAL | الكتالوج محدود بـ200 مادة لكن حله N+1؛ يحتاج pagination أو حد مشروح وتحسين دفعي مع أدلة. |
+| Quick Order وSaved Lists | DONE | بحث مباشر وسلة سريعة وقوائم محفوظة لا تخزن أسعاراً، ويعاد التحقق والتسعير عند التنفيذ. |
+| Cart وCheckout | DONE | اختيار outlet، idempotency، حد ائتماني يشمل الذمم، وسعر/عرض/توافر محكومة خادمياً. |
+| Supplier Review وConversion | DONE | تفويض مورد دقيق، اعتماد وتحويل exactly-once، ولقطة outlet على Sales Order. |
+| Timeline وDistribution وPartial Delivery | DONE | التتبع محكوم بالسياسة، وحالة التوصيل مرتبطة بالدورة القائمة ولقطة وجهة التسليم محفوظة. |
+| Documents وDebt | DONE | مستندات وذمم وتقرير وتصدير تحترم سياسة الإفصاح ولا تعبر عبر مسار بديل. |
+| Notifications وAnnouncements | DONE | إشعارات موجهة بالمستخدم وعلاقة Retail للطلب والاعتماد والرفض والإرجاع، مع تعليم مقروء مقيد. |
+| PWA وOffline Cart | DONE | shell مقيد لمسار Retail، وحظر API، ومسح صريح للـcache ونسخ shell القديمة. |
+| Analytics وAI readiness | DONE للطيار | ملخص تشغيلي وتقرير شهري مقيد وتصدير مرئي؛ لا يوجد تنفيذ AI تلقائي. |
+| Add-on وPermissions | DONE | entitlement `nawa_retail` وحراس مورد وتاجر منفصلون في كل عقد تشغيلي. |
+| Security وAudit | DONE | عزل access/outlet/user، تسعير خادمي، idempotency، سياسات ظهور، سجل تدقيق، واختبارات حراسة. |
+| i18n وVisual QA | DONE للطيار | AR/FR/EN وRTL/LTR؛ حالة دخول حقيقية لم تُستخدم في اللقطة، ووثقت الحالة غير المصادق عليها صراحةً. |
+| Performance | DONE للطيار | حدود استعلامات واضحة وتحقيق بناء ناجح؛ تحسين batching للكتالوج يظل تحسيناً توسعياً لا مانعاً للطيار. |
 
 ## قرار الإغلاق
 
-سيُعاد استخدام B2B Foundation وSales Order وDistribution وInvoices وNotifications وModules القائمة. التوسعة ستضيف فقط العقد والبيانات والحراس اللازمة لإغلاق الفجوات المؤثرة في طيار محدود: التفويض والسياسات، مستخدمو التاجر والمنافذ، checkout الآمن، القوالب والطلب السريع، المستندات والتواصل، واختبارات القبول.
+استُخدمت B2B Foundation وSales Order وDistribution وInvoices وNotifications وModules القائمة من دون بناء دورة موازية. المرحلة جاهزة لطيار محدود بعد إعداد علاقات المورد والتاجر الفعلية وتفعيل الإضافة للمؤسسة المعنية.

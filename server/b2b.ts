@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
-import { auditLogs, b2bOrderAdjustments, b2bOrderReviews, b2bPromotions, b2bRetailerAccesses, b2bRetailerFavorites, b2bRetailerOrderItems, b2bRetailerOrders, b2bRetailerOutlets, b2bSavedOrderListItems, b2bSavedOrderLists, businessParties, distributionRouteStops, distributionRoutes, notifications, organizationModules, organizations, priceListItems, priceLists, productBatches, productPackagingLevels, products, salesInvoices, salesOrderItems, salesOrders } from "../drizzle/schema";
+import { auditLogs, b2bOrderAdjustments, b2bOrderReviews, b2bPromotions, b2bRetailerAccesses, b2bRetailerFavorites, b2bRetailerOrderItems, b2bRetailerOrders, b2bRetailerOutlets, b2bRetailerReturnRequests, b2bSavedOrderListItems, b2bSavedOrderLists, businessParties, distributionRouteStops, distributionRoutes, notifications, organizationModules, organizations, priceListItems, priceLists, productBatches, productPackagingLevels, products, salesInvoices, salesOrderItems, salesOrders, users } from "../drizzle/schema";
 import { getDb } from "./db";
 import { canUseRetailerPermission, isOutletAllowedForRetailer, type RetailerPermission, type RetailerRole } from "./retailerAccessPolicy";
 
@@ -126,6 +126,16 @@ export async function listManagedRetailerAccesses(organizationId: number) {
   const db = await getDb();
   if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
   return db.select({ id: b2bRetailerAccesses.id, userId: b2bRetailerAccesses.userId, customerId: b2bRetailerAccesses.customerId, customerName: businessParties.name, status: b2bRetailerAccesses.status, retailerRole: b2bRetailerAccesses.retailerRole, outletIds: b2bRetailerAccesses.outletIds, priceListId: b2bRetailerAccesses.priceListId, priceListName: priceLists.name, customerSegment: b2bRetailerAccesses.customerSegment, territoryId: b2bRetailerAccesses.territoryId, deliveryTrackingPolicy: b2bRetailerAccesses.deliveryTrackingPolicy, availabilityDisclosure: b2bRetailerAccesses.availabilityDisclosure, visibilityPolicy: b2bRetailerAccesses.visibilityPolicy, permissions: b2bRetailerAccesses.permissions, invitedAt: b2bRetailerAccesses.invitedAt, lastInviteSentAt: b2bRetailerAccesses.lastInviteSentAt, grantedAt: b2bRetailerAccesses.grantedAt, revokedAt: b2bRetailerAccesses.revokedAt }).from(b2bRetailerAccesses).innerJoin(businessParties, and(eq(businessParties.id, b2bRetailerAccesses.customerId), eq(businessParties.organizationId, b2bRetailerAccesses.organizationId))).leftJoin(priceLists, and(eq(priceLists.id, b2bRetailerAccesses.priceListId), eq(priceLists.organizationId, b2bRetailerAccesses.organizationId))).where(eq(b2bRetailerAccesses.organizationId, organizationId)).orderBy(asc(businessParties.name));
+}
+
+export async function lookupRetailerUserByEmail(email: string) {
+  const normalizedEmail = email.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) throw new Error("البريد الإلكتروني غير صالح.");
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const [user] = await db.select({ id: users.id, name: users.name, email: users.email }).from(users).where(eq(users.email, normalizedEmail)).limit(1);
+  if (!user) throw new Error("لا يوجد حساب مستخدم مطابق؛ يجب أن يسجل المستخدم في المنصة أولاً.");
+  return user;
 }
 
 export async function listRetailerOutlets(organizationId: number, customerId: number) {
@@ -523,9 +533,73 @@ export async function cancelRetailerOrder(userId: number, accessId: number, orde
   return { status: "cancelled" as const };
 }
 
+export async function createRetailerReturnRequest(userId: number, accessId: number, input: { orderId: number; reason: string }) {
+  const access = await requireRetailerAccess(userId, accessId);
+  assertRetailerPermission(access.access, "retail.returns.create");
+  if (!resolveVisibilityPolicy(access.access).allowReturnRequest) throw new Error("طلبات الإرجاع غير مفعلة لهذه العلاقة التجارية.");
+  const reason = input.reason.trim();
+  if (reason.length < 3 || reason.length > 2000) throw new Error("سبب طلب الإرجاع يجب أن يكون بين 3 و2000 حرف.");
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const [order] = await db.select({ id: b2bRetailerOrders.id, outletId: b2bRetailerOrders.outletId, status: b2bRetailerOrders.status, salesOrderId: salesOrders.id }).from(b2bRetailerOrders).leftJoin(salesOrders, and(eq(salesOrders.organizationId, b2bRetailerOrders.organizationId), eq(salesOrders.b2bOrderId, b2bRetailerOrders.id))).where(and(eq(b2bRetailerOrders.id, input.orderId), eq(b2bRetailerOrders.organizationId, access.access.organizationId), eq(b2bRetailerOrders.accessId, access.access.id), eq(b2bRetailerOrders.customerId, access.customer.id))).limit(1);
+  if (!order || !order.salesOrderId || !["partial", "delivered"].includes(order.status)) throw new Error("لا يمكن طلب إرجاع إلا لطلب تم تسليمه أو تسليمه جزئياً.");
+  const existing = await db.select({ id: b2bRetailerReturnRequests.id }).from(b2bRetailerReturnRequests).where(and(eq(b2bRetailerReturnRequests.organizationId, access.access.organizationId), eq(b2bRetailerReturnRequests.b2bOrderId, order.id), inArray(b2bRetailerReturnRequests.status, ["requested", "under_review", "approved"]))).limit(1);
+  if (existing.length) throw new Error("يوجد طلب إرجاع مفتوح لهذا الطلب.");
+  const inserted = await db.transaction(async tx => {
+    const result = await tx.insert(b2bRetailerReturnRequests).values({ organizationId: access.access.organizationId, accessId: access.access.id, customerId: access.customer.id, outletId: order.outletId, b2bOrderId: order.id, salesOrderId: order.salesOrderId, reason, requestedByUserId: userId });
+    const id = Number(result[0].insertId);
+    await tx.insert(auditLogs).values({ organizationId: access.access.organizationId, actorUserId: userId, action: "b2b_return.requested", entityType: "b2b_retailer_return_request", entityId: String(id), metadata: { accessId: access.access.id, b2bOrderId: order.id, salesOrderId: order.salesOrderId } });
+    return id;
+  });
+  return { id: inserted, status: "requested" as const };
+}
+
+export async function listRetailerReturnRequests(userId: number, accessId: number) {
+  const access = await requireRetailerAccess(userId, accessId);
+  assertRetailerPermission(access.access, "retail.orders.view");
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  return db.select().from(b2bRetailerReturnRequests).where(and(eq(b2bRetailerReturnRequests.organizationId, access.access.organizationId), eq(b2bRetailerReturnRequests.accessId, access.access.id), eq(b2bRetailerReturnRequests.customerId, access.customer.id))).orderBy(desc(b2bRetailerReturnRequests.createdAt)).limit(100);
+}
+
+export async function listOrganizationRetailerReturnRequests(organizationId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  return db.select({ request: b2bRetailerReturnRequests, retailerName: businessParties.name, orderNumber: b2bRetailerOrders.orderNumber }).from(b2bRetailerReturnRequests).innerJoin(businessParties, and(eq(businessParties.id, b2bRetailerReturnRequests.customerId), eq(businessParties.organizationId, b2bRetailerReturnRequests.organizationId))).innerJoin(b2bRetailerOrders, and(eq(b2bRetailerOrders.id, b2bRetailerReturnRequests.b2bOrderId), eq(b2bRetailerOrders.organizationId, b2bRetailerReturnRequests.organizationId))).where(eq(b2bRetailerReturnRequests.organizationId, organizationId)).orderBy(desc(b2bRetailerReturnRequests.createdAt)).limit(200);
+}
+
+export async function listOrganizationRetailerPromotions(organizationId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  return db.select({ id: b2bPromotions.id, name: b2bPromotions.name, type: b2bPromotions.type, startsAt: b2bPromotions.startsAt, endsAt: b2bPromotions.endsAt, visibleToB2b: b2bPromotions.visibleToB2b, customerId: b2bPromotions.customerId, productName: products.name, productNameAr: products.nameAr, productNameFr: products.nameFr, productNameEn: products.nameEn }).from(b2bPromotions).innerJoin(products, and(eq(products.id, b2bPromotions.productId), eq(products.organizationId, b2bPromotions.organizationId))).where(eq(b2bPromotions.organizationId, organizationId)).orderBy(desc(b2bPromotions.endsAt)).limit(200);
+}
+
+export async function reviewRetailerReturnRequest(organizationId: number, actorUserId: number, input: { requestId: number; action: "under_review" | "approved" | "rejected"; note?: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const [request] = await db.select().from(b2bRetailerReturnRequests).where(and(eq(b2bRetailerReturnRequests.id, input.requestId), eq(b2bRetailerReturnRequests.organizationId, organizationId))).limit(1);
+  if (!request || !["requested", "under_review"].includes(request.status)) throw new Error("طلب الإرجاع غير متاح للمراجعة.");
+  if (input.action === "under_review" && request.status !== "requested") throw new Error("تمت مراجعة طلب الإرجاع بالفعل.");
+  const resolutionNote = input.note?.trim() || undefined;
+  await db.transaction(async tx => {
+    await tx.update(b2bRetailerReturnRequests).set({ status: input.action, reviewedByUserId: actorUserId, reviewedAt: new Date(), resolutionNote }).where(and(eq(b2bRetailerReturnRequests.id, request.id), eq(b2bRetailerReturnRequests.organizationId, organizationId)));
+    await tx.insert(auditLogs).values({ organizationId, actorUserId, action: `b2b_return.${input.action}`, entityType: "b2b_retailer_return_request", entityId: String(request.id), metadata: { b2bOrderId: request.b2bOrderId, salesOrderId: request.salesOrderId, note: resolutionNote ?? null } });
+    if (input.action !== "under_review") await tx.insert(notifications).values({ organizationId, targetUserId: request.requestedByUserId, targetRetailerAccessId: request.accessId, type: `retail_return_${input.action}`, severity: input.action === "approved" ? "success" : "warning", title: input.action === "approved" ? "تم اعتماد طلب الإرجاع" : "تم رفض طلب الإرجاع", content: resolutionNote || `تمت مراجعة طلب الإرجاع المرتبط بالطلب #${request.b2bOrderId}.`, isRead: "no" });
+  });
+  return { id: request.id, status: input.action };
+}
+
 export async function listRetailerNotifications(userId: number, accessId: number) {
   const access = await requireRetailerAccess(userId, accessId);
   const db = await getDb();
   if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
   return db.select({ id: notifications.id, type: notifications.type, severity: notifications.severity, title: notifications.title, content: notifications.content, isRead: notifications.isRead, createdAt: notifications.createdAt }).from(notifications).where(and(eq(notifications.organizationId, access.access.organizationId), eq(notifications.targetUserId, userId), eq(notifications.targetRetailerAccessId, access.access.id))).orderBy(desc(notifications.createdAt)).limit(50);
+}
+
+export async function markRetailerNotificationRead(userId: number, accessId: number, notificationId: number) {
+  const access = await requireRetailerAccess(userId, accessId);
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const result = await db.update(notifications).set({ isRead: "yes" }).where(and(eq(notifications.id, notificationId), eq(notifications.organizationId, access.access.organizationId), eq(notifications.targetUserId, userId), eq(notifications.targetRetailerAccessId, access.access.id), eq(notifications.isRead, "no")));
+  return { updated: Number(result[0].affectedRows) > 0 };
 }
