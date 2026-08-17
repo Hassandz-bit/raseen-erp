@@ -1073,9 +1073,19 @@ export const erpRouter = router({
         return askNawaAI({ organizationId: context.organization.id, userId: ctx.user.id, feature: "assistant", prompt: input.prompt, safeContext: { currency: context.organization.baseCurrency, metrics } });
       }),
     insight: protectedProcedure
-      .input(z.object({ domain: z.enum(["commerce", "inventory"]) }))
+      .input(z.object({ domain: z.enum(["commerce", "inventory", "manufacturing", "finance"]) }))
       .mutation(async ({ ctx, input }) => {
         const context = await requireModule(ctx.user.id, "ai_assistant");
+        if (input.domain === "manufacturing") {
+          const manufacturingContext = await requireManufacturingPermission(ctx.user.id, "manufacturing.view");
+          const manufacturing = await getManufacturingOverview(manufacturingContext.organization.id, manufacturingContext.membership.dataScope);
+          return askNawaAI({ organizationId: manufacturingContext.organization.id, userId: ctx.user.id, feature: "manufacturing", prompt: "حلل مخاطر نقص المواد والإنتاج والجودة والهدر من الملخص المتاح فقط. قدّم توصية واحدة تتطلب موافقة بشرية.", safeContext: { manufacturing } });
+        }
+        if (input.domain === "finance") {
+          await requireModule(ctx.user.id, "reports");
+          const finance = await getFinancialReportSummary(context.organization.id);
+          return askNawaAI({ organizationId: context.organization.id, userId: ctx.user.id, feature: "finance", prompt: "حلل مؤشرات التدفق النقدي والذمم والربحية من الملخص المالي فقط. لا تقدم توقعاً دقيقاً بلا بيانات كافية، وقدّم توصية واحدة تتطلب موافقة بشرية.", safeContext: { currency: context.organization.baseCurrency, finance } });
+        }
         const commerce = await getCommerceReportSummary(context.organization.id);
         const prompt = input.domain === "commerce"
           ? "حلل مؤشرات التجارة وقدّم توصية واحدة قابلة للتنفيذ بعد موافقة بشرية، مع ذكر الدليل المتاح فقط."
