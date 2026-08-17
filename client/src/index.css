@@ -141,6 +141,26 @@ input[aria-invalid="true"]:focus-visible, textarea[aria-invalid="true"]:focus-vi
   button { min-height: 44px; }
   label { line-height: 1.45; }
   [role="dialog"] input:not([type="checkbox"]):not([type="radio"]), [role="dialog"] select { min-height: 48px !important; }
+
+  main[dir] > .grid.gap-6 { grid-template-columns: minmax(0, 1fr); gap: 1rem; }
+  main[dir] > .grid.gap-6 > aside.surface {
+    display: flex;
+    gap: .35rem;
+    overflow-x: auto;
+    padding: .5rem;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+  }
+  main[dir] > .grid.gap-6 > aside.surface > button {
+    flex: 0 0 auto;
+    min-height: 42px;
+    scroll-snap-align: start;
+    white-space: nowrap;
+  }
+  main[dir] > .grid.gap-6 > section .surface { padding: 1.25rem; }
+  main[dir] > .grid.gap-6 > section .surface > .mt-6.grid { gap: 1rem; }
+  main[dir] > .grid.gap-6 > section .surface > .mt-6.flex { align-items: stretch; }
+  main[dir] > .grid.gap-6 > section .surface > .mt-6.flex > button { flex: 1 1 100%; }
 }
 
 ::selection { background: oklch(0.78 0.12 82 / 0.38); color: oklch(0.98 0.01 95); }
