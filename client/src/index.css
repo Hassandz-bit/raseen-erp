@@ -143,15 +143,16 @@ input[aria-invalid="true"]:focus-visible, textarea[aria-invalid="true"]:focus-vi
   [role="dialog"] input:not([type="checkbox"]):not([type="radio"]), [role="dialog"] select { min-height: 48px !important; }
 
   main[dir] > .grid.gap-6 { grid-template-columns: minmax(0, 1fr); gap: 1rem; }
-  main[dir] > .grid.gap-6 > aside.surface {
+  main[dir] > .grid.gap-6 > aside.surface { padding: .5rem; }
+  .settings-section-list {
     display: flex;
     gap: .35rem;
     overflow-x: auto;
-    padding: .5rem;
     scroll-snap-type: x proximity;
     -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
   }
-  main[dir] > .grid.gap-6 > aside.surface > button {
+  .settings-section-list > button {
     flex: 0 0 auto;
     min-height: 42px;
     scroll-snap-align: start;
@@ -161,6 +162,31 @@ input[aria-invalid="true"]:focus-visible, textarea[aria-invalid="true"]:focus-vi
   main[dir] > .grid.gap-6 > section .surface > .mt-6.grid { gap: 1rem; }
   main[dir] > .grid.gap-6 > section .surface > .mt-6.flex { align-items: stretch; }
   main[dir] > .grid.gap-6 > section .surface > .mt-6.flex > button { flex: 1 1 100%; }
+  .settings-section-nav { padding-bottom: .9rem !important; }
+  .settings-section-search { min-width: 180px; }
+  .settings-scroll-cue {
+    position: sticky;
+    inset-inline-start: 0;
+    display: grid;
+    flex: 0 0 32px;
+    min-height: 42px;
+    place-items: center;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--primary) 82%, transparent);
+    color: var(--primary-foreground);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--background) 76%, transparent);
+  }
+  .settings-save-bar {
+    position: sticky;
+    bottom: .75rem;
+    z-index: 20;
+    padding: .7rem;
+    border: 1px solid color-mix(in srgb, var(--primary) 30%, var(--border));
+    border-radius: 1rem;
+    background: color-mix(in srgb, var(--background) 90%, transparent);
+    backdrop-filter: blur(12px);
+    box-shadow: 0 12px 30px rgba(0,0,0,.22);
+  }
 }
 
 ::selection { background: oklch(0.78 0.12 82 / 0.38); color: oklch(0.98 0.01 95); }
