@@ -1,5 +1,4 @@
-import type { LucideIcon } from "lucide-react";
-import { Bot, Boxes, Factory, Landmark, Settings2, Store, Truck, UsersRound } from "lucide-react";
+import { Bot, Boxes, Factory, Landmark, Settings2, Store, Truck, type LucideIcon, UsersRound } from "lucide-react";
 
 export type SupportedLanguage = "ar" | "fr" | "en";
 export type PortalId = "commerce" | "manufacturing" | "distribution" | "retail" | "finance" | "hr" | "ai" | "administration";

@@ -4,27 +4,21 @@ import { describe, expect, it } from "vitest";
 
 const source = readFileSync(resolve(process.cwd(), "client/src/components/DashboardLayout.tsx"), "utf8");
 
-describe("تنقل Nawa AI وNawa Retail", () => {
-  it("يعرض مدخل Nawa AI من خلال مساحة العمل المحكومة", () => {
-    expect(source).toContain('label: "Nawa AI", path: "/workspace"');
+describe("تنقل بوابات Nawa", () => {
+  it("يستمد البوابة والتنقل المحلي من تعريف مركزي", () => {
+    expect(source).toContain("getPortalForPath");
+    expect(source).toContain("activePortal?.localNavigation");
+    expect(source).toContain("nawaPortals.map");
   });
 
-  it("يعرض مدخل Nawa Retail من دون تمرير معرف مؤسسة أو تخطي الحارس", () => {
-    expect(source).toContain('label: "Nawa Retail", path: "/retailer"');
-    expect(source).not.toContain('path: "/retailer?organizationId=');
+  it("يحافظ على مبدّل البوابات ولا يعيد القائمة العالمية السابقة", () => {
+    expect(source).toContain("chrome.portals");
+    expect(source).not.toContain("const menuItems = [");
   });
 
-  it("يضع مدخلي Nawa في بداية التنقل بعد لوحة التحكم", () => {
-    const dashboard = source.indexOf('label: t("dashboard"), path: "/"');
-    const ai = source.indexOf('label: "Nawa AI", path: "/workspace"');
-    const retail = source.indexOf('label: "Nawa Retail", path: "/retailer"');
-    const commerce = source.indexOf('label: t("commerceInventory"), path: "/commerce"');
-    expect(dashboard).toBeLessThan(ai);
-    expect(ai).toBeLessThan(retail);
-    expect(retail).toBeLessThan(commerce);
-  });
-
-  it("لا يعرض Nawa Flow كأداة مستقلة في التنقل الأعلى", () => {
-    expect(source).not.toContain('path: "/workspace?view=nawa_flow"');
+  it("يحفظ آخر بوابة ويربط الرأس بسياق المؤسسة دون أي معرف عميل", () => {
+    expect(source).toContain('localStorage.setItem("nawa:last-portal"');
+    expect(source).toContain("bootstrap.data?.organization?.name");
+    expect(source).not.toContain("organizationId=");
   });
 });
