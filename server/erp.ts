@@ -2,7 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { addOrganizationExchangeRate, adjustProductBatchQuantity, approveInventoryCount, approveStockTransfer, createBranchForOrganization, createBusinessParty, createInventoryCount, createOperationalNotifications, createOperationalRecord, createOrganizationForUser, createProductBatch, createProductMaster, createPurchaseOrder, createSalesInvoice, createStockTransfer, createWarehouseForOrganization, dispatchStockTransfer, getCommerceReportSummary, getDashboardMetrics, getDefaultTenantContext, getFinancialReportSummary, getOrCreateOrganizationSettings, getOrCreateUserPreferences, getOrganizationRolePermissions, issueSalesInvoiceWithFefo, issueStockByFefo, listBranchesForOrganization, listInventoryCountsForOrganization, listNotificationsForOrganization, listOperationalRecords, listOrganizationCurrencies, listOrganizationExchangeRates, listOrganizationMembersForOrganization, listProductBatchesForOrganization, listProductsForOrganization, listPurchaseOrdersForOrganization, listSalesInvoicesForOrganization, listStockMovementsForOrganization, listStockTransfersForOrganization, listWarehousesForOrganization, markNotificationRead, previewFefoAllocation, receivePurchaseOrder, receiveStockTransfer, recordSalesInvoicePayment, recordStockMovement, saveOrganizationCurrency, sendPurchaseOrder, startInventoryCount, submitInventoryCount, updateOrganizationSettings, updateProductBatchStatus, updateUserPreferences, type OperationalModule } from "./db";
 import { currencyCatalog } from "../shared/currencyCatalog";
-import { invokeLLM } from "./_core/llm";
+import { askNawaAI } from "./nawaAI";
 import { notifyOwner } from "./_core/notification";
 import { protectedProcedure, router } from "./_core/trpc";
 import { buildOwnerAlertReasons, canAccessTenantModule, hasActiveMembership, isOrganizationOwner } from "./tenantPolicy";
@@ -131,12 +131,6 @@ function assertDistributionScope(context: Awaited<ReturnType<typeof getTenantCon
   if (!isScopedIdAllowed(scope, "branchIds", input.branchId) || !isScopedIdAllowed(scope, "territoryIds", input.territoryId) || !isScopedIdAllowed(scope, "vehicleIds", input.vehicleId) || !isScopedIdAllowed(scope, "assignedRouteIds", input.routeId)) throw new TRPCError({ code: "FORBIDDEN", message: "العنصر المطلوب خارج نطاق الفرع أو المنطقة أو المركبة المسموح لعضويتك." });
 }
 
-function readReply(response: Awaited<ReturnType<typeof invokeLLM>>) {
-  const content = response.choices[0]?.message.content;
-  return typeof content === "string" && content.trim()
-    ? content.trim()
-    : "لم أتمكن من صياغة إجابة الآن. يرجى إعادة المحاولة.";
-}
 
 export const erpRouter = router({
   onboarding: router({
@@ -1076,27 +1070,7 @@ export const erpRouter = router({
       .mutation(async ({ ctx, input }) => {
         const context = await requireModule(ctx.user.id, "ai_assistant");
         const metrics = await getDashboardMetrics(context.organization.id);
-        const model = "gpt-5-mini";
-        const response = await invokeLLM({
-          model,
-          maxTokens: 700,
-          messages: [
-            {
-              role: "system",
-              content:
-                "أنت مساعد Nawa ERP. أجب بالعربية بوضوح وباختصار. استخدم فقط ملخص المؤسسة المقدم لك. لا تخترع أرقاماً أو سجلات، ولا تطلب أو تكشف بيانات مؤسسة أخرى. قدّم توصية عملية عند وجود إشارة تشغيلية واضحة.",
-            },
-            {
-              role: "user",
-              content: `سؤال المستخدم: ${input.prompt}\n\nسياق المؤسسة المصرح به: ${JSON.stringify({
-                name: context.organization.name,
-                currency: context.organization.baseCurrency,
-                metrics,
-              })}`,
-            },
-          ],
-        });
-        return { reply: readReply(response), model };
+        return askNawaAI({ organizationId: context.organization.id, userId: ctx.user.id, feature: "assistant", prompt: input.prompt, safeContext: { currency: context.organization.baseCurrency, metrics } });
       }),
   }),
 

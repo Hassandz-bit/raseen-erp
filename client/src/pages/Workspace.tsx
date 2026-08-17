@@ -140,7 +140,7 @@ function WorkspaceContent({ organizationName, activeModules, modules }: { organi
   const [messages, setMessages] = useState<Message[]>([]);
   const [alertReasons, setAlertReasons] = useState<string[]>([]);
   const askAssistant = trpc.erp.ai.ask.useMutation({
-    onSuccess: response => setMessages(current => [...current, { role: "assistant", content: response.reply }]),
+    onSuccess: response => setMessages(current => [...current, { role: "assistant", content: [response.recommendation, response.evidence.length ? `\n\n**الدليل:**\n${response.evidence.map(item => `- ${item}`).join("\n")}` : "", response.proposedAction ? `\n\n**إجراء مقترح (يتطلب موافقة بشرية):** ${response.proposedAction}` : ""].join("") }]),
     onError: error => toast.error(error.message || t("assistantRequestError")),
   });
   const handleSendMessage = (content: string) => {
