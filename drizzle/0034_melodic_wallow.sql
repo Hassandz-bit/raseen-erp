@@ -1,0 +1,1 @@
+ALTER TABLE `commission_rules` MODIFY COLUMN `sourceType` enum('sales','collections','deliveries','product','customer','target','route_performance') NOT NULL;

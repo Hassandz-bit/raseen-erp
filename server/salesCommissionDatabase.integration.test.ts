@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { auditLogs, businessParties, distributionCollections, employees, organizations, salesInvoices } from "../drizzle/schema";
+import { auditLogs, businessParties, distributionCollections, distributionDeliveries, distributionReturns, distributionRoutes, employees, organizations, salesInvoiceItems, salesInvoices } from "../drizzle/schema";
 import { commissionEntries, commissionRules } from "../drizzle/hrPayrollSchema";
 import { getDb } from "./db";
-import { createCollectionCommissionFromDistributionReceipt, createSalesCommissionFromIssuedInvoice } from "./payroll";
+import { createCollectionCommissionFromDistributionReceipt, createDeliveryCommissionFromCompletedDelivery, createSalesCommissionFromIssuedInvoice, reverseDeliveryCommissionFromReturn } from "./payroll";
 
 let organizationId: number | null = null;
 afterEach(async () => {
@@ -13,6 +13,9 @@ afterEach(async () => {
   await db.delete(auditLogs).where(eq(auditLogs.organizationId, id));
   await db.delete(commissionEntries).where(eq(commissionEntries.organizationId, id));
   await db.delete(commissionRules).where(eq(commissionRules.organizationId, id));
+  await db.delete(distributionReturns).where(eq(distributionReturns.organizationId, id));
+  await db.delete(distributionDeliveries).where(eq(distributionDeliveries.organizationId, id));
+  await db.delete(distributionRoutes).where(eq(distributionRoutes.organizationId, id));
   await db.delete(distributionCollections).where(eq(distributionCollections.organizationId, id));
   await db.delete(salesInvoices).where(eq(salesInvoices.organizationId, id));
   await db.delete(businessParties).where(eq(businessParties.organizationId, id));
@@ -62,5 +65,36 @@ describe("عمولة المبيعات التلقائية", () => {
     expect(duplicate).toMatchObject({ created: false, reason: "duplicate_source" });
     expect(entries).toHaveLength(1);
     expect(entries[0]).toMatchObject({ employeeId, sourceDocumentType: "distribution_collection", sourceDocumentId: collectionId, amount: "40.00" });
+  });
+
+  it("ينشئ عمولة تسليم كاملة مرة واحدة لمسؤول الجولة الموثوق", async () => {
+    const db = await getDb(); expect(db).toBeTruthy(); if (!db) return;
+    const suffix = `${Date.now()}-${Math.floor(Math.random() * 100_000)}`;
+    const org = await db.insert(organizations).values({ name: `تسليم عمولة ${suffix}`, slug: `delivery-commission-${suffix}`, status: "active", baseCurrency: "SAR", locale: "ar-SA", monthlyBudget: "0" });
+    organizationId = Number(org[0].insertId);
+    const employee = await db.insert(employees).values({ organizationId, fullName: "مندوب جولة", employeeNumber: `D-${suffix}`, status: "active" });
+    const employeeId = Number(employee[0].insertId);
+    await db.insert(commissionRules).values({ organizationId, name: "عمولة تسليم 4%", sourceType: "deliveries", calculationType: "percentage", value: "4", status: "active" });
+    const route = await db.insert(distributionRoutes).values({ organizationId, routeNumber: `RT-${suffix}`, routeDate: new Date(), representativeEmployeeId: employeeId });
+    const routeId = Number(route[0].insertId);
+    const invoice = await db.insert(salesInvoices).values({ organizationId, invoiceNumber: `INV-D-${suffix}`, status: "issued", grandTotal: "500", currencyCode: "SAR", issuedAt: new Date() });
+    const invoiceId = Number(invoice[0].insertId);
+    await db.insert(salesInvoiceItems).values({ organizationId, invoiceId, productId: 99, warehouseId: 1, quantity: "10", unit: "unit", unitPrice: "50", lineTotal: "500" });
+    const delivery = await db.insert(distributionDeliveries).values({ organizationId, deliveryNumber: `DL-${suffix}`, routeId, vehicleId: 1, customerId: 1, salesInvoiceId: invoiceId, status: "full", deliveredAt: new Date(), idempotencyKey: `delivery-${suffix}` });
+    const deliveryId = Number(delivery[0].insertId);
+    const first = await createDeliveryCommissionFromCompletedDelivery(organizationId, 1, deliveryId);
+    const duplicate = await createDeliveryCommissionFromCompletedDelivery(organizationId, 1, deliveryId);
+    const returned = await db.insert(distributionReturns).values({ organizationId, returnNumber: `RET-${suffix}`, routeId, vehicleId: 1, customerId: 1, deliveryId, salesInvoiceId: invoiceId, productId: 99, vehicleBatchId: 1, quantity: "2", unit: "unit", idempotencyKey: `return-${suffix}` });
+    const returnId = Number(returned[0].insertId);
+    const reversal = await reverseDeliveryCommissionFromReturn(organizationId, 1, returnId);
+    const repeatedReversal = await reverseDeliveryCommissionFromReturn(organizationId, 1, returnId);
+    const entries = await db.select().from(commissionEntries).where(eq(commissionEntries.organizationId, organizationId));
+    expect(first).toMatchObject({ created: true, amount: 20 });
+    expect(duplicate).toMatchObject({ created: false, reason: "duplicate_source" });
+    expect(reversal).toMatchObject({ created: true, amount: 4 });
+    expect(repeatedReversal).toMatchObject({ created: false, reason: "duplicate_source" });
+    expect(entries).toHaveLength(2);
+    expect(entries.find(entry => entry.sourceDocumentType === "distribution_delivery")).toMatchObject({ employeeId, sourceDocumentId: deliveryId, amount: "20.00" });
+    expect(entries.find(entry => entry.sourceDocumentType === "distribution_return_reversal")).toMatchObject({ employeeId, sourceDocumentId: returnId, amount: "-4.00" });
   });
 });

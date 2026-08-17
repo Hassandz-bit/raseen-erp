@@ -42,3 +42,12 @@ export async function assertHrEmployeeInScope(scope: HrEmployeeScope, employeeId
 export function hasRestrictedHrScope(scope: HrEmployeeScope) {
   return scope.roleKey !== "owner" && (scope.branchIds.length > 0 || scope.departmentIds.length > 0 || scope.employeeIds.length > 0);
 }
+
+export function isHrRowInScope(scope: HrEmployeeScope, row: { employeeId?: number; id?: number; branchId?: number | null; departmentId?: number | null }) {
+  if (scope.roleKey === "owner") return true;
+  const employeeId = row.employeeId ?? row.id;
+  const branchAllowed = scope.branchIds.length === 0 || (row.branchId !== null && row.branchId !== undefined && scope.branchIds.includes(row.branchId));
+  const departmentAllowed = scope.departmentIds.length === 0 || (row.departmentId !== null && row.departmentId !== undefined && scope.departmentIds.includes(row.departmentId));
+  const employeeAllowed = scope.employeeIds.length === 0 || (employeeId !== undefined && scope.employeeIds.includes(employeeId));
+  return branchAllowed && departmentAllowed && employeeAllowed;
+}

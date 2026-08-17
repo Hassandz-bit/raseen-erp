@@ -4,6 +4,7 @@ import { employees, organizations } from "../drizzle/schema";
 import { employeeProfiles } from "../drizzle/hrPayrollSchema";
 import { assertHrEmployeeInScope, resolveHrEmployeeScope } from "./hrDataScope";
 import { getDb } from "./db";
+import { listHrDirectory } from "./hr";
 
 let organizationId: number | null = null;
 afterEach(async () => {
@@ -28,6 +29,9 @@ describe("نطاق بيانات الموارد البشرية", () => {
     const managerId = Number(manager[0].insertId); const teamMemberId = Number(teamMember[0].insertId); const otherId = Number(other[0].insertId);
     await db.insert(employeeProfiles).values([{ organizationId, employeeId: managerId, userId: 710_001, branchId: 10, departmentId: 100, payrollCurrency: "SAR", status: "active" }, { organizationId, employeeId: teamMemberId, branchId: 10, departmentId: 100, managerEmployeeId: managerId, payrollCurrency: "SAR", status: "active" }, { organizationId, employeeId: otherId, branchId: 20, departmentId: 200, payrollCurrency: "SAR", status: "active" }]);
     const scope = await resolveHrEmployeeScope({ organizationId, userId: 710_001, roleKey: "line_manager", dataScope: { branchIds: [10], departmentIds: [100] } });
+    const directory = await listHrDirectory(organizationId, scope);
+    expect(directory.map(row => row.id)).toEqual(expect.arrayContaining([managerId, teamMemberId]));
+    expect(directory.map(row => row.id)).not.toContain(otherId);
     await expect(assertHrEmployeeInScope(scope, teamMemberId, { allowDirectReports: true })).resolves.toMatchObject({ employeeId: teamMemberId });
     await expect(assertHrEmployeeInScope(scope, otherId, { allowDirectReports: true })).rejects.toThrow("خارج نطاق بيانات الموارد البشرية");
     await expect(assertHrEmployeeInScope(scope, teamMemberId)).resolves.toMatchObject({ employeeId: teamMemberId });
