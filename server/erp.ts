@@ -15,6 +15,8 @@ import { cancelRetailerOrder, createB2bPromotion, createRetailerOrder, getRetail
 import { calculatePackagingLogistics, findSuitableVehicles, listProductPackaging, listUomCatalog } from "./uomPackaging";
 import { closeProductionOrder, createManufacturingBom, createProductionOrder, getManufacturingOperationalOptions, getManufacturingOverview, getProductionBatchGenealogy, getProductionOrderOperationalDetails, getProductionOrderScope, getProductionTraceability, issueMaterialsForProduction, listProductionOrders, recordProductionExpense, recordProductionOutput, recordProductionQualityCheck, recordProductionWaste, reserveProductionMaterials, returnMaterialsFromProduction, saveManufacturingProductProfile, transitionProductionOrderStatus, updateProductionStage } from "./manufacturing";
 import { canAccessManufacturingOrderScope, canUseManufacturingPermission, isManufacturingScopeAllowed, type ManufacturingPermission } from "./manufacturingPermissionPolicy";
+import { createFiscalPeriod, createFiscalYear, getAccountBalance, listChartOfAccounts, listFinanceSetup, listJournalEntries, postJournalEntry, reverseJournalEntry, seedDefaultChartOfAccounts } from "./finance";
+import { postCollection, postDistributionCollection, postDistributionRouteExpense, postInventoryAdjustment, postProductionMaterialIssue, postProductionOutput, postPurchaseOrder, postSalesInvoice } from "./accountingPostingRules";
 
 type ModuleKey = "inventory" | "sales" | "purchases" | "finance" | "hr" | "reports" | "ai_assistant" | "distribution" | "manufacturing";
 const operationalModuleKeys = ["inventory", "sales", "purchases", "finance", "hr"] as const;
@@ -45,6 +47,17 @@ export async function requireOrganizationOwner(userId: number) {
     throw new TRPCError({ code: "FORBIDDEN", message: "يلزم دور مالك المؤسسة لتعديل هذه الإعدادات." });
   }
   return context;
+}
+
+export async function requireFinanceOwner(userId: number) {
+  const context = await requireModule(userId, "finance");
+  if (!isOrganizationOwner(context.membership.roleKey)) throw new TRPCError({ code: "FORBIDDEN", message: "يلزم دور مالك المؤسسة لإدارة إعدادات وقيود المالية." });
+  return context;
+}
+
+async function postWhenFinanceEnabled(context: Awaited<ReturnType<typeof getTenantContext>>, post: () => Promise<unknown>) {
+  const financeModule = context.modules.find(module => module.moduleKey === "finance");
+  if (canAccessTenantModule({ membershipStatus: context.membership.status, moduleStatus: financeModule?.status })) await post();
 }
 
 export async function requireManufacturingOwner(userId: number) {
@@ -257,7 +270,9 @@ export const erpRouter = router({
     }),
     adjustBatchQuantity: protectedProcedure.input(z.object({ batchId: z.number().int().positive(), quantity: z.number().finite().refine(value => value !== 0, "كمية التسوية لا يمكن أن تكون صفراً."), reason: z.string().trim().max(300).optional() })).mutation(async ({ ctx, input }) => {
       const context = await requireModule(ctx.user.id, "inventory");
-      return adjustProductBatchQuantity(context.organization.id, ctx.user.id, input.batchId, input.quantity, input.reason);
+      const adjustment = await adjustProductBatchQuantity(context.organization.id, ctx.user.id, input.batchId, input.quantity, input.reason);
+      await postWhenFinanceEnabled(context, () => postInventoryAdjustment(context.organization.id, ctx.user.id, adjustment.stockMovementId));
+      return adjustment;
     }),
     listTransfers: protectedProcedure.query(async ({ ctx }) => {
       const context = await requireModule(ctx.user.id, "inventory");
@@ -346,11 +361,15 @@ export const erpRouter = router({
     issueInvoice: protectedProcedure.input(z.object({ invoiceId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
       const context = await requireModule(ctx.user.id, "sales");
       await requireModule(ctx.user.id, "inventory");
-      return issueSalesInvoiceWithFefo(context.organization.id, ctx.user.id, input.invoiceId);
+      const issued = await issueSalesInvoiceWithFefo(context.organization.id, ctx.user.id, input.invoiceId);
+      await postWhenFinanceEnabled(context, () => postSalesInvoice(context.organization.id, ctx.user.id, input.invoiceId));
+      return issued;
     }),
     recordPayment: protectedProcedure.input(z.object({ invoiceId: z.number().int().positive(), amount: z.number().positive().max(999_999_999).optional() })).mutation(async ({ ctx, input }) => {
       const context = await requireModule(ctx.user.id, "sales");
-      return recordSalesInvoicePayment(context.organization.id, ctx.user.id, input.invoiceId, input.amount);
+      const payment = await recordSalesInvoicePayment(context.organization.id, ctx.user.id, input.invoiceId, input.amount);
+      await postWhenFinanceEnabled(context, () => postCollection(context.organization.id, ctx.user.id, payment.financialTransactionId));
+      return payment;
     }),
   }),
 
@@ -382,7 +401,9 @@ export const erpRouter = router({
     })).mutation(async ({ ctx, input }) => {
       const context = await requireModule(ctx.user.id, "purchases");
       await requireModule(ctx.user.id, "inventory");
-      return receivePurchaseOrder(context.organization.id, ctx.user.id, input.purchaseOrderId, input.receipts);
+      const receipt = await receivePurchaseOrder(context.organization.id, ctx.user.id, input.purchaseOrderId, input.receipts);
+      if (receipt.status === "received") await postWhenFinanceEnabled(context, () => postPurchaseOrder(context.organization.id, ctx.user.id, input.purchaseOrderId));
+      return receipt;
     }),
   }),
 
@@ -403,6 +424,79 @@ export const erpRouter = router({
         const context = await requireModule(ctx.user.id, input.module);
         return createOperationalRecord({ ...input, organizationId: context.organization.id, module: input.module as OperationalModule });
       }),
+  }),
+
+  finance: router({
+    bootstrap: protectedProcedure.mutation(async ({ ctx }) => {
+      const context = await requireFinanceOwner(ctx.user.id);
+      return seedDefaultChartOfAccounts(context.organization.id);
+    }),
+    chartOfAccounts: protectedProcedure.query(async ({ ctx }) => {
+      const context = await requireModule(ctx.user.id, "finance");
+      return listChartOfAccounts(context.organization.id);
+    }),
+    setup: protectedProcedure.query(async ({ ctx }) => {
+      const context = await requireModule(ctx.user.id, "finance");
+      return listFinanceSetup(context.organization.id);
+    }),
+    journalEntries: protectedProcedure.query(async ({ ctx }) => {
+      const context = await requireModule(ctx.user.id, "finance");
+      return listJournalEntries(context.organization.id);
+    }),
+    createFiscalYear: protectedProcedure.input(z.object({ name: z.string().trim().min(2).max(64), startsAt: z.coerce.date(), endsAt: z.coerce.date() })).mutation(async ({ ctx, input }) => {
+      const context = await requireFinanceOwner(ctx.user.id);
+      return createFiscalYear(context.organization.id, input);
+    }),
+    createFiscalPeriod: protectedProcedure.input(z.object({ fiscalYearId: z.number().int().positive(), name: z.string().trim().min(2).max(64), startsAt: z.coerce.date(), endsAt: z.coerce.date() })).mutation(async ({ ctx, input }) => {
+      const context = await requireFinanceOwner(ctx.user.id);
+      return createFiscalPeriod(context.organization.id, input);
+    }),
+    postJournalEntry: protectedProcedure.input(z.object({ journalEntryId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+      const context = await requireFinanceOwner(ctx.user.id);
+      return postJournalEntry(context.organization.id, ctx.user.id, input.journalEntryId);
+    }),
+    reverseJournalEntry: protectedProcedure.input(z.object({ journalEntryId: z.number().int().positive(), fiscalPeriodId: z.number().int().positive(), reversalDate: z.coerce.date(), note: z.string().trim().max(1000).optional() })).mutation(async ({ ctx, input }) => {
+      const context = await requireFinanceOwner(ctx.user.id);
+      return reverseJournalEntry(context.organization.id, ctx.user.id, input.journalEntryId, input.fiscalPeriodId, input.note, input.reversalDate);
+    }),
+    accountBalance: protectedProcedure.input(z.object({ accountId: z.number().int().positive(), startsAt: z.coerce.date().optional(), endsAt: z.coerce.date().optional() })).query(async ({ ctx, input }) => {
+      const context = await requireModule(ctx.user.id, "finance");
+      return getAccountBalance(context.organization.id, input.accountId, input);
+    }),
+    posting: router({
+      salesInvoice: protectedProcedure.input(z.object({ invoiceId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+        const context = await requireFinanceOwner(ctx.user.id);
+        return postSalesInvoice(context.organization.id, ctx.user.id, input.invoiceId);
+      }),
+      purchaseOrder: protectedProcedure.input(z.object({ purchaseOrderId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+        const context = await requireFinanceOwner(ctx.user.id);
+        return postPurchaseOrder(context.organization.id, ctx.user.id, input.purchaseOrderId);
+      }),
+      collection: protectedProcedure.input(z.object({ financialTransactionId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+        const context = await requireFinanceOwner(ctx.user.id);
+        return postCollection(context.organization.id, ctx.user.id, input.financialTransactionId);
+      }),
+      productionMaterialIssue: protectedProcedure.input(z.object({ productionOrderId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+        const context = await requireFinanceOwner(ctx.user.id);
+        return postProductionMaterialIssue(context.organization.id, ctx.user.id, input.productionOrderId);
+      }),
+      productionOutput: protectedProcedure.input(z.object({ productionOutputId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+        const context = await requireFinanceOwner(ctx.user.id);
+        return postProductionOutput(context.organization.id, ctx.user.id, input.productionOutputId);
+      }),
+      inventoryAdjustment: protectedProcedure.input(z.object({ stockMovementId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+        const context = await requireFinanceOwner(ctx.user.id);
+        return postInventoryAdjustment(context.organization.id, ctx.user.id, input.stockMovementId);
+      }),
+      distributionCollection: protectedProcedure.input(z.object({ collectionId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+        const context = await requireFinanceOwner(ctx.user.id);
+        return postDistributionCollection(context.organization.id, ctx.user.id, input.collectionId);
+      }),
+      distributionRouteExpense: protectedProcedure.input(z.object({ expenseId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+        const context = await requireFinanceOwner(ctx.user.id);
+        return postDistributionRouteExpense(context.organization.id, ctx.user.id, input.expenseId);
+      }),
+    }),
   }),
 
   reports: router({
@@ -483,7 +577,9 @@ export const erpRouter = router({
     }),
     issueMaterials: protectedProcedure.input(z.object({ productionOrderId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
       const context = await requireManufacturingOrderPermission(ctx.user.id, "manufacturing.materials.issue", input.productionOrderId);
-      return issueMaterialsForProduction(context.organization.id, ctx.user.id, input.productionOrderId);
+      const issued = await issueMaterialsForProduction(context.organization.id, ctx.user.id, input.productionOrderId);
+      await postWhenFinanceEnabled(context, () => postProductionMaterialIssue(context.organization.id, ctx.user.id, input.productionOrderId));
+      return issued;
     }),
     returnMaterials: protectedProcedure.input(z.object({ productionOrderId: z.number().int().positive(), items: z.array(z.object({ reservationId: z.number().int().positive(), quantity: z.number().positive() })).min(1).max(200) })).mutation(async ({ ctx, input }) => {
       const context = await requireManufacturingOrderPermission(ctx.user.id, "manufacturing.materials.return", input.productionOrderId);
@@ -496,7 +592,9 @@ export const erpRouter = router({
     }),
     recordOutput: protectedProcedure.input(z.object({ productionOrderId: z.number().int().positive(), lotNumber: z.string().trim().min(2).max(96), goodQuantity: z.number().positive(), defectiveQuantity: z.number().nonnegative().optional(), reworkQuantity: z.number().nonnegative().optional(), scrapQuantity: z.number().nonnegative().optional(), manufacturingDate: z.coerce.date().optional(), expiryDate: z.coerce.date().optional() })).mutation(async ({ ctx, input }) => {
       const context = await requireManufacturingOrderPermission(ctx.user.id, "manufacturing.output.record", input.productionOrderId);
-      return recordProductionOutput(context.organization.id, ctx.user.id, input.productionOrderId, input);
+      const output = await recordProductionOutput(context.organization.id, ctx.user.id, input.productionOrderId, input);
+      await postWhenFinanceEnabled(context, () => postProductionOutput(context.organization.id, ctx.user.id, output.outputId));
+      return output;
     }),
     qualityCheck: protectedProcedure.input(z.object({ productionOrderId: z.number().int().positive(), productionOutputId: z.number().int().positive(), checkType: z.string().trim().min(2).max(120), result: z.enum(["pass", "fail"]), numericValue: z.number().finite().optional(), notes: z.string().trim().max(2000).optional(), checkedAt: z.coerce.date().optional() })).mutation(async ({ ctx, input }) => {
       const context = await requireManufacturingOrderPermission(ctx.user.id, input.result === "pass" ? "manufacturing.quality.approve" : "manufacturing.quality.inspect", input.productionOrderId);
@@ -711,7 +809,9 @@ export const erpRouter = router({
       record: protectedProcedure.input(z.object({ routeId: z.number().int().positive(), customerId: z.number().int().positive(), salesInvoiceId: z.number().int().positive().optional(), representativeEmployeeId: z.number().int().positive().optional(), driverEmployeeId: z.number().int().positive().optional(), collectionType: z.enum(["cash_sale", "current_invoice", "previous_debt"]), amount: z.number().positive(), currencyCode: z.string().trim().length(3), exchangeRateUsed: z.number().positive().optional(), paymentMethod: z.enum(["cash", "card", "transfer", "check", "other"]).optional(), idempotencyKey: z.string().trim().min(8).max(128) })).mutation(async ({ ctx, input }) => {
         const context = await requireDistributionPermission(ctx.user.id, "distribution.collect");
         assertDistributionScope(context, { routeId: input.routeId });
-        return recordDistributionCollection(context.organization.id, ctx.user.id, input);
+        const collection = await recordDistributionCollection(context.organization.id, ctx.user.id, input);
+        if (!collection.replayed) await postWhenFinanceEnabled(context, () => postDistributionCollection(context.organization.id, ctx.user.id, collection.id));
+        return collection;
       }),
     }),
     returns: router({
@@ -730,7 +830,9 @@ export const erpRouter = router({
       create: protectedProcedure.input(z.object({ routeId: z.number().int().positive(), vehicleId: z.number().int().positive().optional(), category: z.enum(["fuel", "toll", "parking", "minor"]), amount: z.number().positive(), currencyCode: z.string().trim().length(3), receiptUrl: z.string().url().max(1024).optional(), notes: z.string().trim().max(2000).optional() })).mutation(async ({ ctx, input }) => {
         const context = await requireDistributionPermission(ctx.user.id, "fleet.expenses");
         assertDistributionScope(context, { routeId: input.routeId, vehicleId: input.vehicleId });
-        return addDistributionRouteExpense(context.organization.id, ctx.user.id, input);
+        const expense = await addDistributionRouteExpense(context.organization.id, ctx.user.id, input);
+        await postWhenFinanceEnabled(context, () => postDistributionRouteExpense(context.organization.id, ctx.user.id, expense.id));
+        return expense;
       }),
     }),
     closings: router({

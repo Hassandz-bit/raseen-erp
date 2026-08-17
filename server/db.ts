@@ -362,9 +362,9 @@ export async function recordSalesInvoicePayment(organizationId: number, actorUse
     const nextStatus = amountPaid >= Number(invoice[0].grandTotal) ? "paid" : "partial";
     if (!canTransitionSalesDocument(invoice[0].status, nextStatus)) throw new Error("انتقال حالة سداد الفاتورة غير مسموح.");
     await tx.update(salesInvoices).set({ status: nextStatus, amountPaid: String(amountPaid) }).where(and(eq(salesInvoices.id, invoiceId), eq(salesInvoices.organizationId, organizationId)));
-    await tx.insert(financialTransactions).values({ organizationId, type: "income", category: "تحصيل فاتورة مبيعات", amount: String(paymentAmount), occurredAt: new Date(), referenceType: "sales_invoice", referenceId: invoiceId, notes: `تحصيل من الفاتورة ${invoice[0].invoiceNumber}` });
+    const transaction = await tx.insert(financialTransactions).values({ organizationId, type: "income", category: "تحصيل فاتورة مبيعات", amount: String(paymentAmount), occurredAt: new Date(), referenceType: "sales_invoice", referenceId: invoiceId, notes: `تحصيل من الفاتورة ${invoice[0].invoiceNumber}` });
     await tx.insert(auditLogs).values({ organizationId, actorUserId, action: "sales_invoice.payment_recorded", entityType: "sales_invoice", entityId: String(invoiceId), metadata: { paymentAmount, amountPaid, status: nextStatus } });
-    return { id: invoiceId, status: nextStatus, amountPaid };
+    return { id: invoiceId, status: nextStatus, amountPaid, financialTransactionId: Number(transaction[0].insertId) };
   });
 }
 
@@ -503,10 +503,10 @@ export async function adjustProductBatchQuantity(organizationId: number, actorUs
     if (Number(batch[0].currentQuantity) + quantity < Number(batch[0].reservedQuantity)) throw new Error("لا يمكن خفض كمية الدفعة تحت الكمية المحجوزة.");
     const updateResult = await tx.update(productBatches).set({ currentQuantity: sql`${productBatches.currentQuantity} + ${quantity}` }).where(and(eq(productBatches.id, batchId), eq(productBatches.organizationId, organizationId), sql`${productBatches.currentQuantity} + ${quantity} >= ${productBatches.reservedQuantity}`));
     if (!Number(updateResult[0]?.affectedRows ?? 0)) throw new Error("تعذر تسوية كمية الدفعة بأمان؛ يرجى إعادة المحاولة.");
-    await tx.insert(stockMovements).values({ organizationId, warehouseId: batch[0].warehouseId, productId: batch[0].productId, batchId, movementType: "adjustment", quantity: String(quantity), unit: product[0].baseUnit, sourceDocumentType: "product_batch_adjustment", sourceDocumentId: batchId, occurredAt: new Date(), actorUserId, auditReference: `BAT-ADJ-${batchId}` });
+    const movement = await tx.insert(stockMovements).values({ organizationId, warehouseId: batch[0].warehouseId, productId: batch[0].productId, batchId, movementType: "adjustment", quantity: String(quantity), unit: product[0].baseUnit, sourceDocumentType: "product_batch_adjustment", sourceDocumentId: batchId, occurredAt: new Date(), actorUserId, auditReference: `BAT-ADJ-${batchId}` });
     await tx.insert(inventoryBalances).values({ organizationId, warehouseId: batch[0].warehouseId, productId: batch[0].productId, quantity: String(quantity), reservedQuantity: "0" }).onDuplicateKeyUpdate({ set: { quantity: sql`${inventoryBalances.quantity} + ${quantity}` } });
     await tx.insert(auditLogs).values({ organizationId, actorUserId, action: "product_batch.quantity_adjusted", entityType: "product_batch", entityId: String(batchId), metadata: { quantity, reason: reason?.trim() || null } });
-    return { id: batchId, quantity };
+    return { id: batchId, quantity, stockMovementId: Number(movement[0].insertId) };
   });
 }
 
