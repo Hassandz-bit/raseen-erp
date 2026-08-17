@@ -1,12 +1,10 @@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { dashboardHeroCopy, dashboardSampleCopy, homeChromeCopy, homeShellCopy, moduleViewCopy, moduleViewUiCopy, navigationFeedbackCopy } from "@/i18n/translations";
 import { cn } from "@/lib/utils";
 import {
-  ArrowUpLeft,
   Bell,
   Bot,
   Building2,
@@ -23,7 +21,6 @@ import {
   ReceiptText,
   Search,
   Settings2,
-  ShieldCheck,
   ShoppingCart,
   Sparkles,
   Store,
@@ -32,7 +29,6 @@ import {
   UsersRound,
   WalletCards,
   X,
-  Zap,
 } from "lucide-react";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
@@ -219,8 +215,6 @@ export default function Home() {
   const chromeCopy = homeChromeCopy[language];
   const [section, setSection] = useState<SectionKey>("dashboard");
   const [isSidebarOpen, setSidebarOpen] = useState(false);
-  const [assistantOpen, setAssistantOpen] = useState(false);
-  const [query, setQuery] = useState("");
   const [isTransitioning, setTransitioning] = useState(false);
   const [, setLocation] = useLocation();
 
@@ -234,12 +228,6 @@ export default function Home() {
       toast.success(navigationFeedbackCopy[language].opened(t(key as never)));
     }, 180);
   };
-  const submitAssistant = () => {
-    if (!query.trim()) return toast.error(shellCopy.assistantQuestionRequired);
-    toast.success(shellCopy.assistantQueryAdded);
-    setQuery("");
-  };
-
   return (
     <div className="app-shell text-right" dir={language === "ar" ? "rtl" : "ltr"}>
       <div className="fixed inset-0 -z-10 bg-[radial-gradient(circle_at_75%_0%,rgba(89,143,178,.08),transparent_28rem)]" />
@@ -247,19 +235,16 @@ export default function Home() {
         <div className="flex items-center justify-between px-2 pt-2"><NawaMark /><button onClick={() => setSidebarOpen(false)} className="grid h-9 w-9 place-items-center rounded-xl text-muted-foreground hover:bg-white/[.05] lg:hidden"><X className="h-5 w-5" /></button></div>
         <div className="mt-8 px-2"><p className="text-[10px] font-semibold tracking-[.18em] text-[#777f90]">{chromeCopy.mainNavigation}</p></div>
         <nav className="mt-3 flex-1 space-y-1 overflow-y-auto thin-scrollbar">{navItems.map(item => { const Icon = item.icon; const active = item.key === section; return <button key={item.key} onClick={() => item.path ? setLocation(item.path) : changeSection(item.key as SectionKey)} className={cn("group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm transition-all", active ? "bg-primary text-primary-foreground shadow-[0_12px_22px_rgba(217,180,107,.12)]" : "text-[#afb7c4] hover:bg-white/[.045] hover:text-white")}><Icon className={cn("h-[18px] w-[18px]", active ? "" : "text-[#7e899b] group-hover:text-primary")} /><span className="flex-1 text-right font-medium">{item.path ? item.label : t(item.label as never)}</span>{item.module === "reports" && <span className={cn("rounded-md px-1.5 py-0.5 text-[9px]", active ? "bg-black/10" : "bg-primary/10 text-primary")}>{chromeCopy.newBadge}</span>}</button>})}</nav>
-        <div className="mt-4 rounded-2xl border border-primary/15 bg-gradient-to-br from-primary/[.12] to-primary/[.025] p-4"><div className="flex items-center gap-2 text-primary"><Zap className="h-4 w-4" /><p className="text-xs font-bold">{chromeCopy.assistantTitle}</p></div><p className="mt-2 text-[11px] leading-6 text-[#b4b9c4]">{chromeCopy.assistantDescription}</p><button onClick={() => setAssistantOpen(true)} className="mt-3 text-xs font-semibold text-[#e8c87f] hover:text-[#f5dc9e]">{chromeCopy.startConversation} ←</button></div>
         <div className="mt-4 flex items-center gap-3 rounded-2xl border border-white/[.07] bg-white/[.025] p-3"><Avatar className="h-9 w-9 border border-primary/20"><AvatarFallback className="bg-primary/10 text-xs text-primary">{chromeCopy.teamName.slice(0, 1)}</AvatarFallback></Avatar><div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold text-white">{chromeCopy.teamName}</p><p className="mt-1 text-[10px] text-muted-foreground">{chromeCopy.organizationManager}</p></div><MoreHorizontal className="h-4 w-4 text-muted-foreground" /></div>
       </aside>
 
       {isSidebarOpen && <button className="fixed inset-0 z-30 bg-black/45 lg:hidden" onClick={() => setSidebarOpen(false)} aria-label={chromeCopy.closeMenu} />}
       <main className={cn("min-h-screen", language === "ar" ? "lg:mr-[278px]" : "lg:ml-[278px]")}>
-        <header className="sticky top-0 z-20 flex h-[76px] items-center gap-3 border-b border-white/[.06] bg-[#10141d]/72 px-4 backdrop-blur-xl md:px-7"><button onClick={() => setSidebarOpen(true)} className="grid h-10 w-10 place-items-center rounded-xl border border-white/10 bg-white/[.035] text-slate-300 hover:bg-white/[.07] lg:hidden"><Menu className="h-5 w-5" /></button><div className="hidden min-w-0 flex-1 items-center gap-3 sm:flex"><Search className="h-4 w-4 text-muted-foreground" /><input aria-label={shellCopy.searchLabel} placeholder={shellCopy.searchPlaceholder} className="w-full max-w-lg bg-transparent text-sm text-white outline-none placeholder:text-[#778092]" /></div><div className="flex flex-1 items-center gap-2 sm:flex-none"><button onClick={() => setLocation("/workspace")} className="hidden h-10 items-center gap-2 rounded-xl border border-primary/20 bg-primary/[.08] px-3 text-xs font-semibold text-primary transition-colors hover:bg-primary/[.14] md:flex"><ShieldCheck className="h-4 w-4" />{shellCopy.workspace}</button><div className="flex min-w-0 items-center gap-2 rounded-xl border border-white/[.08] bg-white/[.035] px-3 py-2"><Building2 className="h-4 w-4 shrink-0 text-primary" /><span className="truncate text-xs font-semibold text-slate-200">{shellCopy.organizationName}</span><ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /></div><button onClick={() => toast.info(shellCopy.noUnreadNotifications)} className="relative grid h-10 w-10 place-items-center rounded-xl border border-white/[.08] bg-white/[.035] text-slate-300 hover:bg-white/[.07]" aria-label={shellCopy.notifications}><Bell className="h-[18px] w-[18px]" /><span className="absolute left-2 top-2 h-1.5 w-1.5 rounded-full bg-primary" /></button><button onClick={() => toast.info(shellCopy.permissionAwareInterface)} className="hidden h-10 w-10 place-items-center rounded-xl border border-white/[.08] bg-white/[.035] text-slate-300 hover:bg-white/[.07] sm:grid" aria-label={shellCopy.help}><HelpCircle className="h-[18px] w-[18px]" /></button></div></header>
+        <header className="sticky top-0 z-20 flex h-[76px] items-center gap-3 border-b border-white/[.06] bg-[#10141d]/72 px-4 backdrop-blur-xl md:px-7"><button onClick={() => setSidebarOpen(true)} className="grid h-10 w-10 place-items-center rounded-xl border border-white/10 bg-white/[.035] text-slate-300 hover:bg-white/[.07] lg:hidden"><Menu className="h-5 w-5" /></button><div className="hidden min-w-0 flex-1 items-center gap-3 sm:flex"><Search className="h-4 w-4 text-muted-foreground" /><input aria-label={shellCopy.searchLabel} placeholder={shellCopy.searchPlaceholder} className="w-full max-w-lg bg-transparent text-sm text-white outline-none placeholder:text-[#778092]" /></div><div className="flex flex-1 items-center gap-2 sm:flex-none"><button onClick={() => setLocation("/workspace")} className="hidden h-10 items-center gap-2 rounded-xl border border-primary/20 bg-primary/[.08] px-3 text-xs font-semibold text-primary transition-colors hover:bg-primary/[.14] md:flex"><Bot className="h-4 w-4" />Nawa AI</button><div className="flex min-w-0 items-center gap-2 rounded-xl border border-white/[.08] bg-white/[.035] px-3 py-2"><Building2 className="h-4 w-4 shrink-0 text-primary" /><span className="truncate text-xs font-semibold text-slate-200">{shellCopy.organizationName}</span><ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /></div><button onClick={() => toast.info(shellCopy.noUnreadNotifications)} className="relative grid h-10 w-10 place-items-center rounded-xl border border-white/[.08] bg-white/[.035] text-slate-300 hover:bg-white/[.07]" aria-label={shellCopy.notifications}><Bell className="h-[18px] w-[18px]" /><span className="absolute left-2 top-2 h-1.5 w-1.5 rounded-full bg-primary" /></button><button onClick={() => toast.info(shellCopy.permissionAwareInterface)} className="hidden h-10 w-10 place-items-center rounded-xl border border-white/[.08] bg-white/[.035] text-slate-300 hover:bg-white/[.07] sm:grid" aria-label={shellCopy.help}><HelpCircle className="h-[18px] w-[18px]" /></button></div></header>
 
         <div className="mx-auto max-w-[1600px] p-4 md:p-7" aria-busy={isTransitioning}>{isTransitioning ? <div className="enter flex min-h-[55vh] items-center justify-center gap-3 text-sm text-muted-foreground" role="status"><span className="h-5 w-5 animate-spin rounded-full border-2 border-primary/25 border-t-primary motion-reduce:animate-none" />{navigationFeedbackCopy[language].moving}</div> : section === "dashboard" ? <DashboardContent onOpenModule={changeSection} /> : <ModuleView section={section} onBack={() => changeSection("dashboard")} />}</div>
       </main>
 
-      <button onClick={() => setAssistantOpen(true)} className="fixed bottom-5 left-5 z-20 flex items-center gap-2 rounded-2xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground shadow-[0_15px_38px_rgba(217,180,107,.25)] transition-transform active:scale-[.97]"><Bot className="h-5 w-5" />{shellCopy.assistantButton}</button>
-      {assistantOpen && <div className="fixed inset-0 z-50 grid place-items-end bg-black/45 p-4 sm:place-items-center"><section className="surface enter w-full max-w-xl rounded-3xl border p-5 shadow-2xl"><div className="flex items-start justify-between"><div className="flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-2xl bg-primary/10 text-primary"><Bot className="h-5 w-5" /></div><div><p className="text-sm font-bold text-white">{shellCopy.assistantTitle}</p><p className="mt-1 text-[11px] text-muted-foreground">{shellCopy.assistantContext}</p></div></div><button onClick={() => setAssistantOpen(false)} className="grid h-9 w-9 place-items-center rounded-xl text-muted-foreground hover:bg-white/[.05]"><X className="h-5 w-5" /></button></div><div className="mt-5 rounded-2xl border border-primary/12 bg-primary/[.055] p-4"><p className="text-sm leading-7 text-slate-200">{shellCopy.assistantWelcome}</p></div><div className="mt-5 flex gap-2"><Input value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === "Enter") submitAssistant(); }} placeholder={shellCopy.assistantPlaceholder} className="h-12 rounded-xl border-white/10 bg-white/[.035] text-right text-sm placeholder:text-muted-foreground" /><Button onClick={submitAssistant} className="h-12 rounded-xl bg-primary px-4 text-primary-foreground"><ArrowUpLeft className="h-4 w-4" /></Button></div><p className="mt-3 text-[10px] leading-5 text-muted-foreground">{shellCopy.assistantPrivacy}</p></section></div>}
     </div>
   );
 }

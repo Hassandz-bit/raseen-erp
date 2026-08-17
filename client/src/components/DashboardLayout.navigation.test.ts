@@ -23,4 +23,8 @@ describe("تنقل Nawa AI وNawa Retail", () => {
     expect(ai).toBeLessThan(retail);
     expect(retail).toBeLessThan(commerce);
   });
+
+  it("لا يعرض Nawa Flow كأداة مستقلة في التنقل الأعلى", () => {
+    expect(source).not.toContain('path: "/workspace?view=nawa_flow"');
+  });
 });
