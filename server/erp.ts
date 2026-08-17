@@ -17,6 +17,7 @@ import { closeProductionOrder, createManufacturingBom, createProductionOrder, ge
 import { canAccessManufacturingOrderScope, canUseManufacturingPermission, isManufacturingScopeAllowed, type ManufacturingPermission } from "./manufacturingPermissionPolicy";
 import { createFiscalPeriod, createFiscalYear, getAccountBalance, listChartOfAccounts, listFinanceSetup, listJournalEntries, postJournalEntry, reverseJournalEntry, seedDefaultChartOfAccounts } from "./finance";
 import { postCollection, postDistributionCollection, postDistributionRouteExpense, postInventoryAdjustment, postProductionMaterialIssue, postProductionOutput, postPurchaseOrder, postSalesInvoice } from "./accountingPostingRules";
+import { createBankAccount, createCashbox, getPayableAging, getReceivableAging, listTreasury, recordPayablePayment, transferTreasuryFunds } from "./treasury";
 
 type ModuleKey = "inventory" | "sales" | "purchases" | "finance" | "hr" | "reports" | "ai_assistant" | "distribution" | "manufacturing";
 const operationalModuleKeys = ["inventory", "sales", "purchases", "finance", "hr"] as const;
@@ -462,6 +463,38 @@ export const erpRouter = router({
     accountBalance: protectedProcedure.input(z.object({ accountId: z.number().int().positive(), startsAt: z.coerce.date().optional(), endsAt: z.coerce.date().optional() })).query(async ({ ctx, input }) => {
       const context = await requireModule(ctx.user.id, "finance");
       return getAccountBalance(context.organization.id, input.accountId, input);
+    }),
+    treasury: router({
+      list: protectedProcedure.query(async ({ ctx }) => {
+        const context = await requireModule(ctx.user.id, "finance");
+        return listTreasury(context.organization.id);
+      }),
+      createCashbox: protectedProcedure.input(z.object({ code: z.string().trim().min(2).max(48), name: z.string().trim().min(2).max(160), currencyCode: z.string().trim().length(3), accountId: z.number().int().positive(), branchId: z.number().int().positive().optional() })).mutation(async ({ ctx, input }) => {
+        const context = await requireFinanceOwner(ctx.user.id);
+        return createCashbox(context.organization.id, input);
+      }),
+      createBankAccount: protectedProcedure.input(z.object({ code: z.string().trim().min(2).max(48), name: z.string().trim().min(2).max(160), bankName: z.string().trim().min(2).max(180), accountNumberMasked: z.string().trim().max(64).optional(), currencyCode: z.string().trim().length(3), accountId: z.number().int().positive(), branchId: z.number().int().positive().optional() })).mutation(async ({ ctx, input }) => {
+        const context = await requireFinanceOwner(ctx.user.id);
+        return createBankAccount(context.organization.id, input);
+      }),
+      transfer: protectedProcedure.input(z.object({ fromType: z.enum(["cashbox", "bank"]), fromId: z.number().int().positive(), toType: z.enum(["cashbox", "bank"]), toId: z.number().int().positive(), amount: z.number().positive(), occurredAt: z.coerce.date(), notes: z.string().trim().max(2000).optional(), idempotencyKey: z.string().trim().min(8).max(128) })).mutation(async ({ ctx, input }) => {
+        const context = await requireFinanceOwner(ctx.user.id);
+        return transferTreasuryFunds(context.organization.id, ctx.user.id, input);
+      }),
+      recordPayablePayment: protectedProcedure.input(z.object({ supplierId: z.number().int().positive(), purchaseOrderId: z.number().int().positive().optional(), paymentAccountType: z.enum(["cashbox", "bank"]), paymentAccountId: z.number().int().positive(), amount: z.number().positive(), occurredAt: z.coerce.date(), notes: z.string().trim().max(2000).optional(), idempotencyKey: z.string().trim().min(8).max(128) })).mutation(async ({ ctx, input }) => {
+        const context = await requireFinanceOwner(ctx.user.id);
+        return recordPayablePayment(context.organization.id, ctx.user.id, input);
+      }),
+    }),
+    aging: router({
+      receivables: protectedProcedure.query(async ({ ctx }) => {
+        const context = await requireModule(ctx.user.id, "finance");
+        return getReceivableAging(context.organization.id);
+      }),
+      payables: protectedProcedure.query(async ({ ctx }) => {
+        const context = await requireModule(ctx.user.id, "finance");
+        return getPayableAging(context.organization.id);
+      }),
     }),
     posting: router({
       salesInvoice: protectedProcedure.input(z.object({ invoiceId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {

@@ -43,6 +43,7 @@ const defaultMappings = [
   { mappingKey: "distribution_cash_sale", debitCode: "1001", creditCode: "4100" },
   { mappingKey: "distribution_route_expense", debitCode: "5200", creditCode: "1001" },
   { mappingKey: "purchase_receipt", debitCode: "1200", creditCode: "2100" },
+  { mappingKey: "supplier_payment", debitCode: "2100", creditCode: "1001" },
   { mappingKey: "production_material_issue", debitCode: "1300", creditCode: "1200" },
   { mappingKey: "production_output", debitCode: "1200", creditCode: "1300" },
   { mappingKey: "inventory_adjustment_loss", debitCode: "5100", creditCode: "1200" },
