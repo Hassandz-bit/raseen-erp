@@ -33,6 +33,8 @@ describe("Manufacturing UI", () => {
     render(<Manufacturing />);
     expect(screen.getByText("مركز التصنيع والإنتاج")).toBeTruthy();
     expect(screen.getByText("أمر إنتاج جديد")).toBeTruthy();
+    fireEvent.click(screen.getByText("أمر إنتاج جديد"));
+    expect(screen.getAllByText("اختر إصدار BOM").length).toBeGreaterThan(0);
     expect(screen.getByText("exportSpreadsheet")).toBeTruthy();
     expect(screen.getByText("downloadPdf")).toBeTruthy();
     expect(screen.getByText("3")).toBeTruthy();
