@@ -99,7 +99,21 @@ body {
 :root[data-accent="emerald"] { --primary: oklch(0.74 0.14 165); --primary-foreground: oklch(0.17 0.02 165); --ring: oklch(0.74 0.14 165); }
 :root[data-accent="violet"] { --primary: oklch(0.72 0.15 300); --primary-foreground: oklch(0.96 0.02 300); --ring: oklch(0.72 0.15 300); }
 
-button, input, textarea { font: inherit; }
+button, input, textarea, select { font: inherit; }
+
+input:not([type="checkbox"]):not([type="radio"]), textarea, select {
+  border-width: 1.5px;
+  transition: border-color 160ms cubic-bezier(0.23, 1, 0.32, 1), box-shadow 160ms cubic-bezier(0.23, 1, 0.32, 1), background-color 160ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+input:not([type="checkbox"]):not([type="radio"]):focus-visible, textarea:focus-visible, select:focus-visible {
+  border-color: var(--primary) !important;
+  outline: 2px solid oklch(0.78 0.12 82 / 0.52);
+  outline-offset: 1px;
+  box-shadow: 0 0 0 4px oklch(0.78 0.12 82 / 0.13);
+}
+
+input:not([type="checkbox"]):not([type="radio"]):disabled, textarea:disabled, select:disabled { opacity: 0.62; }
 
 ::selection { background: oklch(0.78 0.12 82 / 0.38); color: oklch(0.98 0.01 95); }
 
