@@ -1073,7 +1073,7 @@ export const erpRouter = router({
         return askNawaAI({ organizationId: context.organization.id, userId: ctx.user.id, feature: "assistant", prompt: input.prompt, safeContext: { currency: context.organization.baseCurrency, metrics } });
       }),
     insight: protectedProcedure
-      .input(z.object({ domain: z.enum(["commerce", "inventory", "manufacturing", "finance"]) }))
+      .input(z.object({ domain: z.enum(["commerce", "inventory", "manufacturing", "finance", "hr", "distribution"]) }))
       .mutation(async ({ ctx, input }) => {
         const context = await requireModule(ctx.user.id, "ai_assistant");
         if (input.domain === "manufacturing") {
@@ -1085,6 +1085,16 @@ export const erpRouter = router({
           await requireModule(ctx.user.id, "reports");
           const finance = await getFinancialReportSummary(context.organization.id);
           return askNawaAI({ organizationId: context.organization.id, userId: ctx.user.id, feature: "finance", prompt: "حلل مؤشرات التدفق النقدي والذمم والربحية من الملخص المالي فقط. لا تقدم توقعاً دقيقاً بلا بيانات كافية، وقدّم توصية واحدة تتطلب موافقة بشرية.", safeContext: { currency: context.organization.baseCurrency, finance } });
+        }
+        if (input.domain === "hr") {
+          const hrContext = await requireHrOwner(ctx.user.id);
+          const payroll = await getPayrollDashboard(hrContext.organization.id);
+          return askNawaAI({ organizationId: hrContext.organization.id, userId: ctx.user.id, feature: "hr", prompt: "حلل مؤشرات الرواتب والسلف من الملخص الإجمالي فقط. لا تقترح قراراً آلياً عن موظف، وقدّم توصية واحدة تتطلب موافقة بشرية.", safeContext: { currency: hrContext.organization.baseCurrency, payroll } });
+        }
+        if (input.domain === "distribution") {
+          const distributionContext = await requireDistributionPermission(ctx.user.id, "distribution.view");
+          const distribution = await getDistributionControlCenter(distributionContext.organization.id);
+          return askNawaAI({ organizationId: distributionContext.organization.id, userId: ctx.user.id, feature: "distribution", prompt: "حلل مخاطر الجولات والتحصيلات ووثائق المركبات من مركز التحكم المتاح فقط، وقدّم توصية واحدة تتطلب موافقة بشرية.", safeContext: { distribution } });
         }
         const commerce = await getCommerceReportSummary(context.organization.id);
         const prompt = input.domain === "commerce"
