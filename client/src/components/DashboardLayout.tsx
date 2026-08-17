@@ -128,6 +128,20 @@ function DashboardLayoutContent({
   const activeMenuItem = localItems.find(item => location === item.href || pathWithoutQuery === item.href.split("?")[0]);
   const isMobile = useIsMobile();
   const bootstrap = trpc.erp.bootstrap.useQuery(undefined, { retry: false, refetchOnWindowFocus: false });
+  const notifications = trpc.erp.notifications.list.useQuery(undefined, { retry: false, refetchInterval: 30_000, refetchOnWindowFocus: true });
+  const unreadCount = (notifications.data ?? []).filter(notification => notification.isRead === "no").length;
+  const [notificationPulse, setNotificationPulse] = useState(false);
+  const previousUnreadCount = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (previousUnreadCount.current !== null && unreadCount > previousUnreadCount.current) {
+      setNotificationPulse(true);
+      const timer = window.setTimeout(() => setNotificationPulse(false), 1_650);
+      previousUnreadCount.current = unreadCount;
+      return () => window.clearTimeout(timer);
+    }
+    previousUnreadCount.current = unreadCount;
+  }, [unreadCount]);
 
   useEffect(() => {
     if (activePortal) localStorage.setItem("nawa:last-portal", activePortal.id);
@@ -222,8 +236,8 @@ function DashboardLayoutContent({
               </SidebarMenuItem>
               <p className="px-3 pb-1 pt-5 text-[11px] font-bold uppercase tracking-[.12em] text-muted-foreground group-data-[collapsible=icon]:hidden">{chrome.workspace}</p>
               <SidebarMenuItem>
-                <SidebarMenuButton isActive={activePortal?.id === "ai"} onClick={() => navigateTo("/workspace", chrome.ai)} tooltip={chrome.ai} className="h-12 text-[16px] font-bold text-primary">
-                  <Bot className="h-5 w-5 text-primary" /><span>{chrome.ai}</span>
+                <SidebarMenuButton isActive={activePortal?.id === "ai"} onClick={() => navigateTo("/workspace", chrome.ai)} tooltip={chrome.ai} className={`group/ai relative h-12 overflow-hidden text-[16px] font-bold text-primary transition-all duration-200 hover:-translate-y-px hover:bg-primary/12 hover:shadow-[0_10px_22px_rgba(212,161,49,.14)] active:scale-[.985] motion-reduce:hover:translate-y-0 ${activePortal?.id === "ai" ? "bg-primary/14 shadow-[inset_3px_0_0_hsl(var(--primary)),0_8px_20px_rgba(212,161,49,.12)]" : ""}`}>
+                  <Bot className="h-5 w-5 text-primary transition-transform duration-200 group-hover/ai:scale-110 group-hover/ai:-rotate-3" /><span>{chrome.ai}</span>{activePortal?.id === "ai" ? <span className="absolute end-2 h-2 w-2 rounded-full bg-primary shadow-[0_0_12px_hsl(var(--primary))]" aria-hidden="true" /> : null}
                 </SidebarMenuButton>
               </SidebarMenuItem>
               {activePortal ? <p className="px-2 pb-2 pt-4 text-[10px] font-semibold uppercase tracking-[.14em] text-muted-foreground group-data-[collapsible=icon]:hidden">{chrome.navigation}</p> : null}
@@ -296,7 +310,7 @@ function DashboardLayoutContent({
       <SidebarInset className="min-w-0 flex-1">
         <div className="sticky top-0 z-40 flex h-[68px] items-center justify-between gap-2 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:backdrop-blur">
           <div className="flex min-w-0 items-center gap-3"><SidebarTrigger className="h-10 w-10 shrink-0 rounded-xl bg-background" /><div className="min-w-0"><p className="truncate text-[16px] font-bold text-foreground">{activePortal?.name[language] ?? chrome.portals}</p><p className="mt-0.5 truncate text-[11px] text-muted-foreground">{chrome.breadcrumbRoot} / {activePortal?.name[language] ?? chrome.portals}{activeMenuItem ? ` / ${activeMenuItem.label[language]}` : ""}</p></div><div className="hidden min-w-0 border-s ps-3 text-[11px] text-muted-foreground lg:block"><p className="truncate font-bold text-foreground">{bootstrap.data?.organization?.name ?? "—"}</p><p className="truncate">{chrome.defaultBranch}</p></div></div>
-          <div className="flex shrink-0 items-center gap-1"><Button variant="ghost" size="icon" onClick={() => toast.info(chrome.notifications)} aria-label={chrome.notifications} className="relative h-10 w-10 rounded-xl"><Bell className="h-4 w-4" /><span className="absolute end-2 top-2 h-1.5 w-1.5 rounded-full bg-primary" /></Button><Button variant="ghost" size="icon" onClick={() => navigateTo("/settings", chrome.settings)} aria-label={chrome.settings} className="hidden h-10 w-10 rounded-xl sm:inline-flex"><Settings2 className="h-4 w-4" /></Button><Avatar className="hidden h-9 w-9 border border-primary/20 sm:flex"><AvatarFallback className="bg-primary/10 text-[11px] font-bold text-primary">{user?.name?.charAt(0).toUpperCase() || "N"}</AvatarFallback></Avatar></div>
+          <div className="flex shrink-0 items-center gap-1"><Button variant="ghost" size="icon" onClick={() => toast.info(unreadCount ? `${chrome.notifications}: ${unreadCount}` : chrome.notifications)} aria-label={unreadCount ? `${chrome.notifications}: ${unreadCount}` : chrome.notifications} className="relative h-10 w-10 rounded-xl transition-all duration-200 hover:bg-primary/10 hover:text-primary active:scale-95"><Bell className={`h-4 w-4 transition-transform duration-200 ${notificationPulse ? "motion-safe:animate-[pulse_825ms_cubic-bezier(.23,1,.32,1)_2] text-primary" : ""}`} />{unreadCount > 0 ? <span aria-live="polite" className={`absolute end-0.5 top-0.5 grid h-5 min-w-5 place-items-center rounded-full border-2 border-background bg-primary px-1 text-[10px] font-extrabold leading-none text-primary-foreground shadow-[0_0_14px_rgba(212,161,49,.42)] ${notificationPulse ? "motion-safe:animate-[pulse_825ms_cubic-bezier(.23,1,.32,1)_2]" : ""}`}>{unreadCount > 99 ? "99+" : unreadCount}</span> : null}</Button><Button variant="ghost" size="icon" onClick={() => navigateTo("/settings", chrome.settings)} aria-label={chrome.settings} className="hidden h-10 w-10 rounded-xl sm:inline-flex"><Settings2 className="h-4 w-4" /></Button><Avatar className="hidden h-9 w-9 border border-primary/20 sm:flex"><AvatarFallback className="bg-primary/10 text-[11px] font-bold text-primary">{user?.name?.charAt(0).toUpperCase() || "N"}</AvatarFallback></Avatar></div>
         </div>
         {isMobile && (
           <div className="hidden border-b h-14 items-center justify-between bg-background/95 px-2 backdrop-blur supports-[backdrop-filter]:backdrop-blur sticky top-0 z-40">

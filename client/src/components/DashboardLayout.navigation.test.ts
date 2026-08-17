@@ -29,4 +29,13 @@ describe("تنقل بوابات Nawa", () => {
     expect(source).not.toContain("placeholder={chrome.search}");
     expect(source).not.toContain("nawaPortals.map(portal");
   });
+
+  it("يعرض حالة نشاط وHover محسّنة لـ Nawa AI وعداد تنبيهات خادمي متحرك", () => {
+    expect(source).toContain("group-hover/ai:scale-110");
+    expect(source).toContain("shadow-[inset_3px_0_0_hsl(var(--primary))");
+    expect(source).toContain("trpc.erp.notifications.list.useQuery");
+    expect(source).toContain("refetchInterval: 30_000");
+    expect(source).toContain("previousUnreadCount");
+    expect(source).toContain('aria-live="polite"');
+  });
 });
