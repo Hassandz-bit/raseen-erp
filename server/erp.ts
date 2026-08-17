@@ -25,6 +25,7 @@ import { approveOvertimeEntry, createDepartment, createEmployeeContract, createE
 import { approvePayroll, assignAllowance, calculatePayroll, createAllowanceType, createCommissionEntry, createCommissionRule, createEmployeeAdvance, createPayrollAdjustment, createPayrollPeriod, getPayrollDashboard, reopenPayroll } from "./payroll";
 import { payPayrollPeriod, postEmployeeAdvance, postPayrollPeriod } from "./payrollPostingRules";
 import { exportPaidPayrollBankFile } from "./payrollBankExport";
+import { getHrOperationalReports } from "./hrReports";
 import { canUseHrPermission, type HrPermission } from "./hrPermissionPolicy";
 import { decideTeamAdvanceRequest, decideTeamLeaveRequest, getEmployeeSelfService, submitSelfAdvanceRequest, submitSelfLeaveRequest } from "./hrSelfService";
 
@@ -463,6 +464,7 @@ export const erpRouter = router({
     directory: protectedProcedure.query(async ({ ctx }) => { const context = await requireModule(ctx.user.id, "hr"); return listHrDirectory(context.organization.id); }),
     operations: protectedProcedure.query(async ({ ctx }) => { const context = await requireModule(ctx.user.id, "hr"); return listHrOperations(context.organization.id); }),
     payrollDashboard: protectedProcedure.query(async ({ ctx }) => { const context = await requireHrOwner(ctx.user.id); return getPayrollDashboard(context.organization.id); }),
+    reports: protectedProcedure.query(async ({ ctx }) => { const context = await requireHrPermission(ctx.user.id, "hr.payroll.view"); return getHrOperationalReports(context.organization.id); }),
     exportBankFile: protectedProcedure.input(z.object({ payrollPeriodId: z.number().int().positive(), delimiter: z.enum([",", ";"]).optional() })).query(async ({ ctx, input }) => { const context = await requireHrPermission(ctx.user.id, "hr.payroll.export_bank"); return exportPaidPayrollBankFile(context.organization.id, input.payrollPeriodId, input.delimiter); }),
     createDepartment: protectedProcedure.input(z.object({ code: z.string().trim().min(2).max(48), name: z.string().trim().min(2).max(160), branchId: z.number().int().positive().optional() })).mutation(async ({ ctx, input }) => { const context = await requireOrganizationOwner(ctx.user.id); return createDepartment(context.organization.id, ctx.user.id, input); }),
     createPosition: protectedProcedure.input(z.object({ code: z.string().trim().min(2).max(48), name: z.string().trim().min(2).max(160), departmentId: z.number().int().positive().optional() })).mutation(async ({ ctx, input }) => { const context = await requireOrganizationOwner(ctx.user.id); return createPosition(context.organization.id, ctx.user.id, input); }),
