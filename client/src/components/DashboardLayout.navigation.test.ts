@@ -22,9 +22,10 @@ describe("تنقل بوابات Nawa", () => {
     expect(source).not.toContain("organizationId=");
   });
 
-  it("يعرض Nawa AI كمدخل دائم ويحذف البحث ومبدل البوابات المكرر", () => {
+  it("يبقي Nawa AI في الشريط الجانبي فقط ويحذف البحث ومبدل البوابات المكرر", () => {
     expect(source).toContain("chrome.ai");
-    expect(source).toContain('navigateTo("/workspace", chrome.ai)');
+    expect(source.match(/navigateTo\("\/workspace", chrome\.ai\)/g)).toHaveLength(1);
+    expect(source).toContain("chrome.workspace");
     expect(source).not.toContain("placeholder={chrome.search}");
     expect(source).not.toContain("nawaPortals.map(portal");
   });
