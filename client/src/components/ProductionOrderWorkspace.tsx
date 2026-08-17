@@ -11,7 +11,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { trpc } from "@/lib/trpc";
 import { buildManufacturingDocument, downloadManufacturingDocumentHtml, downloadManufacturingDocumentPdf, printManufacturingDocument, type ManufacturingDocumentType } from "@/lib/manufacturingOperationalDocuments";
 import { CheckCircle2, ClipboardList, Factory, PackageCheck, Play, Plus, RotateCcw, ShieldCheck, Trash2, XCircle } from "lucide-react";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 const copyByLanguage = {
   ar: { newOrder: "أمر إنتاج جديد", orderWorkspace: "تشغيل أمر الإنتاج", selectBom: "اختر إصدار BOM", rawWarehouse: "مخزن المواد الخام", finishedWarehouse: "مخزن المنتج النهائي", line: "خط الإنتاج", quantity: "الكمية", create: "إنشاء الأمر", close: "إغلاق", materials: "المواد", stages: "المراحل", consumption: "الاستهلاك", output: "المخرجات", waste: "الهدر والتالف", quality: "الجودة", costs: "التكاليف", traceability: "التتبع", audit: "التدقيق", required: "المطلوب", available: "المتاح", reserved: "المحجوز", issued: "المسحوب", returned: "المرتجع", variance: "الانحراف", reserve: "حجز المواد", issue: "سحب وبدء الإنتاج", returnUnused: "إرجاع غير المستخدم", status: "الحالة", stage: "المرحلة", start: "بدء", complete: "إكمال", blocked: "معطل", notes: "ملاحظات", saveStage: "حفظ المرحلة", lotNumber: "رقم الدفعة", goodQuantity: "كمية جيدة", recordOutput: "تسجيل المخرج", wasteQuantity: "هدر / تالف", reworkQuantity: "إعادة تشغيل", recordWaste: "تسجيل الهدر", pass: "اجتياز وإطلاق", fail: "رفض / حجر", inspect: "فحص الجودة", closeOrder: "إقفال الأمر", plan: "تخطيط", approve: "اعتماد", startProduction: "بدء الإنتاج", noCosts: "لا تملك صلاحية عرض التكاليف.", noSelection: "اختر أمر إنتاج من القائمة لبدء التشغيل.", actionError: "تعذر تنفيذ الإجراء.", planned: "مخطط", inProgress: "قيد التنفيذ", completed: "مكتمل", ready: "جاهز", noRows: "لا توجد بيانات في هذا المحور بعد.", expense: "مصروف إنتاج", amount: "القيمة", addExpense: "إضافة مصروف", trace: "تتبّع الدفعات", auditEvent: "إجراء تدقيق", product: "المنتج", bom: "BOM", productionOrder: "أمر الإنتاج" },
@@ -38,6 +38,10 @@ export function ProductionOrderWorkspace({ selectedOrderId, onSelectedOrderIdCha
   const copy = copyByLanguage[language];
   const capabilities = trpc.erp.manufacturing.capabilities.useQuery();
   const can = (permission: string) => Boolean(capabilities.data?.capabilities[permission]);
+  useEffect(() => {
+    const actions = new Map<string, string>([[copy.reserve, "manufacturing.materials.reserve"], [copy.issue, "manufacturing.materials.issue"], [copy.returnUnused, "manufacturing.materials.return"], [copy.recordOutput, "manufacturing.output.record"], [copy.recordWaste, "manufacturing.waste.record"], [copy.pass, "manufacturing.quality.inspect"], [copy.fail, "manufacturing.quality.inspect"], [copy.addExpense, "manufacturing.costs.edit"], [copy.closeOrder, "manufacturing.order.close"]]);
+    document.querySelectorAll<HTMLButtonElement>("button").forEach(button => { const permission = actions.get(button.textContent?.trim() ?? ""); if (permission) button.hidden = !can(permission); });
+  }, [capabilities.data, copy, selectedOrderId]);
   const options = trpc.erp.manufacturing.operationalOptions.useQuery();
   const details = trpc.erp.manufacturing.orderDetails.useQuery({ productionOrderId: selectedOrderId ?? 1 }, { enabled: Boolean(selectedOrderId) });
   const [error, setError] = useState("");
