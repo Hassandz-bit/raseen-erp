@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { and, eq } from "drizzle-orm";
 import { auditLogs, distributionSettings, distributionTerritories, fleetVehicleDocuments, fleetVehicles, inventoryBalances, organizations, productBatches, products, stockMovements, vehicleLoadItems, vehicleLoadOrders, warehouses } from "../drizzle/schema";
-import { createDistributionTerritory, createFleetVehicle, createVehicleLoadOrder, transitionVehicleLoadOrder } from "./distribution";
+import { createDistributionTerritory, createFleetVehicle, createVehicleLoadOrder, listFleetVehicleDocumentAlerts, transitionVehicleLoadOrder } from "./distribution";
 import { getDb } from "./db";
 
 let fixture: { organizationIds: number[]; productId?: number; sourceWarehouseId?: number; vehicleWarehouseId?: number } | null = null;
@@ -50,6 +50,20 @@ describe("تكامل تحميل المركبة", () => {
     expect(documents.map(document => document.documentType)).toEqual(expect.arrayContaining(["insurance", "technical_inspection"]));
     expect(documents.find(document => document.documentType === "insurance")).toMatchObject({ issuedAt: new Date("2026-01-01T00:00:00Z"), expiresAt: new Date("2026-12-31T23:59:59Z") });
     await expect(createFleetVehicle(organizationId, 1, { code: `BAD-DOC-${suffix}`, registrationNumber: `REG-BAD-${suffix}`, type: "van", ownershipType: "owned", maximumPayloadWeight: 10, maximumVolume: 4, insuranceStartAt: new Date("2026-12-31T00:00:00Z"), insuranceEndAt: new Date("2026-01-01T00:00:00Z") })).rejects.toThrow("انتهاء التأمين");
+  });
+
+  it("يعرض في لوحة الوثائق التأمين القريب من الانتهاء داخل المؤسسة فقط", async () => {
+    const db = await getDb(); expect(db).toBeTruthy(); if (!db) return;
+    const suffix = `${Date.now()}-${Math.floor(Math.random() * 100_000)}`;
+    const first = await db.insert(organizations).values({ name: `تنبيه وثيقة ${suffix}`, slug: `fleet-alert-${suffix}`, status: "active", baseCurrency: "SAR", locale: "ar-SA", monthlyBudget: "0" });
+    const second = await db.insert(organizations).values({ name: `عزل تنبيه ${suffix}`, slug: `fleet-alert-isolated-${suffix}`, status: "active", baseCurrency: "SAR", locale: "ar-SA", monthlyBudget: "0" });
+    const organizationId = Number(first[0].insertId); const secondOrganizationId = Number(second[0].insertId); fixture = { organizationIds: [organizationId, secondOrganizationId] };
+    const nearExpiry = new Date(Date.now() + 3 * 86_400_000);
+    await createFleetVehicle(organizationId, 1, { code: `ALERT-${suffix}`, registrationNumber: `REG-ALERT-${suffix}`, type: "van", ownershipType: "owned", maximumPayloadWeight: 10, maximumVolume: 4, insuranceStartAt: new Date(Date.now() - 7 * 86_400_000), insuranceEndAt: nearExpiry });
+    await createFleetVehicle(secondOrganizationId, 1, { code: `OTHER-${suffix}`, registrationNumber: `REG-OTHER-${suffix}`, type: "van", ownershipType: "owned", maximumPayloadWeight: 10, maximumVolume: 4, insuranceStartAt: new Date(Date.now() - 7 * 86_400_000), insuranceEndAt: nearExpiry });
+    const alerts = await listFleetVehicleDocumentAlerts(organizationId, 30);
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]).toMatchObject({ vehicleCode: `ALERT-${suffix}`, documentType: "insurance", alertLevel: "critical" });
   });
 
   it("يعزل المؤسسة وينقل دفعة نشطة إلى مخزن المركبة مرة واحدة مع حركات مدققة", async () => {

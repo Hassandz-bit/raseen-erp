@@ -50,6 +50,19 @@ export async function listFleetVehicles(organizationId: number) {
   return db.select().from(fleetVehicles).where(eq(fleetVehicles.organizationId, organizationId)).orderBy(desc(fleetVehicles.updatedAt), desc(fleetVehicles.id)).limit(200);
 }
 
+export async function listFleetVehicleDocumentAlerts(organizationId: number, thresholdDays = 30) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const now = new Date();
+  const threshold = new Date(now);
+  threshold.setDate(threshold.getDate() + thresholdDays);
+  const rows = await db.select({ id: fleetVehicleDocuments.id, vehicleId: fleetVehicles.id, vehicleCode: fleetVehicles.code, registrationNumber: fleetVehicles.registrationNumber, documentType: fleetVehicleDocuments.documentType, issuedAt: fleetVehicleDocuments.issuedAt, expiresAt: fleetVehicleDocuments.expiresAt }).from(fleetVehicleDocuments).innerJoin(fleetVehicles, and(eq(fleetVehicles.id, fleetVehicleDocuments.vehicleId), eq(fleetVehicles.organizationId, fleetVehicleDocuments.organizationId))).where(and(eq(fleetVehicleDocuments.organizationId, organizationId), inArray(fleetVehicleDocuments.documentType, ["insurance", "technical_inspection"]), sql`${fleetVehicleDocuments.expiresAt} IS NOT NULL AND ${fleetVehicleDocuments.expiresAt} <= ${threshold}`)).orderBy(asc(fleetVehicleDocuments.expiresAt)).limit(100);
+  return rows.map(row => {
+    const daysUntilExpiry = Math.ceil((row.expiresAt!.getTime() - now.getTime()) / 86_400_000);
+    return { ...row, daysUntilExpiry, alertLevel: daysUntilExpiry < 0 ? "expired" as const : daysUntilExpiry <= 7 ? "critical" as const : "warning" as const };
+  });
+}
+
 export async function createFleetVehicle(organizationId: number, actorUserId: number, input: { code: string; registrationNumber: string; type: string; brand?: string; model?: string; modelYear?: number; branchId?: number; ownerPartyId?: number; ownershipType: "owned" | "leased" | "external"; driverEmployeeId?: number; representativeEmployeeId?: number; maximumPayloadWeight: number; maximumVolume: number; palletCapacity?: number; insuranceStartAt?: Date; insuranceEndAt?: Date; technicalInspectionStartAt?: Date; technicalInspectionEndAt?: Date }) {
   const db = await getDb();
   if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
