@@ -1,0 +1,1 @@
+ALTER TABLE `organization_memberships` MODIFY COLUMN `updatedAt` timestamp NOT NULL ON UPDATE CURRENT_TIMESTAMP;
