@@ -7,7 +7,7 @@ const appSource = readFileSync(resolve(process.cwd(), "client/src/App.tsx"), "ut
 
 describe("صفحة بوابات Nawa", () => {
   it("تستمد البطاقات من تعريف البوابات المركزي وحالة الاشتراك فقط", () => {
-    expect(portalsSource).toContain("nawaPortals.map");
+    expect(portalsSource).toContain("orderedPortals.map");
     expect(portalsSource).toContain("trpc.erp.bootstrap.useQuery");
     expect(portalsSource).toContain("requiredModules");
     expect(portalsSource).not.toContain("organizationId=");
@@ -16,5 +16,10 @@ describe("صفحة بوابات Nawa", () => {
   it("يفصل صفحة البوابات عن الملخص التنفيذي", () => {
     expect(appSource).toContain('path="/" component={PortalsHome}');
     expect(appSource).toContain('path="/executive" component={Home}');
+  });
+
+  it("يقدّم بوابة Nawa AI في ترتيب البطاقات", () => {
+    expect(portalsSource).toContain('a.id === "ai" ? -1');
+    expect(portalsSource).toContain('isAiPortal ? "Nawa AI"');
   });
 });
