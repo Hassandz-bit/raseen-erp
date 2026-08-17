@@ -1072,6 +1072,16 @@ export const erpRouter = router({
         const metrics = await getDashboardMetrics(context.organization.id);
         return askNawaAI({ organizationId: context.organization.id, userId: ctx.user.id, feature: "assistant", prompt: input.prompt, safeContext: { currency: context.organization.baseCurrency, metrics } });
       }),
+    insight: protectedProcedure
+      .input(z.object({ domain: z.enum(["commerce", "inventory"]) }))
+      .mutation(async ({ ctx, input }) => {
+        const context = await requireModule(ctx.user.id, "ai_assistant");
+        const commerce = await getCommerceReportSummary(context.organization.id);
+        const prompt = input.domain === "commerce"
+          ? "حلل مؤشرات التجارة وقدّم توصية واحدة قابلة للتنفيذ بعد موافقة بشرية، مع ذكر الدليل المتاح فقط."
+          : "حلل مخاطر المخزون من المؤشرات المتاحة وقدّم توصية واحدة قابلة للتنفيذ بعد موافقة بشرية، مع ذكر الدليل المتاح فقط.";
+        return askNawaAI({ organizationId: context.organization.id, userId: ctx.user.id, feature: input.domain, prompt, safeContext: { currency: context.organization.baseCurrency, commerce } });
+      }),
   }),
 
   alerts: router({
