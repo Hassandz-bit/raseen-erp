@@ -1,0 +1,19 @@
+import { afterEach, describe, expect, it } from "vitest";
+import { eq } from "drizzle-orm";
+import { attendanceRecords, auditLogs, employees, organizations } from "../drizzle/schema";
+import { attendanceDetails, employeeProfiles, leaveBalances, leaveRequests, leaveTypes, overtimeEntries } from "../drizzle/hrPayrollSchema";
+import { approveOvertimeEntry, createEmployeeProfile, createLeaveType, createOvertimeEntry, decideLeaveRequest, recordAttendance, submitLeaveRequest } from "./hr";
+import { getDb } from "./db";
+
+let organizationIds: number[] = [];
+afterEach(async () => { const db = await getDb(); if (!db) return; for (const id of organizationIds) { await db.delete(auditLogs).where(eq(auditLogs.organizationId, id)); await db.delete(leaveBalances).where(eq(leaveBalances.organizationId, id)); await db.delete(leaveRequests).where(eq(leaveRequests.organizationId, id)); await db.delete(leaveTypes).where(eq(leaveTypes.organizationId, id)); await db.delete(overtimeEntries).where(eq(overtimeEntries.organizationId, id)); await db.delete(attendanceDetails).where(eq(attendanceDetails.organizationId, id)); await db.delete(attendanceRecords).where(eq(attendanceRecords.organizationId, id)); await db.delete(employeeProfiles).where(eq(employeeProfiles.organizationId, id)); await db.delete(employees).where(eq(employees.organizationId, id)); await db.delete(organizations).where(eq(organizations.id, id)); } organizationIds = []; });
+
+describe("تكامل أساس الموارد البشرية", () => {
+  it("يفصل الموظف عن المستخدم ويعزل الحضور والإجازة والساعات الإضافية بين المؤسسات", async () => {
+    const db = await getDb(); expect(db).toBeTruthy(); if (!db) return; const suffix = `${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+    const first = await db.insert(organizations).values({ name: `HR A ${suffix}`, slug: `hr-a-${suffix}`, status: "active", baseCurrency: "SAR", locale: "ar-SA", monthlyBudget: "0" }); const second = await db.insert(organizations).values({ name: `HR B ${suffix}`, slug: `hr-b-${suffix}`, status: "active", baseCurrency: "SAR", locale: "ar-SA", monthlyBudget: "0" }); const orgA = Number(first[0].insertId); const orgB = Number(second[0].insertId); organizationIds = [orgA, orgB];
+    const employeeA = await db.insert(employees).values({ organizationId: orgA, fullName: "موظف أ", employeeNumber: `A-${suffix}`, status: "active" }); const employeeB = await db.insert(employees).values({ organizationId: orgB, fullName: "موظف ب", employeeNumber: `B-${suffix}`, status: "active" }); const employeeAId = Number(employeeA[0].insertId); const employeeBId = Number(employeeB[0].insertId);
+    await expect(createEmployeeProfile(orgA, 1, { employeeId: employeeAId, userId: 777, payrollCurrency: "SAR", fullNameAr: "موظف أ" })).resolves.toMatchObject({ id: expect.any(Number) }); await expect(createEmployeeProfile(orgA, 1, { employeeId: employeeBId, payrollCurrency: "SAR" })).rejects.toThrow("الموظف غير موجود");
+    await recordAttendance(orgA, 1, { employeeId: employeeAId, attendanceDate: new Date("2026-08-17T00:00:00Z"), status: "present", workingMinutes: 480, source: "supervisor" }); const leaveType = await createLeaveType(orgA, 1, { code: `ANNUAL-${suffix}`, name: "إجازة سنوية", defaultDays: 20 }); const leave = await submitLeaveRequest(orgA, 1, { employeeId: employeeAId, leaveTypeId: leaveType.id, startsAt: new Date("2026-08-20T00:00:00Z"), endsAt: new Date("2026-08-21T00:00:00Z"), days: 2, reason: "طلب إجازة" }); await expect(decideLeaveRequest(orgA, 1, leave.id, "approved")).resolves.toMatchObject({ status: "approved" }); const overtime = await createOvertimeEntry(orgA, 1, { employeeId: employeeAId, occurredAt: new Date("2026-08-17T18:00:00Z"), hours: 2, overtimeType: "normal", multiplier: 1.25 }); await expect(approveOvertimeEntry(orgA, 1, overtime.id, true)).resolves.toMatchObject({ status: "approved" });
+  });
+});

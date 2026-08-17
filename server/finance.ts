@@ -14,9 +14,11 @@ const defaultAccounts: AccountSeed[] = [
   { code: "1100", parentCode: "1000", nameAr: "الذمم المدينة", nameFr: "Créances clients", nameEn: "Accounts receivable", accountType: "asset" },
   { code: "1200", parentCode: "1000", nameAr: "المخزون", nameFr: "Stocks", nameEn: "Inventory", accountType: "asset" },
   { code: "1300", parentCode: "1000", nameAr: "إنتاج تحت التشغيل", nameFr: "Production en cours", nameEn: "Work in progress", accountType: "asset" },
+  { code: "1400", parentCode: "1000", nameAr: "سلف الموظفين", nameFr: "Avances aux employés", nameEn: "Employee advances", accountType: "asset" },
   { code: "2000", nameAr: "الالتزامات", nameFr: "Passifs", nameEn: "Liabilities", accountType: "liability", allowManualPosting: "no" },
   { code: "2100", parentCode: "2000", nameAr: "الذمم الدائنة", nameFr: "Dettes fournisseurs", nameEn: "Accounts payable", accountType: "liability" },
   { code: "2200", parentCode: "2000", nameAr: "الضرائب المستحقة", nameFr: "Taxes à payer", nameEn: "Taxes payable", accountType: "liability" },
+  { code: "2300", parentCode: "2000", nameAr: "رواتب مستحقة", nameFr: "Salaires à payer", nameEn: "Payroll payable", accountType: "liability" },
   { code: "3000", nameAr: "حقوق الملكية", nameFr: "Capitaux propres", nameEn: "Equity", accountType: "equity", allowManualPosting: "no" },
   { code: "3100", parentCode: "3000", nameAr: "رأس المال", nameFr: "Capital", nameEn: "Capital", accountType: "equity" },
   { code: "4000", nameAr: "الإيرادات", nameFr: "Produits", nameEn: "Revenue", accountType: "revenue", allowManualPosting: "no" },
@@ -24,6 +26,7 @@ const defaultAccounts: AccountSeed[] = [
   { code: "5000", nameAr: "المصروفات", nameFr: "Charges", nameEn: "Expenses", accountType: "expense", allowManualPosting: "no" },
   { code: "5100", parentCode: "5000", nameAr: "تكلفة المبيعات", nameFr: "Coût des ventes", nameEn: "Cost of sales", accountType: "expense" },
   { code: "5200", parentCode: "5000", nameAr: "مصروفات تشغيلية", nameFr: "Charges d'exploitation", nameEn: "Operating expenses", accountType: "expense" },
+  { code: "5300", parentCode: "5000", nameAr: "مصروفات الرواتب", nameFr: "Charges de paie", nameEn: "Payroll expense", accountType: "expense" },
 ];
 
 const defaultJournals = [
@@ -48,6 +51,10 @@ const defaultMappings = [
   { mappingKey: "production_output", debitCode: "1200", creditCode: "1300" },
   { mappingKey: "inventory_adjustment_loss", debitCode: "5100", creditCode: "1200" },
   { mappingKey: "inventory_adjustment_gain", debitCode: "1200", creditCode: "5100" },
+  { mappingKey: "payroll_posting", debitCode: "5300", creditCode: "2300" },
+  { mappingKey: "payroll_payment", debitCode: "2300", creditCode: "1002" },
+  { mappingKey: "employee_advance_payment", debitCode: "1400", creditCode: "1001" },
+  { mappingKey: "employee_advance_recovery", debitCode: "2300", creditCode: "1400" },
 ];
 
 const entryNumber = () => `JE-${new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14)}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
