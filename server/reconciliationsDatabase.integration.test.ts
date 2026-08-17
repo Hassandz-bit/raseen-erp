@@ -1,0 +1,27 @@
+import { afterEach, describe, expect, it } from "vitest";
+import { eq } from "drizzle-orm";
+import { auditLogs, organizations } from "../drizzle/schema";
+import { accountingJournals, accountingMappings, bankAccounts, bankMovements, bankReconciliationLines, bankReconciliations, cashboxMovements, cashboxes, cashReconciliations, cashTransfers, chartOfAccounts, fiscalPeriods, fiscalYears, journalEntries, journalLines } from "../drizzle/financeSchema";
+import { createFiscalPeriod, createFiscalYear, listChartOfAccounts, seedDefaultChartOfAccounts } from "./finance";
+import { addBankReconciliationLine, changeBankReconciliationStatus, createBankReconciliation, createCashReconciliation, listReconciliations } from "./reconciliations";
+import { createBankAccount, createCashbox, transferTreasuryFunds } from "./treasury";
+import { getDb } from "./db";
+
+let organizationId: number | null = null;
+afterEach(async () => { if (!organizationId) return; const db = await getDb(); if (!db) return; const id = organizationId; await db.delete(auditLogs).where(eq(auditLogs.organizationId, id)); await db.delete(bankReconciliationLines).where(eq(bankReconciliationLines.organizationId, id)); await db.delete(bankReconciliations).where(eq(bankReconciliations.organizationId, id)); await db.delete(cashReconciliations).where(eq(cashReconciliations.organizationId, id)); await db.delete(cashboxMovements).where(eq(cashboxMovements.organizationId, id)); await db.delete(bankMovements).where(eq(bankMovements.organizationId, id)); await db.delete(cashTransfers).where(eq(cashTransfers.organizationId, id)); await db.delete(journalLines).where(eq(journalLines.organizationId, id)); await db.delete(journalEntries).where(eq(journalEntries.organizationId, id)); await db.delete(cashboxes).where(eq(cashboxes.organizationId, id)); await db.delete(bankAccounts).where(eq(bankAccounts.organizationId, id)); await db.delete(accountingMappings).where(eq(accountingMappings.organizationId, id)); await db.delete(fiscalPeriods).where(eq(fiscalPeriods.organizationId, id)); await db.delete(fiscalYears).where(eq(fiscalYears.organizationId, id)); await db.delete(accountingJournals).where(eq(accountingJournals.organizationId, id)); await db.delete(chartOfAccounts).where(eq(chartOfAccounts.organizationId, id)); await db.delete(organizations).where(eq(organizations.id, id)); organizationId = null; });
+
+describe("تكامل مصالحات الخزينة", () => {
+  it("يحسب فروقات المصالحة من الحركات الفعلية ويمنع اعتماد فرق بنكي غير معالج", async () => {
+    const db = await getDb(); expect(db).toBeTruthy(); if (!db) return;
+    const suffix = `${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+    const organization = await db.insert(organizations).values({ name: `مصالحات ${suffix}`, slug: `reconciliation-${suffix}`, status: "active", baseCurrency: "SAR", locale: "ar-SA", monthlyBudget: "0" }); organizationId = Number(organization[0].insertId);
+    await seedDefaultChartOfAccounts(organizationId); const year = await createFiscalYear(organizationId, { name: `FY-${suffix}`, startsAt: new Date("2026-01-01T00:00:00Z"), endsAt: new Date("2026-12-31T23:59:59Z") }); await createFiscalPeriod(organizationId, { fiscalYearId: year.id, name: `AUG-${suffix}`, startsAt: new Date("2026-08-01T00:00:00Z"), endsAt: new Date("2026-08-31T23:59:59Z") });
+    const accounts = await listChartOfAccounts(organizationId); const cash = accounts.find(row => row.code === "1001"); const bankAccount = accounts.find(row => row.code === "1002"); if (!cash || !bankAccount) throw new Error("حسابات الخزينة غير موجودة.");
+    const cashbox = await createCashbox(organizationId, { code: "MAIN", name: "الرئيسي", currencyCode: "SAR", accountId: cash.id }); const bank = await createBankAccount(organizationId, { code: "BANK", name: "التشغيلي", bankName: "اختبار", currencyCode: "SAR", accountId: bankAccount.id }); await transferTreasuryFunds(organizationId, 1, { fromType: "cashbox", fromId: cashbox.id, toType: "bank", toId: bank.id, amount: 300, occurredAt: new Date("2026-08-17T12:00:00Z"), idempotencyKey: `transfer-${suffix}` });
+    const reconciliation = await createBankReconciliation(organizationId, 1, { bankAccountId: bank.id, statementDate: new Date("2026-08-17T23:59:59Z"), statementEndingBalance: 300 }); expect(reconciliation).toMatchObject({ systemBalance: 300, difference: 0 });
+    const [movement] = await db.select().from(bankMovements).where(eq(bankMovements.organizationId, organizationId)); if (!movement) throw new Error("لم تنشأ حركة البنك."); await addBankReconciliationLine(organizationId, 1, { reconciliationId: reconciliation.id, bankMovementId: movement.id, amount: 300, direction: "in", matchStatus: "matched" }); await expect(changeBankReconciliationStatus(organizationId, 1, reconciliation.id, "approved")).resolves.toMatchObject({ status: "approved" });
+    await expect(createCashReconciliation(organizationId, 1, { cashboxId: cashbox.id, reconciledAt: new Date("2026-08-17T23:59:59Z"), actualBalance: 0 })).rejects.toThrow("سبب فرق الصندوق");
+    const cashReconciliation = await createCashReconciliation(organizationId, 1, { cashboxId: cashbox.id, reconciledAt: new Date("2026-08-17T23:59:59Z"), actualBalance: 0, reason: "عد أولي للصندوق" }); expect(cashReconciliation.difference).toBe(300);
+    const listed = await listReconciliations(organizationId); expect(listed.banks).toHaveLength(1); expect(listed.cash).toHaveLength(1);
+  });
+});

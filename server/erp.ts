@@ -15,9 +15,12 @@ import { cancelRetailerOrder, createB2bPromotion, createRetailerOrder, getRetail
 import { calculatePackagingLogistics, findSuitableVehicles, listProductPackaging, listUomCatalog } from "./uomPackaging";
 import { closeProductionOrder, createManufacturingBom, createProductionOrder, getManufacturingOperationalOptions, getManufacturingOverview, getProductionBatchGenealogy, getProductionOrderOperationalDetails, getProductionOrderScope, getProductionTraceability, issueMaterialsForProduction, listProductionOrders, recordProductionExpense, recordProductionOutput, recordProductionQualityCheck, recordProductionWaste, reserveProductionMaterials, returnMaterialsFromProduction, saveManufacturingProductProfile, transitionProductionOrderStatus, updateProductionStage } from "./manufacturing";
 import { canAccessManufacturingOrderScope, canUseManufacturingPermission, isManufacturingScopeAllowed, type ManufacturingPermission } from "./manufacturingPermissionPolicy";
-import { createFiscalPeriod, createFiscalYear, getAccountBalance, listChartOfAccounts, listFinanceSetup, listJournalEntries, postJournalEntry, reverseJournalEntry, seedDefaultChartOfAccounts } from "./finance";
+import { changeFiscalPeriodStatus, createFiscalPeriod, createFiscalYear, getAccountBalance, listChartOfAccounts, listFinanceSetup, listJournalEntries, postJournalEntry, reverseJournalEntry, seedDefaultChartOfAccounts } from "./finance";
+import { getBalanceSheetReport, getCashFlowReport, getGeneralLedgerReport, getProfitAndLossReport, getTrialBalanceReport } from "./financialReports";
 import { postCollection, postDistributionCollection, postDistributionRouteExpense, postInventoryAdjustment, postProductionMaterialIssue, postProductionOutput, postPurchaseOrder, postSalesInvoice } from "./accountingPostingRules";
 import { createBankAccount, createCashbox, getPayableAging, getReceivableAging, listTreasury, recordPayablePayment, transferTreasuryFunds } from "./treasury";
+import { addBankReconciliationLine, changeBankReconciliationStatus, createBankReconciliation, createCashReconciliation, listReconciliations } from "./reconciliations";
+import { approveBudget, createBudget, createCostCenter, getBudgetVsActual, listBudgets, listCostCenters, upsertBudgetLine } from "./financePlanning";
 
 type ModuleKey = "inventory" | "sales" | "purchases" | "finance" | "hr" | "reports" | "ai_assistant" | "distribution" | "manufacturing";
 const operationalModuleKeys = ["inventory", "sales", "purchases", "finance", "hr"] as const;
@@ -452,6 +455,10 @@ export const erpRouter = router({
       const context = await requireFinanceOwner(ctx.user.id);
       return createFiscalPeriod(context.organization.id, input);
     }),
+    changeFiscalPeriodStatus: protectedProcedure.input(z.object({ fiscalPeriodId: z.number().int().positive(), status: z.enum(["open", "closed", "locked"]), reason: z.string().trim().min(3).max(1000) })).mutation(async ({ ctx, input }) => {
+      const context = await requireFinanceOwner(ctx.user.id);
+      return changeFiscalPeriodStatus(context.organization.id, ctx.user.id, input.fiscalPeriodId, input.status, input.reason);
+    }),
     postJournalEntry: protectedProcedure.input(z.object({ journalEntryId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
       const context = await requireFinanceOwner(ctx.user.id);
       return postJournalEntry(context.organization.id, ctx.user.id, input.journalEntryId);
@@ -494,6 +501,80 @@ export const erpRouter = router({
       payables: protectedProcedure.query(async ({ ctx }) => {
         const context = await requireModule(ctx.user.id, "finance");
         return getPayableAging(context.organization.id);
+      }),
+    }),
+    reconciliations: router({
+      list: protectedProcedure.query(async ({ ctx }) => {
+        const context = await requireModule(ctx.user.id, "finance");
+        return listReconciliations(context.organization.id);
+      }),
+      createBank: protectedProcedure.input(z.object({ bankAccountId: z.number().int().positive(), statementDate: z.coerce.date(), statementEndingBalance: z.number(), notes: z.string().trim().max(2000).optional() })).mutation(async ({ ctx, input }) => {
+        const context = await requireFinanceOwner(ctx.user.id);
+        return createBankReconciliation(context.organization.id, ctx.user.id, input);
+      }),
+      addBankLine: protectedProcedure.input(z.object({ reconciliationId: z.number().int().positive(), bankMovementId: z.number().int().positive().optional(), statementReference: z.string().trim().max(128).optional(), statementDate: z.coerce.date().optional(), amount: z.number().positive(), direction: z.enum(["in", "out"]), matchStatus: z.enum(["matched", "unmatched", "excluded"]), notes: z.string().trim().max(2000).optional() })).mutation(async ({ ctx, input }) => {
+        const context = await requireFinanceOwner(ctx.user.id);
+        return addBankReconciliationLine(context.organization.id, ctx.user.id, input);
+      }),
+      changeBankStatus: protectedProcedure.input(z.object({ reconciliationId: z.number().int().positive(), status: z.enum(["reviewed", "approved", "cancelled"]) })).mutation(async ({ ctx, input }) => {
+        const context = await requireFinanceOwner(ctx.user.id);
+        return changeBankReconciliationStatus(context.organization.id, ctx.user.id, input.reconciliationId, input.status);
+      }),
+      createCash: protectedProcedure.input(z.object({ cashboxId: z.number().int().positive(), reconciledAt: z.coerce.date(), actualBalance: z.number(), reason: z.string().trim().max(2000).optional() })).mutation(async ({ ctx, input }) => {
+        const context = await requireFinanceOwner(ctx.user.id);
+        return createCashReconciliation(context.organization.id, ctx.user.id, input);
+      }),
+    }),
+    planning: router({
+      budgets: protectedProcedure.query(async ({ ctx }) => {
+        const context = await requireModule(ctx.user.id, "finance");
+        return listBudgets(context.organization.id);
+      }),
+      costCenters: protectedProcedure.query(async ({ ctx }) => {
+        const context = await requireModule(ctx.user.id, "finance");
+        return listCostCenters(context.organization.id);
+      }),
+      createCostCenter: protectedProcedure.input(z.object({ code: z.string().trim().min(2).max(48), name: z.string().trim().min(2).max(160), branchId: z.number().int().positive().optional(), dimensions: z.record(z.string(), z.union([z.string(), z.number(), z.null()])).optional() })).mutation(async ({ ctx, input }) => {
+        const context = await requireFinanceOwner(ctx.user.id);
+        return createCostCenter(context.organization.id, ctx.user.id, input);
+      }),
+      createBudget: protectedProcedure.input(z.object({ fiscalYearId: z.number().int().positive(), name: z.string().trim().min(2).max(160), notes: z.string().trim().max(2000).optional() })).mutation(async ({ ctx, input }) => {
+        const context = await requireFinanceOwner(ctx.user.id);
+        return createBudget(context.organization.id, ctx.user.id, input);
+      }),
+      upsertBudgetLine: protectedProcedure.input(z.object({ budgetId: z.number().int().positive(), accountId: z.number().int().positive(), fiscalPeriodId: z.number().int().positive(), amount: z.number().nonnegative(), branchId: z.number().int().positive().optional(), costCenterId: z.number().int().positive().optional() })).mutation(async ({ ctx, input }) => {
+        const context = await requireFinanceOwner(ctx.user.id);
+        return upsertBudgetLine(context.organization.id, ctx.user.id, input);
+      }),
+      approveBudget: protectedProcedure.input(z.object({ budgetId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+        const context = await requireFinanceOwner(ctx.user.id);
+        return approveBudget(context.organization.id, ctx.user.id, input.budgetId);
+      }),
+      budgetVsActual: protectedProcedure.input(z.object({ budgetId: z.number().int().positive() })).query(async ({ ctx, input }) => {
+        const context = await requireModule(ctx.user.id, "finance");
+        return getBudgetVsActual(context.organization.id, input.budgetId);
+      }),
+    }),
+    reports: router({
+      generalLedger: protectedProcedure.input(z.object({ startsAt: z.coerce.date().optional(), endsAt: z.coerce.date().optional(), accountId: z.number().int().positive().optional() }).optional()).query(async ({ ctx, input }) => {
+        const context = await requireModule(ctx.user.id, "finance");
+        return getGeneralLedgerReport(context.organization.id, input ?? {});
+      }),
+      trialBalance: protectedProcedure.input(z.object({ startsAt: z.coerce.date().optional(), endsAt: z.coerce.date().optional() }).optional()).query(async ({ ctx, input }) => {
+        const context = await requireModule(ctx.user.id, "finance");
+        return getTrialBalanceReport(context.organization.id, input ?? {});
+      }),
+      profitAndLoss: protectedProcedure.input(z.object({ startsAt: z.coerce.date().optional(), endsAt: z.coerce.date().optional() }).optional()).query(async ({ ctx, input }) => {
+        const context = await requireModule(ctx.user.id, "finance");
+        return getProfitAndLossReport(context.organization.id, input ?? {});
+      }),
+      balanceSheet: protectedProcedure.input(z.object({ startsAt: z.coerce.date().optional(), endsAt: z.coerce.date().optional() }).optional()).query(async ({ ctx, input }) => {
+        const context = await requireModule(ctx.user.id, "finance");
+        return getBalanceSheetReport(context.organization.id, input ?? {});
+      }),
+      cashFlow: protectedProcedure.input(z.object({ startsAt: z.coerce.date().optional(), endsAt: z.coerce.date().optional() }).optional()).query(async ({ ctx, input }) => {
+        const context = await requireModule(ctx.user.id, "finance");
+        return getCashFlowReport(context.organization.id, input ?? {});
       }),
     }),
     posting: router({

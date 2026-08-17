@@ -95,6 +95,20 @@ export async function createFiscalPeriod(organizationId: number, input: { fiscal
   return { id: Number(result[0].insertId), status: "open" as const };
 }
 
+export async function changeFiscalPeriodStatus(organizationId: number, actorUserId: number, fiscalPeriodId: number, status: "open" | "closed" | "locked", reason: string) {
+  if (reason.trim().length < 3) throw new Error("يلزم إدخال سبب واضح لتغيير حالة الفترة المالية.");
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const [period] = await db.select().from(fiscalPeriods).where(and(eq(fiscalPeriods.id, fiscalPeriodId), eq(fiscalPeriods.organizationId, organizationId))).limit(1);
+  if (!period) throw new Error("الفترة المالية غير موجودة ضمن المؤسسة الحالية.");
+  if (period.status === status) return { id: period.id, status, unchanged: true as const };
+  await db.transaction(async tx => {
+    await tx.update(fiscalPeriods).set({ status }).where(and(eq(fiscalPeriods.id, fiscalPeriodId), eq(fiscalPeriods.organizationId, organizationId)));
+    await tx.insert(auditLogs).values({ organizationId, actorUserId, action: status === "open" ? "accounting.period_reopened" : "accounting.period_closed", entityType: "fiscal_period", entityId: String(fiscalPeriodId), metadata: { previousStatus: period.status, nextStatus: status, reason: reason.trim() } });
+  });
+  return { id: fiscalPeriodId, status, unchanged: false as const };
+}
+
 export async function createJournalEntry(organizationId: number, actorUserId: number, input: { journalId: number; fiscalPeriodId: number; entryDate: Date; currencyCode: string; exchangeRateSnapshot?: number; reference?: string; description?: string; sourceModule?: string; sourceDocumentType?: string; sourceDocumentId?: number; lines: FinanceLineInput[] }) {
   assertBalancedJournal(input.lines);
   const db = await getDb();
