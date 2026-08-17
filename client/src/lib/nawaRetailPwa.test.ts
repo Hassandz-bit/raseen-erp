@@ -17,4 +17,9 @@ describe("Nawa Retail PWA", () => {
     expect(worker).toContain("request.method !== \"GET\"");
     expect(worker).toContain('const RETAIL_FALLBACK = "/retailer"');
   });
+
+  it("يحذف نسخ shell القديمة ويدعم مسحاً صريحاً عند الخروج", () => {
+    expect(worker).toContain('key.startsWith("nawa-retail-shell-")');
+    expect(worker).toContain('type === "CLEAR_NAWA_RETAIL_CACHE"');
+  });
 });

@@ -281,6 +281,27 @@
       "when": 1786997949351,
       "tag": "0039_goofy_johnny_storm",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "5",
+      "when": 1786998572144,
+      "tag": "0040_dark_viper",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "5",
+      "when": 1786998830969,
+      "tag": "0041_watery_pandemic",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "5",
+      "when": 1786999189581,
+      "tag": "0042_acoustic_blue_shield",
+      "breakpoints": true
     }
   ]
 }

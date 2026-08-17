@@ -6,7 +6,11 @@ self.addEventListener("install", event => {
 });
 
 self.addEventListener("activate", event => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key.startsWith("nawa-retail-shell-") && key !== RETAIL_SHELL_CACHE).map(key => caches.delete(key)))).then(() => self.clients.claim()));
+});
+
+self.addEventListener("message", event => {
+  if (event.data?.type === "CLEAR_NAWA_RETAIL_CACHE") event.waitUntil(caches.delete(RETAIL_SHELL_CACHE));
 });
 
 self.addEventListener("fetch", event => {

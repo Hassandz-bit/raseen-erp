@@ -2,7 +2,7 @@ import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
 export type RetailerReportOrder = { orderNumber: string; status: string; paymentStatus: string; totalAmount: string | number; currencyCode: string; createdAt: Date | string };
 export type RetailerReportInvoice = { invoiceNumber: string; status: string; grandTotal: string | number; amountPaid: string | number; currencyCode: string; issuedAt: Date | string | null };
-export type RetailerMonthlyReportExport = { period: { month: number; year: number }; currencyCode: string; summary: { orderCount: number; orderTotal: number; invoiceCount: number; invoicedTotal: number; outstandingBalance: number }; orders: RetailerReportOrder[]; invoices: RetailerReportInvoice[] };
+export type RetailerMonthlyReportExport = { period: { month: number; year: number }; currencyCode: string; summary: { orderCount: number; orderTotal: number; invoiceCount: number; invoicedTotal: number; outstandingBalance: number | null }; orders: RetailerReportOrder[]; invoices: RetailerReportInvoice[] };
 
 const date = (value: Date | string | null) => value ? new Date(value).toISOString().slice(0, 10) : "";
 const csv = (value: unknown) => `"${String(value ?? "").replaceAll('"', '""')}"`;
@@ -33,7 +33,7 @@ export async function buildRetailerReportPdf(report: RetailerMonthlyReportExport
   const page = pdf.addPage([842, 595]);
   page.drawText("Nawa Retail — Monthly report", { x: 42, y: 550, size: 18, font: bold, color: rgb(.12, .16, .22) });
   page.drawText(`Period: ${report.period.year}-${String(report.period.month).padStart(2, "0")}  |  Currency: ${report.currencyCode}`, { x: 42, y: 528, size: 10, font });
-  page.drawText(`Orders: ${report.summary.orderCount} (${report.summary.orderTotal})   Invoices: ${report.summary.invoiceCount} (${report.summary.invoicedTotal})   Outstanding: ${report.summary.outstandingBalance}`, { x: 42, y: 507, size: 10, font });
+  page.drawText(`Orders: ${report.summary.orderCount} (${report.summary.orderTotal})   Invoices: ${report.summary.invoiceCount} (${report.summary.invoicedTotal})   Outstanding: ${report.summary.outstandingBalance ?? "withheld"}`, { x: 42, y: 507, size: 10, font });
   page.drawText("Orders", { x: 42, y: 478, size: 12, font: bold });
   page.drawText("Number                         Status                 Payment          Total          Date", { x: 42, y: 462, size: 9, font: bold });
   report.orders.slice(0, 14).forEach((order, index) => page.drawText(`${order.orderNumber.padEnd(31)}${order.status.padEnd(23)}${order.paymentStatus.padEnd(17)}${String(order.totalAmount).padEnd(15)}${date(order.createdAt)}`, { x: 42, y: 446 - index * 14, size: 8, font }));
