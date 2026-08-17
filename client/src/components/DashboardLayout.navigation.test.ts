@@ -46,4 +46,11 @@ describe("تنقل بوابات Nawa", () => {
     expect(source).toContain("chrome.emptyNotifications");
     expect(source).toContain("markNotificationRead.mutate({ notificationId: notification.id })");
   });
+
+  it("يكبر هرمية عنوان الرأس وبيانات المؤسسة بوضوح", () => {
+    expect(source).toContain('md:h-[88px]');
+    expect(source).toContain('text-[21px] font-extrabold');
+    expect(source).toContain('md:text-[26px]');
+    expect(source).toContain('text-[16px] font-bold text-foreground md:text-[18px]');
+  });
 });
