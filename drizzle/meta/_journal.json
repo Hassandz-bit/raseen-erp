@@ -225,6 +225,13 @@
       "when": 1786970035159,
       "tag": "0031_normal_machine_man",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "5",
+      "when": 1786971160365,
+      "tag": "0032_flippant_rhino",
+      "breakpoints": true
     }
   ]
 }

@@ -1,0 +1,1 @@
+ALTER TABLE `commission_entries` ADD `occurredAt` timestamp DEFAULT (now()) NOT NULL;
