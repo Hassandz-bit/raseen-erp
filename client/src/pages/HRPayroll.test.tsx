@@ -12,6 +12,7 @@ vi.mock("@/lib/trpc", () => ({
       directory: { useQuery: () => ({ data: [] }) },
       operations: { useQuery: () => ({ data: { leaves: [], overtime: [] } }) },
       payrollDashboard: { useQuery: () => ({ data: { totals: { gross: 0, net: 0, outstandingAdvances: 0 }, periods: [] } }) },
+      reports: { useQuery: () => ({ data: { payrollRegister: [] }, isLoading: false, error: null }) },
       exportBankFile: { useQuery: () => ({ isFetching: false, refetch: vi.fn() }) },
     } },
     useUtils: () => ({}),
