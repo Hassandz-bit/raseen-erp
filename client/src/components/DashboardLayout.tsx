@@ -26,7 +26,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { useIsMobile } from "@/hooks/useMobile";
 import { navigationFeedbackCopy } from "@/i18n/translations";
 import { trpc } from "@/lib/trpc";
-import { Bell, Bot, Grid2X2, Home, Loader2, LogOut, PanelLeft, Search, Settings2 } from "lucide-react";
+import { Bell, Bot, CircleGauge, Grid2X2, Home, Layers3, Loader2, LogOut, PanelLeft, Search, Settings2, ShieldCheck } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
@@ -34,13 +34,13 @@ import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
-const DEFAULT_WIDTH = 280;
-const MIN_WIDTH = 200;
+const DEFAULT_WIDTH = 304;
+const MIN_WIDTH = 240;
 const MAX_WIDTH = 480;
 const portalChrome = {
-  ar: { portals: "كل البوابات", executive: "الملخص التنفيذي", navigation: "تنقل البوابة", breadcrumbRoot: "نواة", search: "ابحث داخل البوابة…", defaultBranch: "الفرع الافتراضي", notifications: "التنبيهات", settings: "الإعدادات" },
-  fr: { portals: "Tous les portails", executive: "Vue exécutive", navigation: "Navigation du portail", breadcrumbRoot: "Nawa", search: "Rechercher dans le portail…", defaultBranch: "Branche par défaut", notifications: "Notifications", settings: "Paramètres" },
-  en: { portals: "All portals", executive: "Executive overview", navigation: "Portal navigation", breadcrumbRoot: "Nawa", search: "Search this portal…", defaultBranch: "Default branch", notifications: "Notifications", settings: "Settings" },
+  ar: { portals: "كل البوابات", executive: "الملخص التنفيذي", navigation: "تنقل البوابة", breadcrumbRoot: "نواة", search: "ابحث داخل البوابة…", defaultBranch: "الفرع الافتراضي", notifications: "التنبيهات", settings: "الإعدادات", context: "سياق البوابة", liveModules: "وحدات مفعلة", sections: "أقسام متاحة", guarded: "الوصول محكوم خادمياً" },
+  fr: { portals: "Tous les portails", executive: "Vue exécutive", navigation: "Navigation du portail", breadcrumbRoot: "Nawa", search: "Rechercher dans le portail…", defaultBranch: "Branche par défaut", notifications: "Notifications", settings: "Paramètres", context: "Contexte du portail", liveModules: "Modules actifs", sections: "Sections disponibles", guarded: "Accès contrôlé côté serveur" },
+  en: { portals: "All portals", executive: "Executive overview", navigation: "Portal navigation", breadcrumbRoot: "Nawa", search: "Search this portal…", defaultBranch: "Default branch", notifications: "Notifications", settings: "Settings", context: "Portal context", liveModules: "Active modules", sections: "Available sections", guarded: "Server-side access control" },
 } as const;
 
 export default function DashboardLayout({
@@ -128,6 +128,7 @@ function DashboardLayoutContent({
   const activeMenuItem = localItems.find(item => location === item.href || pathWithoutQuery === item.href.split("?")[0]);
   const isMobile = useIsMobile();
   const bootstrap = trpc.erp.bootstrap.useQuery(undefined, { retry: false, refetchOnWindowFocus: false });
+  const activeModuleCount = bootstrap.data?.modules.filter(module => module.status === "active").length ?? 0;
 
   useEffect(() => {
     if (activePortal) localStorage.setItem("nawa:last-portal", activePortal.id);
@@ -195,7 +196,7 @@ function DashboardLayoutContent({
           className={`border-r-0 ${preferences.sidebarMode === "compact" ? "[--sidebar-width:220px]" : ""}`}
           disableTransition={isResizing}
         >
-          <SidebarHeader className="h-16 justify-center">
+          <SidebarHeader className="h-[72px] justify-center border-b border-white/[.06]">
             <div className="flex items-center gap-3 px-2 transition-all w-full">
               <button
                 onClick={toggleSidebar}
@@ -204,20 +205,20 @@ function DashboardLayoutContent({
               >
                 <PanelLeft className="h-4 w-4 text-muted-foreground" />
               </button>
-              {!isCollapsed ? <div className="flex items-center gap-2 min-w-0"><span className="font-semibold tracking-tight truncate">{activePortal?.name[language] ?? chrome.portals}</span></div> : null}
+              {!isCollapsed ? <div className="flex min-w-0 items-center gap-2"><span className="truncate text-[15px] font-bold tracking-tight">{activePortal?.name[language] ?? chrome.portals}</span></div> : null}
             </div>
           </SidebarHeader>
 
-          <SidebarContent className="gap-0">
-            <SidebarMenu className="px-2 py-1">
+          <SidebarContent className="gap-0 overflow-y-auto">
+            <SidebarMenu className="px-2 py-3">
               <SidebarMenuItem>
-                <SidebarMenuButton onClick={() => navigateTo("/", chrome.portals)} tooltip={chrome.portals} className="h-10 font-medium">
-                  <Grid2X2 className="h-4 w-4 text-primary" /><span>{chrome.portals}</span>
+                <SidebarMenuButton onClick={() => navigateTo("/", chrome.portals)} tooltip={chrome.portals} className="h-11 text-[15px] font-semibold">
+                  <Grid2X2 className="h-[18px] w-[18px] text-primary" /><span>{chrome.portals}</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton onClick={() => navigateTo("/executive", chrome.executive)} tooltip={chrome.executive} className="h-10 font-normal">
-                  <Home className="h-4 w-4" /><span>{chrome.executive}</span>
+                <SidebarMenuButton onClick={() => navigateTo("/executive", chrome.executive)} tooltip={chrome.executive} className="h-11 text-[15px] font-medium">
+                  <Home className="h-[18px] w-[18px]" /><span>{chrome.executive}</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               {activePortal ? <p className="px-2 pb-2 pt-4 text-[10px] font-semibold uppercase tracking-[.14em] text-muted-foreground group-data-[collapsible=icon]:hidden">{chrome.navigation}</p> : null}
@@ -226,20 +227,21 @@ function DashboardLayoutContent({
                 const showGroup = index === 0 || item.group[language] !== localItems[index - 1]?.group[language];
                 return (
                   <SidebarMenuItem key={item.id}>
-                    {showGroup ? <p className="px-2 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-[.12em] text-muted-foreground group-data-[collapsible=icon]:hidden">{item.group[language]}</p> : null}
+                    {showGroup ? <p className="px-2 pb-1 pt-4 text-[11px] font-bold uppercase tracking-[.1em] text-muted-foreground group-data-[collapsible=icon]:hidden">{item.group[language]}</p> : null}
                     <SidebarMenuButton
                       isActive={isActive}
                       onClick={() => navigateTo(item.href, item.label[language])}
                       tooltip={item.label[language]}
-                      className={`h-10 transition-all font-normal`}
+                      className="h-11 text-[15px] font-medium transition-all"
                     >
-                      {navigatingTo === item.href ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" /> : activePortal ? <activePortal.icon className={`h-4 w-4 ${isActive ? "text-primary" : ""}`} /> : <Grid2X2 className="h-4 w-4" />}
+                      {navigatingTo === item.href ? <Loader2 className="h-[18px] w-[18px] animate-spin motion-reduce:animate-none" /> : activePortal ? <activePortal.icon className={`h-[18px] w-[18px] ${isActive ? "text-primary" : ""}`} /> : <Grid2X2 className="h-[18px] w-[18px]" />}
                       <span>{item.label[language]}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 );
               })}
             </SidebarMenu>
+            {!isCollapsed ? <aside className="mx-3 mb-4 mt-auto overflow-hidden rounded-2xl border border-primary/15 bg-gradient-to-br from-primary/[.10] via-white/[.035] to-transparent p-4"><div className="flex items-start gap-3"><div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/12 text-primary"><CircleGauge className="h-5 w-5" /></div><div className="min-w-0"><p className="text-[11px] font-bold uppercase tracking-[.12em] text-primary">{chrome.context}</p><p className="mt-1 truncate text-[15px] font-bold text-foreground">{activePortal?.name[language] ?? chrome.portals}</p><p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{activePortal?.description[language] ?? chrome.executive}</p></div></div><div className="mt-4 grid grid-cols-2 gap-2"><div className="rounded-xl border border-white/[.06] bg-white/[.04] p-2.5"><Layers3 className="h-3.5 w-3.5 text-primary" /><p className="mt-2 text-lg font-bold text-foreground">{activeModuleCount}</p><p className="text-[10px] text-muted-foreground">{chrome.liveModules}</p></div><div className="rounded-xl border border-white/[.06] bg-white/[.04] p-2.5"><Grid2X2 className="h-3.5 w-3.5 text-primary" /><p className="mt-2 text-lg font-bold text-foreground">{localItems.length}</p><p className="text-[10px] text-muted-foreground">{chrome.sections}</p></div></div><div className="mt-3 flex items-center gap-2 text-[11px] text-emerald-300"><ShieldCheck className="h-3.5 w-3.5" />{chrome.guarded}</div></aside> : null}
           </SidebarContent>
 
           <SidebarFooter className="p-3">
@@ -288,8 +290,8 @@ function DashboardLayoutContent({
       </div>
 
       <SidebarInset className="min-w-0 flex-1">
-        <div className="sticky top-0 z-40 flex h-14 items-center justify-between gap-2 border-b bg-background/95 px-3 backdrop-blur supports-[backdrop-filter]:backdrop-blur">
-          <div className="flex min-w-0 items-center gap-2"><SidebarTrigger className="h-9 w-9 shrink-0 rounded-lg bg-background" /><div className="min-w-0"><p className="truncate text-sm font-semibold text-foreground">{activePortal?.name[language] ?? chrome.portals}</p><p className="truncate text-[10px] text-muted-foreground">{chrome.breadcrumbRoot} / {activePortal?.name[language] ?? chrome.portals}{activeMenuItem ? ` / ${activeMenuItem.label[language]}` : ""}</p></div><div className="hidden min-w-0 border-s ps-3 text-[10px] text-muted-foreground lg:block"><p className="truncate font-semibold text-foreground">{bootstrap.data?.organization?.name ?? "—"}</p><p className="truncate">{chrome.defaultBranch}</p></div></div>
+        <div className="sticky top-0 z-40 flex h-[68px] items-center justify-between gap-2 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:backdrop-blur">
+          <div className="flex min-w-0 items-center gap-3"><SidebarTrigger className="h-10 w-10 shrink-0 rounded-xl bg-background" /><div className="min-w-0"><p className="truncate text-[16px] font-bold text-foreground">{activePortal?.name[language] ?? chrome.portals}</p><p className="mt-0.5 truncate text-[11px] text-muted-foreground">{chrome.breadcrumbRoot} / {activePortal?.name[language] ?? chrome.portals}{activeMenuItem ? ` / ${activeMenuItem.label[language]}` : ""}</p></div><div className="hidden min-w-0 border-s ps-3 text-[11px] text-muted-foreground lg:block"><p className="truncate font-bold text-foreground">{bootstrap.data?.organization?.name ?? "—"}</p><p className="truncate">{chrome.defaultBranch}</p></div></div>
           <div className="flex shrink-0 items-center gap-1"><label className="hidden h-9 items-center gap-2 rounded-xl border border-white/10 bg-white/[.03] px-3 text-muted-foreground md:flex"><Search className="h-3.5 w-3.5" /><input disabled aria-label={chrome.search} placeholder={chrome.search} className="w-36 bg-transparent text-xs outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed xl:w-52" /></label><Button variant="ghost" size="icon" onClick={() => navigateTo("/workspace", "Nawa AI")} aria-label="Nawa AI" className="h-9 w-9 rounded-xl text-primary"><Bot className="h-4 w-4" /></Button><Button variant="ghost" size="icon" onClick={() => toast.info(chrome.notifications)} aria-label={chrome.notifications} className="relative h-9 w-9 rounded-xl"><Bell className="h-4 w-4" /><span className="absolute end-2 top-2 h-1.5 w-1.5 rounded-full bg-primary" /></Button><Button variant="ghost" size="icon" onClick={() => navigateTo("/settings", chrome.settings)} aria-label={chrome.settings} className="hidden h-9 w-9 rounded-xl sm:inline-flex"><Settings2 className="h-4 w-4" /></Button><Avatar className="hidden h-8 w-8 border border-primary/20 sm:flex"><AvatarFallback className="bg-primary/10 text-[10px] text-primary">{user?.name?.charAt(0).toUpperCase() || "N"}</AvatarFallback></Avatar><DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" size="sm" className="h-9 gap-2 rounded-xl border-white/10 bg-white/[.03] text-xs text-slate-200"><Grid2X2 className="h-4 w-4 text-primary" /><span className="hidden sm:inline">{chrome.portals}</span></Button></DropdownMenuTrigger><DropdownMenuContent align={direction === "rtl" ? "start" : "end"} className="max-h-[70vh] w-64 overflow-y-auto">{nawaPortals.map(portal => <DropdownMenuItem key={portal.id} onClick={() => navigateTo(portal.href, portal.name[language])} className="cursor-pointer gap-2 py-2.5"><portal.icon className="h-4 w-4 text-primary" /><div><p className="text-sm font-medium">{portal.name[language]}</p><p className="text-[10px] text-muted-foreground">{portal.description[language]}</p></div></DropdownMenuItem>)}</DropdownMenuContent></DropdownMenu></div>
         </div>
         {isMobile && (

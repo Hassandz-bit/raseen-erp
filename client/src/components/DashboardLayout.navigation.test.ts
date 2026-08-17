@@ -21,4 +21,11 @@ describe("تنقل بوابات Nawa", () => {
     expect(source).toContain("bootstrap.data?.organization?.name");
     expect(source).not.toContain("organizationId=");
   });
+
+  it("يستغل الشريط الجانبي بلوحة سياق لا تكشف بيانات تشغيلية", () => {
+    expect(source).toContain("chrome.context");
+    expect(source).toContain("chrome.guarded");
+    expect(source).toContain("activeModuleCount");
+    expect(source).toContain("DEFAULT_WIDTH = 304");
+  });
 });
