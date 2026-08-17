@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { addOrganizationExchangeRate, adjustProductBatchQuantity, approveInventoryCount, approveStockTransfer, createBranchForOrganization, createBusinessParty, createInventoryCount, createOperationalNotifications, createOperationalRecord, createOrganizationForUser, createProductBatch, createProductMaster, createPurchaseOrder, createSalesInvoice, createStockTransfer, createWarehouseForOrganization, dispatchStockTransfer, getCommerceReportSummary, getDashboardMetrics, getDefaultTenantContext, getFinancialReportSummary, getOrCreateOrganizationSettings, getOrCreateUserPreferences, getOrganizationRolePermissions, issueSalesInvoiceWithFefo, issueStockByFefo, listBranchesForOrganization, listInventoryCountsForOrganization, listNotificationsForOrganization, listOperationalRecords, listOrganizationCurrencies, listOrganizationExchangeRates, listOrganizationMembersForOrganization, listProductBatchesForOrganization, listProductsForOrganization, listPurchaseOrdersForOrganization, listSalesInvoicesForOrganization, listStockMovementsForOrganization, listStockTransfersForOrganization, listWarehousesForOrganization, markNotificationRead, previewFefoAllocation, receivePurchaseOrder, receiveStockTransfer, recordSalesInvoicePayment, recordStockMovement, saveOrganizationCurrency, sendPurchaseOrder, startInventoryCount, submitInventoryCount, updateOrganizationSettings, updateProductBatchStatus, updateUserPreferences, type OperationalModule } from "./db";
+import { addOrganizationExchangeRate, adjustProductBatchQuantity, approveInventoryCount, approveStockTransfer, createBranchForOrganization, createBusinessParty, createInventoryCount, createOperationalNotifications, createOperationalRecord, createOrganizationForUser, createProductBatch, createProductMaster, createPurchaseOrder, createSalesInvoice, createStockTransfer, createWarehouseForOrganization, dispatchStockTransfer, getCommerceReportSummary, getDashboardMetrics, getDefaultTenantContext, getFinancialReportSummary, getOrCreateOrganizationSettings, getOrCreateUserPreferences, getOrganizationRolePermissions, issueSalesInvoiceWithFefo, issueStockByFefo, listBranchesForOrganization, listInventoryCountsForOrganization, listNotificationsForOrganization, listOperationalRecords, listOrganizationCurrencies, listOrganizationExchangeRates, listOrganizationMembersForOrganization, listProductBatchesForOrganization, listProductsForOrganization, listPurchaseOrdersForOrganization, listSalesInvoicesForOrganization, listStockMovementsForOrganization, listStockTransfersForOrganization, listWarehousesForOrganization, markAllNotificationsRead, markNotificationRead, previewFefoAllocation, receivePurchaseOrder, receiveStockTransfer, recordSalesInvoicePayment, recordStockMovement, saveOrganizationCurrency, sendPurchaseOrder, startInventoryCount, submitInventoryCount, updateOrganizationSettings, updateProductBatchStatus, updateUserPreferences, type OperationalModule } from "./db";
 import { currencyCatalog } from "../shared/currencyCatalog";
 import { askNawaAI } from "./nawaAI";
 import { notifyOwner } from "./_core/notification";
@@ -1121,6 +1121,10 @@ export const erpRouter = router({
       const context = await getTenantContext(ctx.user.id);
       await markNotificationRead(context.organization.id, input.notificationId);
       return { success: true } as const;
+    }),
+    markAllRead: protectedProcedure.mutation(async ({ ctx }) => {
+      const context = await getTenantContext(ctx.user.id);
+      return markAllNotificationsRead(context.organization.id);
     }),
   }),
 

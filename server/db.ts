@@ -874,6 +874,13 @@ export async function markNotificationRead(organizationId: number, notificationI
   await db.update(notifications).set({ isRead: "yes" }).where(and(eq(notifications.id, notificationId), eq(notifications.organizationId, organizationId)));
 }
 
+export async function markAllNotificationsRead(organizationId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const result = await db.update(notifications).set({ isRead: "yes" }).where(and(eq(notifications.organizationId, organizationId), eq(notifications.isRead, "no")));
+  return { updated: Number(result[0]?.affectedRows ?? 0) };
+}
+
 export async function getDashboardMetrics(organizationId: number) {
   const db = await getDb();
   if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");

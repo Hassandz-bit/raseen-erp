@@ -38,4 +38,12 @@ describe("تنقل بوابات Nawa", () => {
     expect(source).toContain("previousUnreadCount");
     expect(source).toContain('aria-live="polite"');
   });
+
+  it("يعرض قائمة الإشعارات ويتيح تحديد الكل كمقروء", () => {
+    expect(source).toContain("trpc.erp.notifications.markAllRead.useMutation");
+    expect(source).toContain("markAllNotificationsRead.mutate()");
+    expect(source).toContain("chrome.markAllRead");
+    expect(source).toContain("chrome.emptyNotifications");
+    expect(source).toContain("markNotificationRead.mutate({ notificationId: notification.id })");
+  });
 });
