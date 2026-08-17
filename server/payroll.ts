@@ -1,5 +1,5 @@
 import { and, eq, gte, inArray, lte, sql } from "drizzle-orm";
-import { attendanceRecords, auditLogs, businessParties, distributionCollections, distributionDeliveries, distributionReturns, distributionRoutes, employees, salesInvoiceItems, salesInvoices } from "../drizzle/schema";
+import { attendanceRecords, auditLogs, businessParties, distributionCollections, distributionDeliveries, distributionDeliveryItems, distributionReturns, distributionRoutes, employees, salesInvoiceItems, salesInvoices } from "../drizzle/schema";
 import { allowanceTypes, commissionEntries, commissionRules, employeeAdvances, employeeAllowances, employeeContracts, overtimeEntries, payrollAdjustments, payrollPeriods, payrollRunEmployees, payslips } from "../drizzle/hrPayrollSchema";
 import { getDb } from "./db";
 
@@ -58,7 +58,7 @@ export async function createCollectionCommissionFromDistributionReceipt(organiza
 export async function createDeliveryCommissionFromCompletedDelivery(organizationId: number, actorUserId: number, deliveryId: number) {
   const db = await getDb(); if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
   const [delivery] = await db.select({ id: distributionDeliveries.id, routeId: distributionDeliveries.routeId, salesInvoiceId: distributionDeliveries.salesInvoiceId, status: distributionDeliveries.status, deliveredAt: distributionDeliveries.deliveredAt }).from(distributionDeliveries).where(and(eq(distributionDeliveries.organizationId, organizationId), eq(distributionDeliveries.id, deliveryId))).limit(1);
-  if (!delivery || delivery.status !== "full" || !delivery.salesInvoiceId) return { created: false, reason: "delivery_not_eligible" as const };
+  if (!delivery || !["full", "partial"].includes(delivery.status) || !delivery.salesInvoiceId) return { created: false, reason: "delivery_not_eligible" as const };
   const [route, invoice, rule] = await Promise.all([
     db.select({ representativeEmployeeId: distributionRoutes.representativeEmployeeId, driverEmployeeId: distributionRoutes.driverEmployeeId }).from(distributionRoutes).where(and(eq(distributionRoutes.organizationId, organizationId), eq(distributionRoutes.id, delivery.routeId))).limit(1),
     db.select({ grandTotal: salesInvoices.grandTotal, currencyCode: salesInvoices.currencyCode }).from(salesInvoices).where(and(eq(salesInvoices.organizationId, organizationId), eq(salesInvoices.id, delivery.salesInvoiceId))).limit(1),
@@ -66,35 +66,52 @@ export async function createDeliveryCommissionFromCompletedDelivery(organization
   ]);
   const employeeId = route[0]?.representativeEmployeeId ?? route[0]?.driverEmployeeId;
   if (!employeeId || !invoice[0] || !rule[0]) return { created: false, reason: "missing_attribution_or_rule" as const };
-  const [employee, existing] = await Promise.all([
+  const [employee, deliveryItems, invoiceItems] = await Promise.all([
     db.select({ id: employees.id }).from(employees).where(and(eq(employees.organizationId, organizationId), eq(employees.id, employeeId))).limit(1),
-    db.select({ id: commissionEntries.id }).from(commissionEntries).where(and(eq(commissionEntries.organizationId, organizationId), eq(commissionEntries.employeeId, employeeId), eq(commissionEntries.sourceModule, "distribution"), eq(commissionEntries.sourceDocumentType, "distribution_delivery"), eq(commissionEntries.sourceDocumentId, delivery.id))).limit(1),
+    db.select().from(distributionDeliveryItems).where(and(eq(distributionDeliveryItems.organizationId, organizationId), eq(distributionDeliveryItems.deliveryId, delivery.id))),
+    db.select().from(salesInvoiceItems).where(and(eq(salesInvoiceItems.organizationId, organizationId), eq(salesInvoiceItems.invoiceId, delivery.salesInvoiceId))),
   ]);
-  const basis = value(invoice[0].grandTotal); const amount = rule[0].calculationType === "percentage" ? basis * value(rule[0].value) / 100 : value(rule[0].value);
   if (!employee[0]) return { created: false, reason: "beneficiary_outside_organization" as const };
-  if (existing[0]) return { created: false, reason: "duplicate_source" as const, amount };
-  try { await db.insert(commissionEntries).values({ organizationId, employeeId, commissionRuleId: rule[0].id, sourceModule: "distribution", sourceDocumentType: "distribution_delivery", sourceDocumentId: delivery.id, occurredAt: delivery.deliveredAt ?? new Date(), amount: String(amount), currencyCode: invoice[0].currencyCode, status: "approved", approvedByUserId: actorUserId }); }
-  catch (error) { if (String(error).toLowerCase().includes("duplicate")) return { created: false, reason: "duplicate_source" as const, amount }; throw error; }
-  await db.insert(auditLogs).values({ organizationId, actorUserId, action: "hr.commission_auto_delivery_created", entityType: "commission_entry", entityId: String(delivery.id), metadata: { deliveryId: delivery.id, employeeId, commissionRuleId: rule[0].id, basis, rate: value(rule[0].value), amount, eventDate: (delivery.deliveredAt ?? new Date()).toISOString() } });
-  return { created: true, reason: "created" as const, amount };
+  let totalBasis = 0; let totalAmount = 0; let createdLines = 0; let eligibleLines = 0; let duplicateLines = 0;
+  for (const item of deliveryItems) {
+    const invoiceLine = invoiceItems.find(line => line.productId === item.productId);
+    const deliveredQuantity = Math.max(0, value(item.deliveredQuantity));
+    if (!invoiceLine || deliveredQuantity <= 0 || value(invoiceLine.quantity) <= 0) continue;
+    const unitValue = value(invoiceLine.lineTotal) / value(invoiceLine.quantity);
+    const basis = Math.max(0, deliveredQuantity * unitValue);
+    if (basis <= 0) continue;
+    eligibleLines += 1;
+    const amount = rule[0].calculationType === "percentage" ? basis * value(rule[0].value) / 100 : value(rule[0].value) * (basis / Math.max(value(invoice[0].grandTotal), 1));
+    const [existing] = await db.select({ id: commissionEntries.id }).from(commissionEntries).where(and(eq(commissionEntries.organizationId, organizationId), eq(commissionEntries.employeeId, employeeId), eq(commissionEntries.sourceModule, "distribution"), eq(commissionEntries.sourceDocumentType, "distribution_delivery_item"), eq(commissionEntries.sourceDocumentId, item.id))).limit(1);
+    if (existing) { duplicateLines += 1; continue; }
+    try { await db.insert(commissionEntries).values({ organizationId, employeeId, commissionRuleId: rule[0].id, sourceModule: "distribution", sourceDocumentType: "distribution_delivery_item", sourceDocumentId: item.id, occurredAt: delivery.deliveredAt ?? new Date(), amount: String(amount), currencyCode: invoice[0].currencyCode, status: "approved", approvedByUserId: actorUserId }); }
+    catch (error) { if (!String(error).toLowerCase().includes("duplicate")) throw error; continue; }
+    totalBasis += basis; totalAmount += amount; createdLines += 1;
+  }
+  if (!createdLines) return { created: false, reason: eligibleLines > 0 && duplicateLines === eligibleLines ? "duplicate_source" as const : "zero_basis" as const, amount: 0, basis: 0 };
+  await db.insert(auditLogs).values({ organizationId, actorUserId, action: "hr.commission_auto_delivery_created", entityType: "distribution_delivery", entityId: String(delivery.id), metadata: { deliveryId: delivery.id, employeeId, commissionRuleId: rule[0].id, basis: totalBasis, rate: value(rule[0].value), amount: totalAmount, deliveryItems: createdLines, eventDate: (delivery.deliveredAt ?? new Date()).toISOString() } });
+  return { created: true, reason: "created" as const, amount: totalAmount, basis: totalBasis, lines: createdLines };
 }
 
 export async function reverseDeliveryCommissionFromReturn(organizationId: number, actorUserId: number, returnId: number) {
   const db = await getDb(); if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
   const [returned] = await db.select({ id: distributionReturns.id, deliveryId: distributionReturns.deliveryId, salesInvoiceId: distributionReturns.salesInvoiceId, productId: distributionReturns.productId, quantity: distributionReturns.quantity, createdAt: distributionReturns.createdAt }).from(distributionReturns).where(and(eq(distributionReturns.organizationId, organizationId), eq(distributionReturns.id, returnId))).limit(1);
   if (!returned?.deliveryId || !returned.salesInvoiceId) return { created: false, reason: "return_not_eligible" as const };
-  const [original, invoice, line, existing] = await Promise.all([
-    db.select().from(commissionEntries).where(and(eq(commissionEntries.organizationId, organizationId), eq(commissionEntries.sourceModule, "distribution"), eq(commissionEntries.sourceDocumentType, "distribution_delivery"), eq(commissionEntries.sourceDocumentId, returned.deliveryId))).limit(1),
-    db.select({ grandTotal: salesInvoices.grandTotal }).from(salesInvoices).where(and(eq(salesInvoices.organizationId, organizationId), eq(salesInvoices.id, returned.salesInvoiceId))).limit(1),
-    db.select({ quantity: salesInvoiceItems.quantity, lineTotal: salesInvoiceItems.lineTotal }).from(salesInvoiceItems).where(and(eq(salesInvoiceItems.organizationId, organizationId), eq(salesInvoiceItems.invoiceId, returned.salesInvoiceId), eq(salesInvoiceItems.productId, returned.productId))).limit(1),
+  const [deliveryItems, priorReturns, existing] = await Promise.all([
+    db.select().from(distributionDeliveryItems).where(and(eq(distributionDeliveryItems.organizationId, organizationId), eq(distributionDeliveryItems.deliveryId, returned.deliveryId), eq(distributionDeliveryItems.productId, returned.productId))),
+    db.select({ quantity: distributionReturns.quantity }).from(distributionReturns).where(and(eq(distributionReturns.organizationId, organizationId), eq(distributionReturns.deliveryId, returned.deliveryId), eq(distributionReturns.productId, returned.productId))),
     db.select({ id: commissionEntries.id }).from(commissionEntries).where(and(eq(commissionEntries.organizationId, organizationId), eq(commissionEntries.sourceModule, "distribution"), eq(commissionEntries.sourceDocumentType, "distribution_return_reversal"), eq(commissionEntries.sourceDocumentId, returned.id))).limit(1),
   ]);
-  if (!original[0] || !invoice[0] || !line[0]) return { created: false, reason: "missing_original_or_basis" as const };
-  const originalAmount = value(original[0].amount); const unitValue = value(line[0].quantity) > 0 ? value(line[0].lineTotal) / value(line[0].quantity) : 0; const returnedValue = unitValue * value(returned.quantity); const reversal = Math.min(originalAmount, originalAmount * (returnedValue / Math.max(value(invoice[0].grandTotal), 1)));
+  const deliveredQuantity = deliveryItems.reduce((sum, item) => sum + value(item.deliveredQuantity), 0); const priorQuantity = Math.max(0, priorReturns.reduce((sum, item) => sum + value(item.quantity), 0) - value(returned.quantity)); const eligibleQuantity = Math.min(value(returned.quantity), Math.max(0, deliveredQuantity - priorQuantity));
+  const originals = [] as Array<{ employeeId: number; commissionRuleId: number | null; amount: number; currencyCode: string; deliveredQuantity: number }>;
+  for (const item of deliveryItems) { const [entry] = await db.select().from(commissionEntries).where(and(eq(commissionEntries.organizationId, organizationId), eq(commissionEntries.sourceModule, "distribution"), eq(commissionEntries.sourceDocumentType, "distribution_delivery_item"), eq(commissionEntries.sourceDocumentId, item.id))).limit(1); if (entry) originals.push({ employeeId: entry.employeeId, commissionRuleId: entry.commissionRuleId, amount: value(entry.amount), currencyCode: entry.currencyCode, deliveredQuantity: value(item.deliveredQuantity) }); }
+  if (!originals.length || deliveredQuantity <= 0) return { created: false, reason: "missing_original_or_basis" as const };
+  const originalAmount = originals.reduce((sum, item) => sum + item.amount, 0); const reversal = Math.min(originalAmount, originalAmount * (eligibleQuantity / deliveredQuantity));
   if (existing[0] || reversal <= 0) return { created: false, reason: existing[0] ? "duplicate_source" as const : "zero_reversal" as const, amount: reversal };
-  try { await db.insert(commissionEntries).values({ organizationId, employeeId: original[0].employeeId, commissionRuleId: original[0].commissionRuleId, sourceModule: "distribution", sourceDocumentType: "distribution_return_reversal", sourceDocumentId: returned.id, occurredAt: returned.createdAt, amount: String(-reversal), currencyCode: original[0].currencyCode, status: "approved", approvedByUserId: actorUserId }); }
+  const original = originals[0];
+  try { await db.insert(commissionEntries).values({ organizationId, employeeId: original.employeeId, commissionRuleId: original.commissionRuleId, sourceModule: "distribution", sourceDocumentType: "distribution_return_reversal", sourceDocumentId: returned.id, occurredAt: returned.createdAt, amount: String(-reversal), currencyCode: original.currencyCode, status: "approved", approvedByUserId: actorUserId }); }
   catch (error) { if (String(error).toLowerCase().includes("duplicate")) return { created: false, reason: "duplicate_source" as const, amount: reversal }; throw error; }
-  await db.insert(auditLogs).values({ organizationId, actorUserId, action: "hr.commission_delivery_reversed", entityType: "commission_entry", entityId: String(returned.id), metadata: { returnId: returned.id, deliveryId: returned.deliveryId, employeeId: original[0].employeeId, returnedValue, reversal } });
+  await db.insert(auditLogs).values({ organizationId, actorUserId, action: "hr.commission_delivery_reversed", entityType: "commission_entry", entityId: String(returned.id), metadata: { returnId: returned.id, deliveryId: returned.deliveryId, employeeId: original.employeeId, deliveredQuantity, eligibleQuantity, reversal } });
   return { created: true, reason: "reversed" as const, amount: reversal };
 }
 export async function calculatePayroll(organizationId: number, actorUserId: number, payrollPeriodId: number) {

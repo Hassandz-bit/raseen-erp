@@ -1,6 +1,6 @@
 import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm";
 import {
-  auditLogs, branches, businessParties, distributionCollections, distributionDeliveries, distributionDeliveryItems, distributionDeliveryProofs, distributionGeofenceEvents, distributionIdempotencyKeys, distributionReturns, distributionRouteClosings, distributionRouteExpenses, distributionRouteStops, distributionRoutes, distributionSettings, distributionTerritories, employees, fleetFuelLogs, fleetGpsRecords, fleetMaintenanceRecords, fleetVehicleDocuments, fleetVehicles, inventoryBalances, organizationSettings, productBatches, products, salesInvoices, stockMovements, vehicleLoadItems, vehicleLoadOrders, warehouses,
+  auditLogs, branches, businessParties, distributionCollections, distributionDeliveries, distributionDeliveryItems, distributionDeliveryProofs, distributionGeofenceEvents, distributionIdempotencyKeys, distributionReturns, distributionRouteClosings, distributionRouteExpenses, distributionRouteStops, distributionRoutes, distributionSettings, distributionTerritories, employees, fleetFuelLogs, fleetGpsRecords, fleetMaintenanceRecords, fleetVehicleDocuments, fleetVehicles, inventoryBalances, organizationSettings, productBatches, products, salesInvoiceItems, salesInvoices, stockMovements, vehicleLoadItems, vehicleLoadOrders, warehouses,
 } from "../drizzle/schema";
 import { createSalesInvoice, getDb, issueSalesInvoiceWithFefo, recordSalesInvoicePayment } from "./db";
 import { calculateLoadCapacity, canTransitionDistributionRoute, canTransitionRouteClosing, canTransitionVehicleLoad } from "./distributionPolicy";
@@ -259,9 +259,26 @@ export async function recordDistributionDelivery(organizationId: number, actorUs
     const route = await assertOrganizationRecord((await tx.select().from(distributionRoutes).where(and(eq(distributionRoutes.id, input.routeId), eq(distributionRoutes.organizationId, organizationId))).limit(1))[0], "الجولة");
     if (!route.vehicleId || !["started", "in_progress", "returning"].includes(route.status)) throw new Error("لا يمكن تسجيل تسليم خارج جولة بدأت ومركبة مسندة.");
     const customer = await assertOrganizationRecord((await tx.select().from(businessParties).where(and(eq(businessParties.id, input.customerId), eq(businessParties.organizationId, organizationId))).limit(1))[0], "العميل");
+    const invoiceLineQuantities = new Map<number, number>();
+    const priorDeliveredQuantities = new Map<number, number>();
     if (input.salesInvoiceId) {
       const invoice = await assertOrganizationRecord((await tx.select().from(salesInvoices).where(and(eq(salesInvoices.id, input.salesInvoiceId), eq(salesInvoices.organizationId, organizationId))).limit(1))[0], "فاتورة المبيعات");
       if (invoice.customerId !== customer.id) throw new Error("لا تطابق الفاتورة العميل المحدد للتسليم.");
+      const [invoiceLines, priorDeliveries] = await Promise.all([
+        tx.select({ productId: salesInvoiceItems.productId, quantity: salesInvoiceItems.quantity }).from(salesInvoiceItems).where(and(eq(salesInvoiceItems.organizationId, organizationId), eq(salesInvoiceItems.invoiceId, input.salesInvoiceId))),
+        tx.select({ id: distributionDeliveries.id }).from(distributionDeliveries).where(and(eq(distributionDeliveries.organizationId, organizationId), eq(distributionDeliveries.salesInvoiceId, input.salesInvoiceId))),
+      ]);
+      for (const line of invoiceLines) invoiceLineQuantities.set(line.productId, (invoiceLineQuantities.get(line.productId) ?? 0) + base(line.quantity));
+      if (priorDeliveries.length) {
+        const priorItems = await tx.select({ productId: distributionDeliveryItems.productId, deliveredQuantity: distributionDeliveryItems.deliveredQuantity }).from(distributionDeliveryItems).where(and(eq(distributionDeliveryItems.organizationId, organizationId), inArray(distributionDeliveryItems.deliveryId, priorDeliveries.map(delivery => delivery.id))));
+        for (const item of priorItems) priorDeliveredQuantities.set(item.productId, (priorDeliveredQuantities.get(item.productId) ?? 0) + base(item.deliveredQuantity));
+      }
+      for (const item of input.items) {
+        const permitted = invoiceLineQuantities.get(item.productId);
+        if (permitted === undefined) throw new Error("لا يوجد بند فاتورة مطابق لصنف التسليم.");
+        const cumulative = (priorDeliveredQuantities.get(item.productId) ?? 0) + item.deliveredQuantity;
+        if (cumulative > permitted) throw new Error("تتجاوز كمية التسليم التراكمية الكمية القابلة للتسليم في الفاتورة.");
+      }
     }
     if (input.stopId) await assertOrganizationRecord((await tx.select().from(distributionRouteStops).where(and(eq(distributionRouteStops.id, input.stopId), eq(distributionRouteStops.organizationId, organizationId), eq(distributionRouteStops.routeId, input.routeId), eq(distributionRouteStops.customerId, input.customerId))).limit(1))[0], "محطة الجولة");
     const statuses = input.items.map(item => item.deliveredQuantity > 0 ? "full" : "failed");

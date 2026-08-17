@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { auditLogs, businessParties, distributionCollections, distributionDeliveries, distributionReturns, distributionRoutes, employees, organizations, salesInvoiceItems, salesInvoices } from "../drizzle/schema";
+import { auditLogs, businessParties, distributionCollections, distributionDeliveries, distributionDeliveryItems, distributionReturns, distributionRoutes, employees, organizations, salesInvoiceItems, salesInvoices } from "../drizzle/schema";
 import { commissionEntries, commissionRules } from "../drizzle/hrPayrollSchema";
 import { getDb } from "./db";
 import { createCollectionCommissionFromDistributionReceipt, createDeliveryCommissionFromCompletedDelivery, createSalesCommissionFromIssuedInvoice, reverseDeliveryCommissionFromReturn } from "./payroll";
@@ -14,6 +14,7 @@ afterEach(async () => {
   await db.delete(commissionEntries).where(eq(commissionEntries.organizationId, id));
   await db.delete(commissionRules).where(eq(commissionRules.organizationId, id));
   await db.delete(distributionReturns).where(eq(distributionReturns.organizationId, id));
+  await db.delete(distributionDeliveryItems).where(eq(distributionDeliveryItems.organizationId, id));
   await db.delete(distributionDeliveries).where(eq(distributionDeliveries.organizationId, id));
   await db.delete(distributionRoutes).where(eq(distributionRoutes.organizationId, id));
   await db.delete(distributionCollections).where(eq(distributionCollections.organizationId, id));
@@ -67,7 +68,7 @@ describe("عمولة المبيعات التلقائية", () => {
     expect(entries[0]).toMatchObject({ employeeId, sourceDocumentType: "distribution_collection", sourceDocumentId: collectionId, amount: "40.00" });
   });
 
-  it("ينشئ عمولة تسليم كاملة مرة واحدة لمسؤول الجولة الموثوق", async () => {
+  it("يحسب كل تسليم جزئي حسب قيمة بنوده الفعلية ويتجاهل الكمية المجانية ويعكس المرتجع بنسبة الجزء المسلم", async () => {
     const db = await getDb(); expect(db).toBeTruthy(); if (!db) return;
     const suffix = `${Date.now()}-${Math.floor(Math.random() * 100_000)}`;
     const org = await db.insert(organizations).values({ name: `تسليم عمولة ${suffix}`, slug: `delivery-commission-${suffix}`, status: "active", baseCurrency: "SAR", locale: "ar-SA", monthlyBudget: "0" });
@@ -77,24 +78,34 @@ describe("عمولة المبيعات التلقائية", () => {
     await db.insert(commissionRules).values({ organizationId, name: "عمولة تسليم 4%", sourceType: "deliveries", calculationType: "percentage", value: "4", status: "active" });
     const route = await db.insert(distributionRoutes).values({ organizationId, routeNumber: `RT-${suffix}`, routeDate: new Date(), representativeEmployeeId: employeeId });
     const routeId = Number(route[0].insertId);
-    const invoice = await db.insert(salesInvoices).values({ organizationId, invoiceNumber: `INV-D-${suffix}`, status: "issued", grandTotal: "500", currencyCode: "SAR", issuedAt: new Date() });
+    const invoice = await db.insert(salesInvoices).values({ organizationId, invoiceNumber: `INV-D-${suffix}`, status: "issued", grandTotal: "700", currencyCode: "SAR", issuedAt: new Date() });
     const invoiceId = Number(invoice[0].insertId);
-    await db.insert(salesInvoiceItems).values({ organizationId, invoiceId, productId: 99, warehouseId: 1, quantity: "10", unit: "unit", unitPrice: "50", lineTotal: "500" });
-    const delivery = await db.insert(distributionDeliveries).values({ organizationId, deliveryNumber: `DL-${suffix}`, routeId, vehicleId: 1, customerId: 1, salesInvoiceId: invoiceId, status: "full", deliveredAt: new Date(), idempotencyKey: `delivery-${suffix}` });
-    const deliveryId = Number(delivery[0].insertId);
-    const first = await createDeliveryCommissionFromCompletedDelivery(organizationId, 1, deliveryId);
-    const duplicate = await createDeliveryCommissionFromCompletedDelivery(organizationId, 1, deliveryId);
-    const returned = await db.insert(distributionReturns).values({ organizationId, returnNumber: `RET-${suffix}`, routeId, vehicleId: 1, customerId: 1, deliveryId, salesInvoiceId: invoiceId, productId: 99, vehicleBatchId: 1, quantity: "2", unit: "unit", idempotencyKey: `return-${suffix}` });
+    await db.insert(salesInvoiceItems).values([{ organizationId, invoiceId, productId: 99, warehouseId: 1, quantity: "10", unit: "unit", unitPrice: "50", lineTotal: "500" }, { organizationId, invoiceId, productId: 100, warehouseId: 1, quantity: "10", unit: "unit", unitPrice: "20", lineTotal: "200" }, { organizationId, invoiceId, productId: 101, warehouseId: 1, quantity: "5", unit: "unit", unitPrice: "0", lineTotal: "0" }]);
+    const firstDelivery = await db.insert(distributionDeliveries).values({ organizationId, deliveryNumber: `DL1-${suffix}`, routeId, vehicleId: 1, customerId: 1, salesInvoiceId: invoiceId, status: "partial", deliveredAt: new Date("2026-08-15T00:00:00Z"), idempotencyKey: `delivery-1-${suffix}` });
+    const firstDeliveryId = Number(firstDelivery[0].insertId);
+    await db.insert(distributionDeliveryItems).values([{ organizationId, deliveryId: firstDeliveryId, productId: 99, vehicleBatchId: 1, expectedQuantity: "10", deliveredQuantity: "6", rejectedQuantity: "0", returnedQuantity: "0", unit: "unit" }, { organizationId, deliveryId: firstDeliveryId, productId: 100, vehicleBatchId: 2, expectedQuantity: "10", deliveredQuantity: "4", rejectedQuantity: "0", returnedQuantity: "0", unit: "unit" }, { organizationId, deliveryId: firstDeliveryId, productId: 101, vehicleBatchId: 3, expectedQuantity: "5", deliveredQuantity: "5", rejectedQuantity: "0", returnedQuantity: "0", unit: "unit" }]);
+    const secondDelivery = await db.insert(distributionDeliveries).values({ organizationId, deliveryNumber: `DL2-${suffix}`, routeId, vehicleId: 1, customerId: 1, salesInvoiceId: invoiceId, status: "partial", deliveredAt: new Date("2026-09-15T00:00:00Z"), idempotencyKey: `delivery-2-${suffix}` });
+    const secondDeliveryId = Number(secondDelivery[0].insertId);
+    await db.insert(distributionDeliveryItems).values([{ organizationId, deliveryId: secondDeliveryId, productId: 99, vehicleBatchId: 1, expectedQuantity: "4", deliveredQuantity: "4", rejectedQuantity: "0", returnedQuantity: "0", unit: "unit" }, { organizationId, deliveryId: secondDeliveryId, productId: 100, vehicleBatchId: 2, expectedQuantity: "6", deliveredQuantity: "6", rejectedQuantity: "0", returnedQuantity: "0", unit: "unit" }]);
+    const first = await createDeliveryCommissionFromCompletedDelivery(organizationId, 1, firstDeliveryId);
+    const duplicate = await createDeliveryCommissionFromCompletedDelivery(organizationId, 1, firstDeliveryId);
+    const second = await createDeliveryCommissionFromCompletedDelivery(organizationId, 1, secondDeliveryId);
+    const returned = await db.insert(distributionReturns).values({ organizationId, returnNumber: `RET-${suffix}`, routeId, vehicleId: 1, customerId: 1, deliveryId: firstDeliveryId, salesInvoiceId: invoiceId, productId: 99, vehicleBatchId: 1, quantity: "1", unit: "unit", idempotencyKey: `return-${suffix}` });
     const returnId = Number(returned[0].insertId);
     const reversal = await reverseDeliveryCommissionFromReturn(organizationId, 1, returnId);
     const repeatedReversal = await reverseDeliveryCommissionFromReturn(organizationId, 1, returnId);
+    const secondReturned = await db.insert(distributionReturns).values({ organizationId, returnNumber: `RET-2-${suffix}`, routeId, vehicleId: 1, customerId: 1, deliveryId: firstDeliveryId, salesInvoiceId: invoiceId, productId: 99, vehicleBatchId: 1, quantity: "6", unit: "unit", idempotencyKey: `return-2-${suffix}` });
+    const secondReversal = await reverseDeliveryCommissionFromReturn(organizationId, 1, Number(secondReturned[0].insertId));
     const entries = await db.select().from(commissionEntries).where(eq(commissionEntries.organizationId, organizationId));
-    expect(first).toMatchObject({ created: true, amount: 20 });
+    expect(first).toMatchObject({ created: true, basis: 380, amount: 15.2, lines: 2 });
     expect(duplicate).toMatchObject({ created: false, reason: "duplicate_source" });
-    expect(reversal).toMatchObject({ created: true, amount: 4 });
+    expect(second).toMatchObject({ created: true, basis: 320, amount: 12.8, lines: 2 });
+    expect(reversal).toMatchObject({ created: true, amount: 2 });
     expect(repeatedReversal).toMatchObject({ created: false, reason: "duplicate_source" });
-    expect(entries).toHaveLength(2);
-    expect(entries.find(entry => entry.sourceDocumentType === "distribution_delivery")).toMatchObject({ employeeId, sourceDocumentId: deliveryId, amount: "20.00" });
-    expect(entries.find(entry => entry.sourceDocumentType === "distribution_return_reversal")).toMatchObject({ employeeId, sourceDocumentId: returnId, amount: "-4.00" });
+    expect(secondReversal).toMatchObject({ created: true, amount: 10 });
+    expect(entries).toHaveLength(6);
+    expect(entries.filter(entry => entry.sourceDocumentType === "distribution_delivery_item").reduce((sum, entry) => sum + Number(entry.amount), 0)).toBe(28);
+    expect(entries.filter(entry => entry.sourceDocumentType === "distribution_return_reversal").reduce((sum, entry) => sum + Number(entry.amount), 0)).toBe(-12);
+    expect(entries.find(entry => entry.sourceDocumentType === "distribution_return_reversal" && entry.sourceDocumentId === returnId)).toMatchObject({ employeeId, amount: "-2.00" });
   });
 });
