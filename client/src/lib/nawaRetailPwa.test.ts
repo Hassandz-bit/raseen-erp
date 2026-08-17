@@ -1,0 +1,20 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+
+const manifest = JSON.parse(readFileSync(resolve(process.cwd(), "client/public/retail.webmanifest"), "utf8"));
+const worker = readFileSync(resolve(process.cwd(), "client/public/nawa-retail-sw.js"), "utf8");
+
+describe("Nawa Retail PWA", () => {
+  it("يبدأ من بوابة التاجر المستقلة", () => {
+    expect(manifest.name).toBe("Nawa Retail");
+    expect(manifest.start_url).toBe("/retailer");
+    expect(manifest.display).toBe("standalone");
+  });
+
+  it("لا يخزن أي استدعاء API أو بيانات تجارية في التخزين المؤقت", () => {
+    expect(worker).toContain('url.pathname.startsWith("/api/")');
+    expect(worker).toContain("request.method !== \"GET\"");
+    expect(worker).toContain('const RETAIL_FALLBACK = "/retailer"');
+  });
+});

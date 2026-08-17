@@ -1,0 +1,9 @@
+{
+  "name": "Nawa Retail",
+  "short_name": "Nawa Retail",
+  "start_url": "/retailer",
+  "display": "standalone",
+  "background_color": "#0b0e14",
+  "theme_color": "#0b0e14",
+  "description": "بوابة B2B مغلقة للتجار المعتمدين في Nawa ERP. لا يخزن التطبيق أي طلبات أو أسعار أو بيانات تجارية للاستخدام دون اتصال."
+}

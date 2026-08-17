@@ -11,7 +11,7 @@ import { isValidTextBarcode } from "./barcodePolicy";
 import { classifyBranchPersistenceError } from "./branchPolicy";
 import { canUseDistributionPermission, isScopedIdAllowed, type DistributionPermission } from "./distributionPolicy";
 import { addDistributionRouteExpense, completeDriverStop, createDistributionRoute, createDistributionTerritory, createDriverVanSale, createFleetVehicle, createMaintenanceRecord, createVehicleDocument, createVehicleLoadOrder, getDistributionControlCenter, getDistributionOwnerAlertReasons, getDistributionSettings, getDriverRouteFeed, getDriverRouteInventory, getLatestFleetLocations, listDistributionRoutes, listDistributionTerritories, listFleetVehicleDocumentAlerts, listFleetVehicles, listVehicleInventory, logFuel, recordDistributionCollection, recordDistributionDelivery, recordDistributionReturn, recordFleetGpsPoint, recordGeofenceEvent, returnVehicleStockToWarehouse, saveDistributionSettings, submitDistributionDeliveryProof, submitRouteClosing, transitionDistributionRoute, transitionRouteClosing, transitionVehicleLoadOrder } from "./distribution";
-import { cancelRetailerOrder, createB2bPromotion, createRetailerOrder, getRetailerCatalog, grantRetailerAccess, listManagedRetailerAccesses, listOrganizationB2bOrders, listRetailerAccesses, listRetailerDocuments, listRetailerOrders, reorderRetailerOrder, reviewAndConvertRetailerOrder, updateRetailerAccessStatus } from "./b2b";
+import { cancelRetailerOrder, createB2bPromotion, createRetailerOrder, createRetailerOutlet, getRetailerCatalog, getRetailerFrequentProducts, getRetailerMonthlyReport, getRetailerSummary, grantRetailerAccess, listManagedRetailerAccesses, listOrganizationB2bOrders, listRetailerAccesses, listRetailerDocuments, listRetailerFavorites, listRetailerOrders, listRetailerOutlets, reorderRetailerOrder, reviewAndConvertRetailerOrder, toggleRetailerFavorite, updateRetailerAccessStatus } from "./b2b";
 import { calculatePackagingLogistics, findSuitableVehicles, listProductPackaging, listUomCatalog } from "./uomPackaging";
 import { closeProductionOrder, createManufacturingBom, createProductionOrder, getManufacturingOperationalOptions, getManufacturingOverview, getProductionBatchGenealogy, getProductionOrderOperationalDetails, getProductionOrderScope, getProductionTraceability, issueMaterialsForProduction, listProductionOrders, recordProductionExpense, recordProductionOutput, recordProductionQualityCheck, recordProductionWaste, reserveProductionMaterials, returnMaterialsFromProduction, saveManufacturingProductProfile, transitionProductionOrderStatus, updateProductionStage } from "./manufacturing";
 import { canAccessManufacturingOrderScope, canUseManufacturingPermission, isManufacturingScopeAllowed, type ManufacturingPermission } from "./manufacturingPermissionPolicy";
@@ -839,7 +839,28 @@ export const erpRouter = router({
         return createB2bPromotion(context.organization.id, ctx.user.id, input);
       }),
     }),
+    outlets: router({
+      list: protectedProcedure.input(z.object({ customerId: z.number().int().positive() })).query(async ({ ctx, input }) => {
+        const context = await getTenantContext(ctx.user.id);
+        if (!isOrganizationOwner(context.membership.roleKey)) throw new TRPCError({ code: "FORBIDDEN", message: "تقتصر إدارة منافذ التاجر على مالك المؤسسة." });
+        return listRetailerOutlets(context.organization.id, input.customerId);
+      }),
+      create: protectedProcedure.input(z.object({ customerId: z.number().int().positive(), code: z.string().trim().min(1).max(64), name: z.string().trim().min(1).max(160), address: z.string().trim().max(4000).optional(), latitude: z.number().min(-90).max(90).optional(), longitude: z.number().min(-180).max(180).optional(), territoryId: z.number().int().positive().optional() }).superRefine((input, validation) => { if ((input.latitude === undefined) !== (input.longitude === undefined)) validation.addIssue({ code: "custom", message: "يلزم إدخال خط العرض وخط الطول معاً." }); })).mutation(async ({ ctx, input }) => {
+        const context = await getTenantContext(ctx.user.id);
+        if (!isOrganizationOwner(context.membership.roleKey)) throw new TRPCError({ code: "FORBIDDEN", message: "تقتصر إدارة منافذ التاجر على مالك المؤسسة." });
+        return createRetailerOutlet(context.organization.id, ctx.user.id, input);
+      }),
+    }),
     catalog: protectedProcedure.input(z.object({ accessId: z.number().int().positive(), query: z.string().trim().max(160).optional(), categoryId: z.number().int().positive().optional(), brandId: z.number().int().positive().optional(), favoritesOnly: z.boolean().optional() })).query(({ ctx, input }) => getRetailerCatalog(ctx.user.id, input.accessId, input)),
+    favorites: router({
+      list: protectedProcedure.input(z.object({ accessId: z.number().int().positive() })).query(({ ctx, input }) => listRetailerFavorites(ctx.user.id, input.accessId)),
+      toggle: protectedProcedure.input(z.object({ accessId: z.number().int().positive(), productId: z.number().int().positive() })).mutation(({ ctx, input }) => toggleRetailerFavorite(ctx.user.id, input.accessId, input.productId)),
+    }),
+    frequent: protectedProcedure.input(z.object({ accessId: z.number().int().positive() })).query(({ ctx, input }) => getRetailerFrequentProducts(ctx.user.id, input.accessId)),
+    summary: protectedProcedure.input(z.object({ accessId: z.number().int().positive() })).query(({ ctx, input }) => getRetailerSummary(ctx.user.id, input.accessId)),
+    report: router({
+      monthly: protectedProcedure.input(z.object({ accessId: z.number().int().positive(), month: z.number().int().min(1).max(12), year: z.number().int().min(2020).max(2100) })).query(({ ctx, input }) => getRetailerMonthlyReport(ctx.user.id, input.accessId, input.month, input.year)),
+    }),
     orders: router({
       list: protectedProcedure.input(z.object({ accessId: z.number().int().positive() })).query(({ ctx, input }) => listRetailerOrders(ctx.user.id, input.accessId)),
       create: protectedProcedure.input(z.object({ accessId: z.number().int().positive(), notes: z.string().trim().max(2000).optional(), requestedDeliveryDate: z.coerce.date().optional(), lines: z.array(z.object({ productId: z.number().int().positive(), quantity: z.number().positive(), unit: z.string().trim().min(1).max(32).optional() })).min(1).max(100) })).mutation(({ ctx, input }) => createRetailerOrder(ctx.user.id, input.accessId, input)),

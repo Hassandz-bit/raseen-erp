@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
-import { auditLogs, b2bOrderAdjustments, b2bOrderReviews, b2bPromotions, b2bRetailerAccesses, b2bRetailerOrderItems, b2bRetailerOrders, businessParties, distributionRouteStops, distributionRoutes, organizations, priceListItems, priceLists, productBatches, productPackagingLevels, products, salesInvoices, salesOrderItems, salesOrders } from "../drizzle/schema";
+import { auditLogs, b2bOrderAdjustments, b2bOrderReviews, b2bPromotions, b2bRetailerAccesses, b2bRetailerFavorites, b2bRetailerOrderItems, b2bRetailerOrders, b2bRetailerOutlets, businessParties, distributionRouteStops, distributionRoutes, organizations, priceListItems, priceLists, productBatches, productPackagingLevels, products, salesInvoices, salesOrderItems, salesOrders } from "../drizzle/schema";
 import { getDb } from "./db";
 
 type CatalogInput = { query?: string; categoryId?: number; brandId?: number; favoritesOnly?: boolean };
@@ -57,6 +57,27 @@ export async function listManagedRetailerAccesses(organizationId: number) {
   return db.select({ id: b2bRetailerAccesses.id, userId: b2bRetailerAccesses.userId, customerId: b2bRetailerAccesses.customerId, customerName: businessParties.name, status: b2bRetailerAccesses.status, priceListId: b2bRetailerAccesses.priceListId, priceListName: priceLists.name, customerSegment: b2bRetailerAccesses.customerSegment, territoryId: b2bRetailerAccesses.territoryId, deliveryTrackingPolicy: b2bRetailerAccesses.deliveryTrackingPolicy, availabilityDisclosure: b2bRetailerAccesses.availabilityDisclosure, permissions: b2bRetailerAccesses.permissions, grantedAt: b2bRetailerAccesses.grantedAt, revokedAt: b2bRetailerAccesses.revokedAt }).from(b2bRetailerAccesses).innerJoin(businessParties, and(eq(businessParties.id, b2bRetailerAccesses.customerId), eq(businessParties.organizationId, b2bRetailerAccesses.organizationId))).leftJoin(priceLists, and(eq(priceLists.id, b2bRetailerAccesses.priceListId), eq(priceLists.organizationId, b2bRetailerAccesses.organizationId))).where(eq(b2bRetailerAccesses.organizationId, organizationId)).orderBy(asc(businessParties.name));
 }
 
+export async function listRetailerOutlets(organizationId: number, customerId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  return db.select().from(b2bRetailerOutlets).where(and(eq(b2bRetailerOutlets.organizationId, organizationId), eq(b2bRetailerOutlets.customerId, customerId))).orderBy(asc(b2bRetailerOutlets.name));
+}
+
+export async function createRetailerOutlet(organizationId: number, actorUserId: number, input: { customerId: number; code: string; name: string; address?: string; latitude?: number; longitude?: number; territoryId?: number }) {
+  if (!input.code.trim() || !input.name.trim()) throw new Error("رمز واسم منفذ التاجر مطلوبان.");
+  const hasLatitude = input.latitude !== undefined;
+  const hasLongitude = input.longitude !== undefined;
+  if (hasLatitude !== hasLongitude || (hasLatitude && (!Number.isFinite(input.latitude) || !Number.isFinite(input.longitude) || Math.abs(input.latitude!) > 90 || Math.abs(input.longitude!) > 180))) throw new Error("إحداثيات منفذ التاجر غير صالحة.");
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const [customer] = await db.select({ id: businessParties.id }).from(businessParties).where(and(eq(businessParties.id, input.customerId), eq(businessParties.organizationId, organizationId), eq(businessParties.status, "active"))).limit(1);
+  if (!customer) throw new Error("عميل التاجر غير موجود ضمن المؤسسة.");
+  const inserted = await db.insert(b2bRetailerOutlets).values({ organizationId, customerId: input.customerId, code: input.code.trim(), name: input.name.trim(), address: input.address?.trim(), latitude: hasLatitude ? String(input.latitude) : undefined, longitude: hasLongitude ? String(input.longitude) : undefined, territoryId: input.territoryId });
+  const id = Number(inserted[0].insertId);
+  await db.insert(auditLogs).values({ organizationId, actorUserId, action: "b2b_retailer.outlet_created", entityType: "b2b_retailer_outlet", entityId: String(id), metadata: { customerId: input.customerId, hasLocation: hasLatitude } });
+  return { id };
+}
+
 export async function requireRetailerAccess(userId: number, accessId: number) {
   const db = await getDb();
   if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
@@ -101,6 +122,11 @@ export async function getRetailerCatalog(userId: number, accessId: number, input
   const db = await getDb();
   if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
   const clauses = [eq(products.organizationId, access.access.organizationId), eq(products.status, "active")];
+  if (input.favoritesOnly) {
+    const favorites = await db.select({ productId: b2bRetailerFavorites.productId }).from(b2bRetailerFavorites).where(and(eq(b2bRetailerFavorites.organizationId, access.access.organizationId), eq(b2bRetailerFavorites.accessId, access.access.id)));
+    if (!favorites.length) return [];
+    clauses.push(inArray(products.id, favorites.map(item => item.productId)));
+  }
   if (input.categoryId) clauses.push(eq(products.categoryId, input.categoryId));
   if (input.brandId) clauses.push(eq(products.brandId, input.brandId));
   if (input.query?.trim()) clauses.push(sql`(${products.name} like ${`%${input.query.trim()}%`} or ${products.sku} like ${`%${input.query.trim()}%`})`);
@@ -110,6 +136,71 @@ export async function getRetailerCatalog(userId: number, accessId: number, input
     const packagingLevels = await db.select({ id: productPackagingLevels.id, code: productPackagingLevels.code, displayName: productPackagingLevels.displayName, factorToBase: productPackagingLevels.factorToBase, barcode: productPackagingLevels.barcode, isDefault: productPackagingLevels.isDefaultB2b }).from(productPackagingLevels).where(and(eq(productPackagingLevels.organizationId, access.access.organizationId), eq(productPackagingLevels.productId, product.id), eq(productPackagingLevels.allowedB2b, "yes"), eq(productPackagingLevels.status, "active"))).orderBy(asc(productPackagingLevels.factorToBase));
     return { id: product.id, name: product.name, nameAr: product.nameAr, nameFr: product.nameFr, nameEn: product.nameEn, sku: product.sku, imageUrl: product.imageUrl, categoryId: product.categoryId, brandId: product.brandId, salesUnit: product.salesUnit, unitsPerCarton: product.unitsPerCarton, unitPrice: resolved.unitPrice, currencyCode: resolved.currencyCode, pricingSource: resolved.pricingSource, promotionLabel: resolved.promotionLabel, availability: resolved.availability, packagingLevels };
   }));
+}
+
+export async function toggleRetailerFavorite(userId: number, accessId: number, productId: number) {
+  const access = await requireRetailerAccess(userId, accessId);
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const [product] = await db.select({ id: products.id }).from(products).where(and(eq(products.id, productId), eq(products.organizationId, access.access.organizationId), eq(products.status, "active"))).limit(1);
+  if (!product) throw new Error("المنتج غير متاح للمؤسسة المحددة.");
+  const [existing] = await db.select({ id: b2bRetailerFavorites.id }).from(b2bRetailerFavorites).where(and(eq(b2bRetailerFavorites.organizationId, access.access.organizationId), eq(b2bRetailerFavorites.accessId, access.access.id), eq(b2bRetailerFavorites.productId, productId))).limit(1);
+  if (existing) {
+    await db.delete(b2bRetailerFavorites).where(eq(b2bRetailerFavorites.id, existing.id));
+    return { productId, favorite: false };
+  }
+  await db.insert(b2bRetailerFavorites).values({ organizationId: access.access.organizationId, accessId: access.access.id, productId });
+  return { productId, favorite: true };
+}
+
+export async function listRetailerFavorites(userId: number, accessId: number) {
+  return getRetailerCatalog(userId, accessId, { favoritesOnly: true });
+}
+
+export async function getRetailerFrequentProducts(userId: number, accessId: number) {
+  const access = await requireRetailerAccess(userId, accessId);
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const rows = await db.select({ productId: b2bRetailerOrderItems.productId, quantity: b2bRetailerOrderItems.quantity }).from(b2bRetailerOrderItems).innerJoin(b2bRetailerOrders, and(eq(b2bRetailerOrders.id, b2bRetailerOrderItems.orderId), eq(b2bRetailerOrders.organizationId, b2bRetailerOrderItems.organizationId))).where(and(eq(b2bRetailerOrderItems.organizationId, access.access.organizationId), eq(b2bRetailerOrders.accessId, access.access.id), eq(b2bRetailerOrders.customerId, access.customer.id))).limit(1000);
+  const quantities = new Map<number, number>();
+  rows.forEach(row => quantities.set(row.productId, (quantities.get(row.productId) ?? 0) + Number(row.quantity)));
+  const rankedIds = Array.from(quantities.entries()).sort((a, b) => b[1] - a[1]).slice(0, 12).map(([productId]) => productId);
+  if (!rankedIds.length) return [];
+  const catalog = await getRetailerCatalog(userId, accessId);
+  const catalogById = new Map(catalog.map(item => [item.id, item]));
+  return rankedIds.flatMap(productId => {
+    const product = catalogById.get(productId);
+    return product ? [{ ...product, orderedQuantity: quantities.get(productId) ?? 0 }] : [];
+  });
+}
+
+export async function getRetailerSummary(userId: number, accessId: number) {
+  const access = await requireRetailerAccess(userId, accessId);
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const [orders, invoices, promotions] = await Promise.all([
+    db.select({ status: b2bRetailerOrders.status }).from(b2bRetailerOrders).where(and(eq(b2bRetailerOrders.organizationId, access.access.organizationId), eq(b2bRetailerOrders.accessId, access.access.id), eq(b2bRetailerOrders.customerId, access.customer.id))).limit(200),
+    db.select({ grandTotal: salesInvoices.grandTotal, amountPaid: salesInvoices.amountPaid }).from(salesInvoices).where(and(eq(salesInvoices.organizationId, access.access.organizationId), eq(salesInvoices.customerId, access.customer.id))).limit(200),
+    db.select({ id: b2bPromotions.id, customerId: b2bPromotions.customerId, customerSegment: b2bPromotions.customerSegment, territoryId: b2bPromotions.territoryId }).from(b2bPromotions).where(and(eq(b2bPromotions.organizationId, access.access.organizationId), eq(b2bPromotions.status, "active"), eq(b2bPromotions.visibleToB2b, "yes"), sql`${b2bPromotions.startsAt} <= ${new Date()}`, sql`${b2bPromotions.endsAt} >= ${new Date()}`)).limit(200),
+  ]);
+  const activeStatuses = new Set(["new", "review", "confirmed", "preparing", "ready", "loaded", "in_transit", "arrived", "partial"]);
+  return { activeOrders: orders.filter(order => activeStatuses.has(order.status)).length, outstandingBalance: roundMoney(invoices.reduce((sum, invoice) => sum + Math.max(0, Number(invoice.grandTotal) - Number(invoice.amountPaid)), 0)), currencyCode: access.organization.baseCurrency, activePromotions: promotions.filter(promotion => (!promotion.customerId || promotion.customerId === access.customer.id) && (!promotion.customerSegment || promotion.customerSegment === access.access.customerSegment) && (!promotion.territoryId || promotion.territoryId === access.access.territoryId)).length };
+}
+
+export async function getRetailerMonthlyReport(userId: number, accessId: number, month: number, year: number) {
+  const access = await requireRetailerAccess(userId, accessId);
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const startsAt = new Date(Date.UTC(year, month - 1, 1));
+  const endsAt = new Date(Date.UTC(year, month, 1));
+  const [orders, invoices] = await Promise.all([
+    db.select({ id: b2bRetailerOrders.id, orderNumber: b2bRetailerOrders.orderNumber, status: b2bRetailerOrders.status, paymentStatus: b2bRetailerOrders.paymentStatus, currencyCode: b2bRetailerOrders.currencyCode, totalAmount: b2bRetailerOrders.totalAmount, createdAt: b2bRetailerOrders.createdAt }).from(b2bRetailerOrders).where(and(eq(b2bRetailerOrders.organizationId, access.access.organizationId), eq(b2bRetailerOrders.accessId, access.access.id), eq(b2bRetailerOrders.customerId, access.customer.id), sql`${b2bRetailerOrders.createdAt} >= ${startsAt}`, sql`${b2bRetailerOrders.createdAt} < ${endsAt}`)).orderBy(desc(b2bRetailerOrders.createdAt)).limit(500),
+    db.select({ id: salesInvoices.id, invoiceNumber: salesInvoices.invoiceNumber, status: salesInvoices.status, currencyCode: salesInvoices.currencyCode, grandTotal: salesInvoices.grandTotal, amountPaid: salesInvoices.amountPaid, issuedAt: salesInvoices.issuedAt }).from(salesInvoices).where(and(eq(salesInvoices.organizationId, access.access.organizationId), eq(salesInvoices.customerId, access.customer.id), sql`${salesInvoices.issuedAt} >= ${startsAt}`, sql`${salesInvoices.issuedAt} < ${endsAt}`)).orderBy(desc(salesInvoices.issuedAt)).limit(500),
+  ]);
+  const orderTotal = roundMoney(orders.reduce((sum, order) => sum + Number(order.totalAmount), 0));
+  const invoicedTotal = roundMoney(invoices.reduce((sum, invoice) => sum + Number(invoice.grandTotal), 0));
+  const outstandingBalance = roundMoney(invoices.reduce((sum, invoice) => sum + Math.max(0, Number(invoice.grandTotal) - Number(invoice.amountPaid)), 0));
+  return { period: { month, year, startsAt, endsAt }, currencyCode: access.organization.baseCurrency, summary: { orderCount: orders.length, orderTotal, invoiceCount: invoices.length, invoicedTotal, outstandingBalance }, orders, invoices };
 }
 
 export async function listRetailerOrders(userId: number, accessId: number) {
