@@ -115,6 +115,34 @@ input:not([type="checkbox"]):not([type="radio"]):focus-visible, textarea:focus-v
 
 input:not([type="checkbox"]):not([type="radio"]):disabled, textarea:disabled, select:disabled { opacity: 0.62; }
 
+input[aria-invalid="true"], textarea[aria-invalid="true"], select[aria-invalid="true"], .field-error {
+  border-color: var(--destructive) !important;
+  background-color: oklch(0.66 0.18 25 / 0.07);
+  box-shadow: 0 0 0 3px oklch(0.66 0.18 25 / 0.13);
+}
+
+input[aria-invalid="true"]:focus-visible, textarea[aria-invalid="true"]:focus-visible, select[aria-invalid="true"]:focus-visible, .field-error:focus-visible {
+  outline-color: oklch(0.66 0.18 25 / 0.62);
+  box-shadow: 0 0 0 4px oklch(0.66 0.18 25 / 0.18);
+}
+
+[data-warning="true"], .field-warning {
+  border-color: oklch(0.78 0.12 82) !important;
+  background-color: oklch(0.78 0.12 82 / 0.09);
+  box-shadow: 0 0 0 3px oklch(0.78 0.12 82 / 0.13);
+}
+
+[data-field-message="error"] { color: var(--destructive); }
+[data-field-message="warning"] { color: oklch(0.63 0.13 75); }
+
+@media (max-width: 640px) {
+  input:not([type="checkbox"]):not([type="radio"]), textarea, select { min-height: 46px !important; font-size: 16px; }
+  textarea { min-height: 108px !important; }
+  button { min-height: 44px; }
+  label { line-height: 1.45; }
+  [role="dialog"] input:not([type="checkbox"]):not([type="radio"]), [role="dialog"] select { min-height: 48px !important; }
+}
+
 ::selection { background: oklch(0.78 0.12 82 / 0.38); color: oklch(0.98 0.01 95); }
 
 .latin { font-family: "Manrope", sans-serif; direction: ltr; unicode-bidi: embed; }
