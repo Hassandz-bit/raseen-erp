@@ -900,7 +900,7 @@ export const erpRouter = router({
         const context = await requireDistributionPermission(ctx.user.id, "distribution.view");
         return listDistributionTerritories(context.organization.id);
       }),
-      create: protectedProcedure.input(z.object({ code: z.string().trim().min(2).max(48), name: z.string().trim().min(2).max(160), branchId: z.number().int().positive().optional(), representativeEmployeeId: z.number().int().positive().optional(), defaultVehicleId: z.number().int().positive().optional() })).mutation(async ({ ctx, input }) => {
+      create: protectedProcedure.input(z.object({ code: z.string().trim().min(2).max(48), name: z.string().trim().min(2).max(160), latitude: z.number().min(-90).max(90).optional(), longitude: z.number().min(-180).max(180).optional(), branchId: z.number().int().positive().optional(), representativeEmployeeId: z.number().int().positive().optional(), defaultVehicleId: z.number().int().positive().optional() }).refine(input => (input.latitude === undefined) === (input.longitude === undefined), { message: "يلزم إدخال خط العرض وخط الطول معاً." })).mutation(async ({ ctx, input }) => {
         const context = await requireDistributionPermission(ctx.user.id, "distribution.editRoute");
         assertDistributionScope(context, { branchId: input.branchId, vehicleId: input.defaultVehicleId });
         return createDistributionTerritory(context.organization.id, ctx.user.id, input);

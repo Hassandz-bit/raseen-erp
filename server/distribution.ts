@@ -66,14 +66,16 @@ export async function createFleetVehicle(organizationId: number, actorUserId: nu
   });
 }
 
-export async function createDistributionTerritory(organizationId: number, actorUserId: number, input: { code: string; name: string; branchId?: number; representativeEmployeeId?: number; defaultVehicleId?: number }) {
+export async function createDistributionTerritory(organizationId: number, actorUserId: number, input: { code: string; name: string; latitude?: number; longitude?: number; branchId?: number; representativeEmployeeId?: number; defaultVehicleId?: number }) {
   const db = await getDb();
   if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  if ((input.latitude === undefined) !== (input.longitude === undefined)) throw new Error("يلزم إدخال خط العرض وخط الطول معاً لتحديد الموقع.");
+  if (input.latitude !== undefined && (input.latitude < -90 || input.latitude > 90 || input.longitude! < -180 || input.longitude! > 180)) throw new Error("إحداثيات الموقع خارج نطاق GPS الصحيح.");
   if (input.branchId) await assertOrganizationRecord((await db.select().from(branches).where(and(eq(branches.id, input.branchId), eq(branches.organizationId, organizationId))).limit(1))[0], "الفرع");
   if (input.defaultVehicleId) await assertVehicle(db, organizationId, input.defaultVehicleId);
-  const result = await db.insert(distributionTerritories).values({ organizationId, code: input.code.trim().toUpperCase(), name: input.name.trim(), branchId: input.branchId, representativeEmployeeId: input.representativeEmployeeId, defaultVehicleId: input.defaultVehicleId });
+  const result = await db.insert(distributionTerritories).values({ organizationId, code: input.code.trim().toUpperCase(), name: input.name.trim(), latitude: input.latitude === undefined ? undefined : String(input.latitude), longitude: input.longitude === undefined ? undefined : String(input.longitude), branchId: input.branchId, representativeEmployeeId: input.representativeEmployeeId, defaultVehicleId: input.defaultVehicleId });
   const id = Number(result[0].insertId);
-  await db.insert(auditLogs).values({ organizationId, actorUserId, action: "distribution_territory.created", entityType: "distribution_territory", entityId: String(id), metadata: { branchId: input.branchId ?? null } });
+  await db.insert(auditLogs).values({ organizationId, actorUserId, action: "distribution_territory.created", entityType: "distribution_territory", entityId: String(id), metadata: { branchId: input.branchId ?? null, locationCaptured: input.latitude !== undefined } });
   return { id };
 }
 
