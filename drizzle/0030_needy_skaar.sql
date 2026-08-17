@@ -1,0 +1,1 @@
+ALTER TABLE `fleet_vehicle_documents` ADD `issuedAt` timestamp;

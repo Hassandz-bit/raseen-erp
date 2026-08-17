@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { and, eq } from "drizzle-orm";
-import { auditLogs, distributionSettings, distributionTerritories, fleetVehicles, inventoryBalances, organizations, productBatches, products, stockMovements, vehicleLoadItems, vehicleLoadOrders, warehouses } from "../drizzle/schema";
+import { auditLogs, distributionSettings, distributionTerritories, fleetVehicleDocuments, fleetVehicles, inventoryBalances, organizations, productBatches, products, stockMovements, vehicleLoadItems, vehicleLoadOrders, warehouses } from "../drizzle/schema";
 import { createDistributionTerritory, createFleetVehicle, createVehicleLoadOrder, transitionVehicleLoadOrder } from "./distribution";
 import { getDb } from "./db";
 
@@ -17,6 +17,7 @@ afterEach(async () => {
     await db.delete(vehicleLoadItems).where(eq(vehicleLoadItems.organizationId, organizationId));
     await db.delete(vehicleLoadOrders).where(eq(vehicleLoadOrders.organizationId, organizationId));
     await db.delete(distributionTerritories).where(eq(distributionTerritories.organizationId, organizationId));
+    await db.delete(fleetVehicleDocuments).where(eq(fleetVehicleDocuments.organizationId, organizationId));
     await db.delete(fleetVehicles).where(eq(fleetVehicles.organizationId, organizationId));
     await db.delete(distributionSettings).where(eq(distributionSettings.organizationId, organizationId));
     await db.delete(productBatches).where(eq(productBatches.organizationId, organizationId));
@@ -37,6 +38,18 @@ describe("تكامل تحميل المركبة", () => {
     const [saved] = await db.select().from(distributionTerritories).where(and(eq(distributionTerritories.organizationId, organizationId), eq(distributionTerritories.id, territory.id))).limit(1);
     expect(saved).toMatchObject({ latitude: "36.7528870", longitude: "3.0420480" });
     await expect(createDistributionTerritory(organizationId, 1, { code: `BAD-${suffix}`, name: "نطاق ناقص", latitude: 36.7 })).rejects.toThrow("خط العرض وخط الطول");
+  });
+
+  it("ينشئ وثيقتي التأمين والمراقبة التقنية مع تواريخ صحيحة داخل المؤسسة", async () => {
+    const db = await getDb(); expect(db).toBeTruthy(); if (!db) return;
+    const suffix = `${Date.now()}-${Math.floor(Math.random() * 100_000)}`;
+    const created = await db.insert(organizations).values({ name: `وثائق مركبة ${suffix}`, slug: `vehicle-docs-${suffix}`, status: "active", baseCurrency: "SAR", locale: "ar-SA", monthlyBudget: "0" });
+    const organizationId = Number(created[0].insertId); fixture = { organizationIds: [organizationId] };
+    const vehicle = await createFleetVehicle(organizationId, 1, { code: `DOC-${suffix}`, registrationNumber: `REG-DOC-${suffix}`, type: "van", ownershipType: "owned", maximumPayloadWeight: 10, maximumVolume: 4, insuranceStartAt: new Date("2026-01-01T00:00:00Z"), insuranceEndAt: new Date("2026-12-31T23:59:59Z"), technicalInspectionStartAt: new Date("2026-02-01T00:00:00Z"), technicalInspectionEndAt: new Date("2026-11-30T23:59:59Z") });
+    const documents = await db.select().from(fleetVehicleDocuments).where(and(eq(fleetVehicleDocuments.organizationId, organizationId), eq(fleetVehicleDocuments.vehicleId, vehicle.id)));
+    expect(documents.map(document => document.documentType)).toEqual(expect.arrayContaining(["insurance", "technical_inspection"]));
+    expect(documents.find(document => document.documentType === "insurance")).toMatchObject({ issuedAt: new Date("2026-01-01T00:00:00Z"), expiresAt: new Date("2026-12-31T23:59:59Z") });
+    await expect(createFleetVehicle(organizationId, 1, { code: `BAD-DOC-${suffix}`, registrationNumber: `REG-BAD-${suffix}`, type: "van", ownershipType: "owned", maximumPayloadWeight: 10, maximumVolume: 4, insuranceStartAt: new Date("2026-12-31T00:00:00Z"), insuranceEndAt: new Date("2026-01-01T00:00:00Z") })).rejects.toThrow("انتهاء التأمين");
   });
 
   it("يعزل المؤسسة وينقل دفعة نشطة إلى مخزن المركبة مرة واحدة مع حركات مدققة", async () => {

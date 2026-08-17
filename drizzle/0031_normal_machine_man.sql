@@ -1,0 +1,1 @@
+ALTER TABLE `employee_contracts` ADD `absenceDeductionPerDay` decimal(18,2) DEFAULT '0' NOT NULL;

@@ -50,9 +50,13 @@ export async function listFleetVehicles(organizationId: number) {
   return db.select().from(fleetVehicles).where(eq(fleetVehicles.organizationId, organizationId)).orderBy(desc(fleetVehicles.updatedAt), desc(fleetVehicles.id)).limit(200);
 }
 
-export async function createFleetVehicle(organizationId: number, actorUserId: number, input: { code: string; registrationNumber: string; type: string; brand?: string; model?: string; modelYear?: number; branchId?: number; ownerPartyId?: number; ownershipType: "owned" | "leased" | "external"; driverEmployeeId?: number; representativeEmployeeId?: number; maximumPayloadWeight: number; maximumVolume: number; palletCapacity?: number }) {
+export async function createFleetVehicle(organizationId: number, actorUserId: number, input: { code: string; registrationNumber: string; type: string; brand?: string; model?: string; modelYear?: number; branchId?: number; ownerPartyId?: number; ownershipType: "owned" | "leased" | "external"; driverEmployeeId?: number; representativeEmployeeId?: number; maximumPayloadWeight: number; maximumVolume: number; palletCapacity?: number; insuranceStartAt?: Date; insuranceEndAt?: Date; technicalInspectionStartAt?: Date; technicalInspectionEndAt?: Date }) {
   const db = await getDb();
   if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  if ((input.insuranceStartAt === undefined) !== (input.insuranceEndAt === undefined)) throw new Error("يلزم إدخال تاريخ بداية ونهاية التأمين معاً.");
+  if ((input.technicalInspectionStartAt === undefined) !== (input.technicalInspectionEndAt === undefined)) throw new Error("يلزم إدخال تاريخ بداية ونهاية المراقبة التقنية معاً.");
+  if (input.insuranceStartAt && input.insuranceEndAt && input.insuranceEndAt <= input.insuranceStartAt) throw new Error("يجب أن يكون انتهاء التأمين بعد تاريخ بدايته.");
+  if (input.technicalInspectionStartAt && input.technicalInspectionEndAt && input.technicalInspectionEndAt <= input.technicalInspectionStartAt) throw new Error("يجب أن يكون انتهاء المراقبة التقنية بعد تاريخ بدايتها.");
   return db.transaction(async tx => {
     if (input.branchId) await assertOrganizationRecord((await tx.select().from(branches).where(and(eq(branches.id, input.branchId), eq(branches.organizationId, organizationId))).limit(1))[0], "الفرع");
     if (input.ownerPartyId) await assertOrganizationRecord((await tx.select().from(businessParties).where(and(eq(businessParties.id, input.ownerPartyId), eq(businessParties.organizationId, organizationId))).limit(1))[0], "مالك المركبة");
@@ -61,7 +65,12 @@ export async function createFleetVehicle(organizationId: number, actorUserId: nu
     const mobileWarehouseId = Number(warehouseResult[0].insertId);
     const vehicleResult = await tx.insert(fleetVehicles).values({ organizationId, branchId: input.branchId, code: input.code.trim().toUpperCase(), registrationNumber: input.registrationNumber.trim().toUpperCase(), type: input.type.trim(), brand: input.brand?.trim(), model: input.model?.trim(), modelYear: input.modelYear, ownerPartyId: input.ownerPartyId, ownershipType: input.ownershipType, driverEmployeeId: input.driverEmployeeId, representativeEmployeeId: input.representativeEmployeeId, mobileWarehouseId, maximumPayloadWeight: String(input.maximumPayloadWeight), maximumVolume: String(input.maximumVolume), palletCapacity: input.palletCapacity ?? 0, status: "active" });
     const id = Number(vehicleResult[0].insertId);
-    await tx.insert(auditLogs).values({ organizationId, actorUserId, action: "fleet_vehicle.created", entityType: "fleet_vehicle", entityId: String(id), metadata: { mobileWarehouseId } });
+    const documents = [
+      input.insuranceStartAt && input.insuranceEndAt ? { documentType: "insurance" as const, issuedAt: input.insuranceStartAt, expiresAt: input.insuranceEndAt } : null,
+      input.technicalInspectionStartAt && input.technicalInspectionEndAt ? { documentType: "technical_inspection" as const, issuedAt: input.technicalInspectionStartAt, expiresAt: input.technicalInspectionEndAt } : null,
+    ].filter((document): document is { documentType: "insurance" | "technical_inspection"; issuedAt: Date; expiresAt: Date } => Boolean(document));
+    if (documents.length) await tx.insert(fleetVehicleDocuments).values(documents.map(document => ({ organizationId, vehicleId: id, ...document, status: document.expiresAt < new Date() ? "expired" as const : "valid" as const })));
+    await tx.insert(auditLogs).values({ organizationId, actorUserId, action: "fleet_vehicle.created", entityType: "fleet_vehicle", entityId: String(id), metadata: { mobileWarehouseId, insuranceRecorded: Boolean(input.insuranceEndAt), technicalInspectionRecorded: Boolean(input.technicalInspectionEndAt) } });
     return { id, mobileWarehouseId };
   });
 }
@@ -85,12 +94,13 @@ export async function listDistributionTerritories(organizationId: number) {
   return db.select().from(distributionTerritories).where(eq(distributionTerritories.organizationId, organizationId)).orderBy(distributionTerritories.name).limit(200);
 }
 
-export async function createVehicleDocument(organizationId: number, actorUserId: number, input: { vehicleId: number; documentType: "insurance" | "technical_inspection" | "registration" | "other"; referenceNumber?: string; expiresAt?: Date; attachmentUrl?: string }) {
+export async function createVehicleDocument(organizationId: number, actorUserId: number, input: { vehicleId: number; documentType: "insurance" | "technical_inspection" | "registration" | "other"; referenceNumber?: string; issuedAt?: Date; expiresAt?: Date; attachmentUrl?: string }) {
   const db = await getDb();
   if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
   await assertVehicle(db, organizationId, input.vehicleId);
   const status = input.expiresAt && input.expiresAt < new Date() ? "expired" : "valid" as const;
-  const result = await db.insert(fleetVehicleDocuments).values({ organizationId, vehicleId: input.vehicleId, documentType: input.documentType, referenceNumber: input.referenceNumber?.trim(), expiresAt: input.expiresAt, attachmentUrl: input.attachmentUrl, status });
+  if (input.issuedAt && input.expiresAt && input.expiresAt <= input.issuedAt) throw new Error("انتهاء الوثيقة يجب أن يكون بعد تاريخ بدايتها.");
+  const result = await db.insert(fleetVehicleDocuments).values({ organizationId, vehicleId: input.vehicleId, documentType: input.documentType, referenceNumber: input.referenceNumber?.trim(), issuedAt: input.issuedAt, expiresAt: input.expiresAt, attachmentUrl: input.attachmentUrl, status });
   const id = Number(result[0].insertId);
   await db.insert(auditLogs).values({ organizationId, actorUserId, action: "fleet_vehicle.document_created", entityType: "fleet_vehicle_document", entityId: String(id), metadata: { vehicleId: input.vehicleId, documentType: input.documentType } });
   return { id };

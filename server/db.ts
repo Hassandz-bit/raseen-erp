@@ -862,7 +862,10 @@ export async function listNotificationsForOrganization(organizationId: number) {
 export async function createOperationalNotifications(organizationId: number, reasons: string[]) {
   const db = await getDb();
   if (!db || reasons.length === 0) return;
-  await db.insert(notifications).values(reasons.map(content => ({ organizationId, type: "operational_alert", severity: "warning" as const, title: "تنبيه تشغيلي", content, isRead: "no" as const })));
+  const openAlerts = await db.select({ content: notifications.content }).from(notifications).where(and(eq(notifications.organizationId, organizationId), eq(notifications.type, "operational_alert"), eq(notifications.isRead, "no"))).limit(500);
+  const knownContents = new Set(openAlerts.map(alert => alert.content));
+  const newReasons = reasons.filter(reason => !knownContents.has(reason));
+  if (newReasons.length) await db.insert(notifications).values(newReasons.map(content => ({ organizationId, type: "operational_alert", severity: "warning" as const, title: "تنبيه تشغيلي", content, isRead: "no" as const })));
 }
 
 export async function markNotificationRead(organizationId: number, notificationId: number) {
