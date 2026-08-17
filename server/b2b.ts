@@ -1,23 +1,72 @@
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
-import { auditLogs, b2bOrderAdjustments, b2bOrderReviews, b2bPromotions, b2bRetailerAccesses, b2bRetailerFavorites, b2bRetailerOrderItems, b2bRetailerOrders, b2bRetailerOutlets, businessParties, distributionRouteStops, distributionRoutes, organizations, priceListItems, priceLists, productBatches, productPackagingLevels, products, salesInvoices, salesOrderItems, salesOrders } from "../drizzle/schema";
+import { auditLogs, b2bOrderAdjustments, b2bOrderReviews, b2bPromotions, b2bRetailerAccesses, b2bRetailerFavorites, b2bRetailerOrderItems, b2bRetailerOrders, b2bRetailerOutlets, businessParties, distributionRouteStops, distributionRoutes, organizationModules, organizations, priceListItems, priceLists, productBatches, productPackagingLevels, products, salesInvoices, salesOrderItems, salesOrders } from "../drizzle/schema";
 import { getDb } from "./db";
+import { canUseRetailerPermission, isOutletAllowedForRetailer, type RetailerPermission, type RetailerRole } from "./retailerAccessPolicy";
 
 type CatalogInput = { query?: string; categoryId?: number; brandId?: number; favoritesOnly?: boolean };
 type OrderLine = { productId: number; quantity: number; unit?: string };
+type RetailerAccessInput = { customerId: number; userId: number; retailerRole?: RetailerRole; outletIds?: number[]; priceListId?: number; customerSegment?: string; territoryId?: number; deliveryTrackingPolicy?: "off" | "status_only" | "eta_only" | "limited_live"; availabilityDisclosure?: "available" | "low" | "request"; permissions?: Record<string, boolean> };
 
 const roundMoney = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 const orderNumber = () => `B2B-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 const salesOrderNumber = () => `SO-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 
-export async function grantRetailerAccess(organizationId: number, actorUserId: number, input: { customerId: number; userId: number; priceListId?: number; customerSegment?: string; territoryId?: number; deliveryTrackingPolicy?: "off" | "status_only" | "eta_only" | "limited_live"; availabilityDisclosure?: "available" | "low" | "request"; permissions?: Record<string, boolean> }) {
+async function assertRetailerOutletsBelongToCustomer(organizationId: number, customerId: number, outletIds: number[] | undefined) {
+  const normalized = Array.from(new Set(outletIds ?? []));
+  if (!normalized.length) return normalized;
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const outlets = await db.select({ id: b2bRetailerOutlets.id }).from(b2bRetailerOutlets).where(and(eq(b2bRetailerOutlets.organizationId, organizationId), eq(b2bRetailerOutlets.customerId, customerId), inArray(b2bRetailerOutlets.id, normalized)));
+  if (outlets.length !== normalized.length) throw new Error("يتضمن نطاق منافذ مستخدم Retail منفذاً غير تابع للتاجر المحدد.");
+  return normalized;
+}
+
+function assertRetailerPermission(access: { retailerRole: RetailerRole; permissions: Record<string, boolean> | null }, permission: RetailerPermission) {
+  if (!canUseRetailerPermission(access.retailerRole, access.permissions, permission)) throw new Error("لا تملك صلاحية Retail المطلوبة لهذه العملية.");
+}
+
+function assertRetailerOutletScope(access: { retailerRole: RetailerRole; outletIds: number[] | null }, outletId: number | undefined) {
+  if (!isOutletAllowedForRetailer(access.retailerRole, access.outletIds, outletId)) throw new Error("هذا المنفذ خارج نطاق مستخدم Retail الحالي.");
+}
+
+export async function grantRetailerAccess(organizationId: number, actorUserId: number, input: RetailerAccessInput) {
   const db = await getDb();
   if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
   const [customer] = await db.select().from(businessParties).where(and(eq(businessParties.id, input.customerId), eq(businessParties.organizationId, organizationId), eq(businessParties.status, "active"))).limit(1);
   if (!customer || !customer.types.includes("customer")) throw new Error("يجب ربط وصول B2B بعميل نشط قائم داخل المؤسسة.");
-  await db.insert(b2bRetailerAccesses).values({ organizationId, customerId: input.customerId, userId: input.userId, status: "active", priceListId: input.priceListId, customerSegment: input.customerSegment?.trim(), territoryId: input.territoryId, deliveryTrackingPolicy: input.deliveryTrackingPolicy ?? "status_only", availabilityDisclosure: input.availabilityDisclosure ?? "available", permissions: input.permissions, grantedAt: new Date() }).onDuplicateKeyUpdate({ set: { status: "active", priceListId: input.priceListId, customerSegment: input.customerSegment?.trim(), territoryId: input.territoryId, deliveryTrackingPolicy: input.deliveryTrackingPolicy ?? "status_only", availabilityDisclosure: input.availabilityDisclosure ?? "available", permissions: input.permissions, grantedAt: new Date(), revokedAt: null } });
+  const outletIds = await assertRetailerOutletsBelongToCustomer(organizationId, input.customerId, input.outletIds);
+  await db.insert(b2bRetailerAccesses).values({ organizationId, customerId: input.customerId, userId: input.userId, status: "active", retailerRole: input.retailerRole ?? "owner", outletIds, priceListId: input.priceListId, customerSegment: input.customerSegment?.trim(), territoryId: input.territoryId, deliveryTrackingPolicy: input.deliveryTrackingPolicy ?? "status_only", availabilityDisclosure: input.availabilityDisclosure ?? "available", permissions: input.permissions, grantedAt: new Date() }).onDuplicateKeyUpdate({ set: { status: "active", retailerRole: input.retailerRole ?? "owner", outletIds, priceListId: input.priceListId, customerSegment: input.customerSegment?.trim(), territoryId: input.territoryId, deliveryTrackingPolicy: input.deliveryTrackingPolicy ?? "status_only", availabilityDisclosure: input.availabilityDisclosure ?? "available", permissions: input.permissions, grantedAt: new Date(), revokedAt: null } });
   const [access] = await db.select().from(b2bRetailerAccesses).where(and(eq(b2bRetailerAccesses.organizationId, organizationId), eq(b2bRetailerAccesses.customerId, input.customerId), eq(b2bRetailerAccesses.userId, input.userId))).limit(1);
   await db.insert(auditLogs).values({ organizationId, actorUserId, action: "b2b_retailer.access_granted", entityType: "b2b_retailer_access", entityId: String(access?.id ?? ""), metadata: { customerId: input.customerId, userId: input.userId } });
   return access;
+}
+
+export async function inviteRetailerAccess(organizationId: number, actorUserId: number, input: RetailerAccessInput) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const [customer] = await db.select().from(businessParties).where(and(eq(businessParties.id, input.customerId), eq(businessParties.organizationId, organizationId), eq(businessParties.status, "active"))).limit(1);
+  if (!customer || !customer.types.includes("customer")) throw new Error("يجب ربط دعوة Retail بعميل نشط قائم داخل المؤسسة.");
+  const [existing] = await db.select({ id: b2bRetailerAccesses.id, status: b2bRetailerAccesses.status }).from(b2bRetailerAccesses).where(and(eq(b2bRetailerAccesses.organizationId, organizationId), eq(b2bRetailerAccesses.customerId, input.customerId), eq(b2bRetailerAccesses.userId, input.userId))).limit(1);
+  if (existing?.status === "active") throw new Error("علاقة Retail نشطة بالفعل؛ لا يمكن إرسال دعوة جديدة قبل تعليقها أو إلغائها.");
+  const now = new Date();
+  const outletIds = await assertRetailerOutletsBelongToCustomer(organizationId, input.customerId, input.outletIds);
+  await db.insert(b2bRetailerAccesses).values({ organizationId, customerId: input.customerId, userId: input.userId, status: "invited", retailerRole: input.retailerRole ?? "owner", outletIds, priceListId: input.priceListId, customerSegment: input.customerSegment?.trim(), territoryId: input.territoryId, deliveryTrackingPolicy: input.deliveryTrackingPolicy ?? "status_only", availabilityDisclosure: input.availabilityDisclosure ?? "available", permissions: input.permissions, invitedAt: now, lastInviteSentAt: now, revokedAt: null }).onDuplicateKeyUpdate({ set: { status: "invited", retailerRole: input.retailerRole ?? "owner", outletIds, priceListId: input.priceListId, customerSegment: input.customerSegment?.trim(), territoryId: input.territoryId, deliveryTrackingPolicy: input.deliveryTrackingPolicy ?? "status_only", availabilityDisclosure: input.availabilityDisclosure ?? "available", permissions: input.permissions, invitedAt: now, lastInviteSentAt: now, revokedAt: null } });
+  const [access] = await db.select().from(b2bRetailerAccesses).where(and(eq(b2bRetailerAccesses.organizationId, organizationId), eq(b2bRetailerAccesses.customerId, input.customerId), eq(b2bRetailerAccesses.userId, input.userId))).limit(1);
+  await db.insert(auditLogs).values({ organizationId, actorUserId, action: "b2b_retailer.access_invited", entityType: "b2b_retailer_access", entityId: String(access?.id ?? ""), metadata: { customerId: input.customerId, userId: input.userId } });
+  return access;
+}
+
+export async function resendRetailerAccessInvite(organizationId: number, actorUserId: number, accessId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const [access] = await db.select().from(b2bRetailerAccesses).where(and(eq(b2bRetailerAccesses.id, accessId), eq(b2bRetailerAccesses.organizationId, organizationId))).limit(1);
+  if (!access || access.status !== "invited") throw new Error("لا يمكن إعادة إرسال دعوة لعلاقة Retail غير معلقة للدعوة.");
+  const sentAt = new Date();
+  await db.transaction(async tx => {
+    await tx.update(b2bRetailerAccesses).set({ lastInviteSentAt: sentAt }).where(and(eq(b2bRetailerAccesses.id, accessId), eq(b2bRetailerAccesses.organizationId, organizationId)));
+    await tx.insert(auditLogs).values({ organizationId, actorUserId, action: "b2b_retailer.access_invite_resent", entityType: "b2b_retailer_access", entityId: String(accessId), metadata: { customerId: access.customerId, userId: access.userId } });
+  });
+  return { id: accessId, lastInviteSentAt: sentAt };
 }
 
 export async function updateRetailerAccessStatus(organizationId: number, actorUserId: number, accessId: number, status: "active" | "suspended" | "revoked") {
@@ -48,13 +97,13 @@ export async function createB2bPromotion(organizationId: number, actorUserId: nu
 export async function listRetailerAccesses(userId: number) {
   const db = await getDb();
   if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
-  return db.select({ id: b2bRetailerAccesses.id, organizationId: b2bRetailerAccesses.organizationId, organizationName: organizations.name, organizationCurrency: organizations.baseCurrency, customerId: b2bRetailerAccesses.customerId, customerName: businessParties.name, status: b2bRetailerAccesses.status, deliveryTrackingPolicy: b2bRetailerAccesses.deliveryTrackingPolicy }).from(b2bRetailerAccesses).innerJoin(organizations, eq(organizations.id, b2bRetailerAccesses.organizationId)).innerJoin(businessParties, and(eq(businessParties.id, b2bRetailerAccesses.customerId), eq(businessParties.organizationId, b2bRetailerAccesses.organizationId))).where(and(eq(b2bRetailerAccesses.userId, userId), eq(b2bRetailerAccesses.status, "active"), eq(organizations.status, "active"), eq(businessParties.status, "active"))).orderBy(asc(organizations.name));
+  return db.select({ id: b2bRetailerAccesses.id, organizationId: b2bRetailerAccesses.organizationId, organizationName: organizations.name, organizationCurrency: organizations.baseCurrency, customerId: b2bRetailerAccesses.customerId, customerName: businessParties.name, status: b2bRetailerAccesses.status, deliveryTrackingPolicy: b2bRetailerAccesses.deliveryTrackingPolicy }).from(b2bRetailerAccesses).innerJoin(organizations, eq(organizations.id, b2bRetailerAccesses.organizationId)).innerJoin(organizationModules, and(eq(organizationModules.organizationId, b2bRetailerAccesses.organizationId), eq(organizationModules.moduleKey, "nawa_retail"), eq(organizationModules.status, "active"))).innerJoin(businessParties, and(eq(businessParties.id, b2bRetailerAccesses.customerId), eq(businessParties.organizationId, b2bRetailerAccesses.organizationId))).where(and(eq(b2bRetailerAccesses.userId, userId), eq(b2bRetailerAccesses.status, "active"), eq(organizations.status, "active"), eq(businessParties.status, "active"))).orderBy(asc(organizations.name));
 }
 
 export async function listManagedRetailerAccesses(organizationId: number) {
   const db = await getDb();
   if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
-  return db.select({ id: b2bRetailerAccesses.id, userId: b2bRetailerAccesses.userId, customerId: b2bRetailerAccesses.customerId, customerName: businessParties.name, status: b2bRetailerAccesses.status, priceListId: b2bRetailerAccesses.priceListId, priceListName: priceLists.name, customerSegment: b2bRetailerAccesses.customerSegment, territoryId: b2bRetailerAccesses.territoryId, deliveryTrackingPolicy: b2bRetailerAccesses.deliveryTrackingPolicy, availabilityDisclosure: b2bRetailerAccesses.availabilityDisclosure, permissions: b2bRetailerAccesses.permissions, grantedAt: b2bRetailerAccesses.grantedAt, revokedAt: b2bRetailerAccesses.revokedAt }).from(b2bRetailerAccesses).innerJoin(businessParties, and(eq(businessParties.id, b2bRetailerAccesses.customerId), eq(businessParties.organizationId, b2bRetailerAccesses.organizationId))).leftJoin(priceLists, and(eq(priceLists.id, b2bRetailerAccesses.priceListId), eq(priceLists.organizationId, b2bRetailerAccesses.organizationId))).where(eq(b2bRetailerAccesses.organizationId, organizationId)).orderBy(asc(businessParties.name));
+  return db.select({ id: b2bRetailerAccesses.id, userId: b2bRetailerAccesses.userId, customerId: b2bRetailerAccesses.customerId, customerName: businessParties.name, status: b2bRetailerAccesses.status, retailerRole: b2bRetailerAccesses.retailerRole, outletIds: b2bRetailerAccesses.outletIds, priceListId: b2bRetailerAccesses.priceListId, priceListName: priceLists.name, customerSegment: b2bRetailerAccesses.customerSegment, territoryId: b2bRetailerAccesses.territoryId, deliveryTrackingPolicy: b2bRetailerAccesses.deliveryTrackingPolicy, availabilityDisclosure: b2bRetailerAccesses.availabilityDisclosure, permissions: b2bRetailerAccesses.permissions, invitedAt: b2bRetailerAccesses.invitedAt, lastInviteSentAt: b2bRetailerAccesses.lastInviteSentAt, grantedAt: b2bRetailerAccesses.grantedAt, revokedAt: b2bRetailerAccesses.revokedAt }).from(b2bRetailerAccesses).innerJoin(businessParties, and(eq(businessParties.id, b2bRetailerAccesses.customerId), eq(businessParties.organizationId, b2bRetailerAccesses.organizationId))).leftJoin(priceLists, and(eq(priceLists.id, b2bRetailerAccesses.priceListId), eq(priceLists.organizationId, b2bRetailerAccesses.organizationId))).where(eq(b2bRetailerAccesses.organizationId, organizationId)).orderBy(asc(businessParties.name));
 }
 
 export async function listRetailerOutlets(organizationId: number, customerId: number) {
@@ -63,7 +112,7 @@ export async function listRetailerOutlets(organizationId: number, customerId: nu
   return db.select().from(b2bRetailerOutlets).where(and(eq(b2bRetailerOutlets.organizationId, organizationId), eq(b2bRetailerOutlets.customerId, customerId))).orderBy(asc(b2bRetailerOutlets.name));
 }
 
-export async function createRetailerOutlet(organizationId: number, actorUserId: number, input: { customerId: number; code: string; name: string; address?: string; latitude?: number; longitude?: number; territoryId?: number }) {
+export async function createRetailerOutlet(organizationId: number, actorUserId: number, input: { customerId: number; code: string; name: string; address?: string; wilaya?: string; commune?: string; deliveryInstructions?: string; latitude?: number; longitude?: number; territoryId?: number }) {
   if (!input.code.trim() || !input.name.trim()) throw new Error("رمز واسم منفذ التاجر مطلوبان.");
   const hasLatitude = input.latitude !== undefined;
   const hasLongitude = input.longitude !== undefined;
@@ -72,7 +121,7 @@ export async function createRetailerOutlet(organizationId: number, actorUserId: 
   if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
   const [customer] = await db.select({ id: businessParties.id }).from(businessParties).where(and(eq(businessParties.id, input.customerId), eq(businessParties.organizationId, organizationId), eq(businessParties.status, "active"))).limit(1);
   if (!customer) throw new Error("عميل التاجر غير موجود ضمن المؤسسة.");
-  const inserted = await db.insert(b2bRetailerOutlets).values({ organizationId, customerId: input.customerId, code: input.code.trim(), name: input.name.trim(), address: input.address?.trim(), latitude: hasLatitude ? String(input.latitude) : undefined, longitude: hasLongitude ? String(input.longitude) : undefined, territoryId: input.territoryId });
+  const inserted = await db.insert(b2bRetailerOutlets).values({ organizationId, customerId: input.customerId, code: input.code.trim(), name: input.name.trim(), address: input.address?.trim(), wilaya: input.wilaya?.trim(), commune: input.commune?.trim(), deliveryInstructions: input.deliveryInstructions?.trim(), latitude: hasLatitude ? String(input.latitude) : undefined, longitude: hasLongitude ? String(input.longitude) : undefined, territoryId: input.territoryId });
   const id = Number(inserted[0].insertId);
   await db.insert(auditLogs).values({ organizationId, actorUserId, action: "b2b_retailer.outlet_created", entityType: "b2b_retailer_outlet", entityId: String(id), metadata: { customerId: input.customerId, hasLocation: hasLatitude } });
   return { id };
@@ -81,9 +130,18 @@ export async function createRetailerOutlet(organizationId: number, actorUserId: 
 export async function requireRetailerAccess(userId: number, accessId: number) {
   const db = await getDb();
   if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
-  const rows = await db.select({ access: b2bRetailerAccesses, organization: organizations, customer: businessParties }).from(b2bRetailerAccesses).innerJoin(organizations, eq(organizations.id, b2bRetailerAccesses.organizationId)).innerJoin(businessParties, and(eq(businessParties.id, b2bRetailerAccesses.customerId), eq(businessParties.organizationId, b2bRetailerAccesses.organizationId))).where(and(eq(b2bRetailerAccesses.id, accessId), eq(b2bRetailerAccesses.userId, userId), eq(b2bRetailerAccesses.status, "active"), eq(organizations.status, "active"), eq(businessParties.status, "active"))).limit(1);
+  const rows = await db.select({ access: b2bRetailerAccesses, organization: organizations, customer: businessParties }).from(b2bRetailerAccesses).innerJoin(organizations, eq(organizations.id, b2bRetailerAccesses.organizationId)).innerJoin(organizationModules, and(eq(organizationModules.organizationId, b2bRetailerAccesses.organizationId), eq(organizationModules.moduleKey, "nawa_retail"), eq(organizationModules.status, "active"))).innerJoin(businessParties, and(eq(businessParties.id, b2bRetailerAccesses.customerId), eq(businessParties.organizationId, b2bRetailerAccesses.organizationId))).where(and(eq(b2bRetailerAccesses.id, accessId), eq(b2bRetailerAccesses.userId, userId), eq(b2bRetailerAccesses.status, "active"), eq(organizations.status, "active"), eq(businessParties.status, "active"))).limit(1);
   if (!rows[0] || !rows[0].customer.types.includes("customer")) throw new Error("لا توجد علاقة وصول B2B نشطة لهذه المؤسسة.");
   return rows[0];
+}
+
+export async function listRetailerOutletsForAccess(userId: number, accessId: number) {
+  const access = await requireRetailerAccess(userId, accessId);
+  assertRetailerPermission(access.access, "retail.outlets.view");
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const outlets = await db.select().from(b2bRetailerOutlets).where(and(eq(b2bRetailerOutlets.organizationId, access.access.organizationId), eq(b2bRetailerOutlets.customerId, access.customer.id), eq(b2bRetailerOutlets.status, "active"))).orderBy(asc(b2bRetailerOutlets.name));
+  return outlets.filter(outlet => isOutletAllowedForRetailer(access.access.retailerRole, access.access.outletIds, outlet.id));
 }
 
 async function resolveRetailerProduct(access: Awaited<ReturnType<typeof requireRetailerAccess>>, productId: number, requestedUnit?: string, quantity = 1) {
@@ -119,6 +177,7 @@ async function resolveRetailerProduct(access: Awaited<ReturnType<typeof requireR
 
 export async function getRetailerCatalog(userId: number, accessId: number, input: CatalogInput = {}) {
   const access = await requireRetailerAccess(userId, accessId);
+  assertRetailerPermission(access.access, "retail.catalog.view");
   const db = await getDb();
   if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
   const clauses = [eq(products.organizationId, access.access.organizationId), eq(products.status, "active")];
@@ -140,6 +199,7 @@ export async function getRetailerCatalog(userId: number, accessId: number, input
 
 export async function toggleRetailerFavorite(userId: number, accessId: number, productId: number) {
   const access = await requireRetailerAccess(userId, accessId);
+  assertRetailerPermission(access.access, "retail.catalog.view");
   const db = await getDb();
   if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
   const [product] = await db.select({ id: products.id }).from(products).where(and(eq(products.id, productId), eq(products.organizationId, access.access.organizationId), eq(products.status, "active"))).limit(1);
@@ -159,6 +219,7 @@ export async function listRetailerFavorites(userId: number, accessId: number) {
 
 export async function getRetailerFrequentProducts(userId: number, accessId: number) {
   const access = await requireRetailerAccess(userId, accessId);
+  assertRetailerPermission(access.access, "retail.orders.view");
   const db = await getDb();
   if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
   const rows = await db.select({ productId: b2bRetailerOrderItems.productId, quantity: b2bRetailerOrderItems.quantity }).from(b2bRetailerOrderItems).innerJoin(b2bRetailerOrders, and(eq(b2bRetailerOrders.id, b2bRetailerOrderItems.orderId), eq(b2bRetailerOrders.organizationId, b2bRetailerOrderItems.organizationId))).where(and(eq(b2bRetailerOrderItems.organizationId, access.access.organizationId), eq(b2bRetailerOrders.accessId, access.access.id), eq(b2bRetailerOrders.customerId, access.customer.id))).limit(1000);
@@ -176,6 +237,7 @@ export async function getRetailerFrequentProducts(userId: number, accessId: numb
 
 export async function getRetailerSummary(userId: number, accessId: number) {
   const access = await requireRetailerAccess(userId, accessId);
+  assertRetailerPermission(access.access, "retail.orders.view");
   const db = await getDb();
   if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
   const [orders, invoices, promotions] = await Promise.all([
@@ -189,6 +251,7 @@ export async function getRetailerSummary(userId: number, accessId: number) {
 
 export async function getRetailerMonthlyReport(userId: number, accessId: number, month: number, year: number) {
   const access = await requireRetailerAccess(userId, accessId);
+  assertRetailerPermission(access.access, "retail.orders.view");
   const db = await getDb();
   if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
   const startsAt = new Date(Date.UTC(year, month - 1, 1));
@@ -205,6 +268,7 @@ export async function getRetailerMonthlyReport(userId: number, accessId: number,
 
 export async function listRetailerOrders(userId: number, accessId: number) {
   const access = await requireRetailerAccess(userId, accessId);
+  assertRetailerPermission(access.access, "retail.orders.view");
   const db = await getDb();
   if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
   const rows = await db.select({ order: b2bRetailerOrders, salesOrder: salesOrders, routeStatus: distributionRoutes.status, stopStatus: distributionRouteStops.deliveryStatus }).from(b2bRetailerOrders).leftJoin(salesOrders, and(eq(salesOrders.b2bOrderId, b2bRetailerOrders.id), eq(salesOrders.organizationId, b2bRetailerOrders.organizationId))).leftJoin(distributionRouteStops, and(eq(distributionRouteStops.salesOrderReference, salesOrders.orderNumber), eq(distributionRouteStops.organizationId, b2bRetailerOrders.organizationId))).leftJoin(distributionRoutes, and(eq(distributionRoutes.id, distributionRouteStops.routeId), eq(distributionRoutes.organizationId, b2bRetailerOrders.organizationId))).where(and(eq(b2bRetailerOrders.organizationId, access.access.organizationId), eq(b2bRetailerOrders.accessId, access.access.id), eq(b2bRetailerOrders.customerId, access.customer.id))).orderBy(desc(b2bRetailerOrders.createdAt)).limit(100);
@@ -232,8 +296,10 @@ export async function listOrganizationB2bOrders(organizationId: number) {
   return rows.map(row => ({ ...row.order, retailerName: row.retailerName, accessStatus: row.accessStatus, items: itemRows.filter(item => item.orderId === row.order.id) }));
 }
 
-export async function createRetailerOrder(userId: number, accessId: number, input: { lines: OrderLine[]; notes?: string; requestedDeliveryDate?: Date }) {
+export async function createRetailerOrder(userId: number, accessId: number, input: { lines: OrderLine[]; outletId?: number; clientOperationId: string; notes?: string; requestedDeliveryDate?: Date }) {
   const access = await requireRetailerAccess(userId, accessId);
+  assertRetailerPermission(access.access, "retail.orders.create");
+  if (!input.clientOperationId.trim() || input.clientOperationId.length > 128) throw new Error("معرف عملية الطلب غير صالح.");
   if (!input.lines.length || input.lines.length > 100) throw new Error("يجب أن يحتوي الطلب على بند واحد على الأقل وبحد أقصى 100 بند.");
   const normalized = [] as Array<{ productId: number; unit: string; quantity: number; paidQuantity: number; freeQuantity: number; promotionId?: number; promotionLabel?: string; unitPrice: number; taxRate: number; lineTotal: number; pricingSource: string; currencyCode: string }>;
   for (const line of input.lines) {
@@ -252,26 +318,37 @@ export async function createRetailerOrder(userId: number, accessId: number, inpu
   if (Number(access.customer.creditLimit) > 0 && totalAmount > Number(access.customer.creditLimit)) throw new Error("يتجاوز الطلب حد الائتمان المسموح به للمحل.");
   const db = await getDb();
   if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const outlets = await db.select().from(b2bRetailerOutlets).where(and(eq(b2bRetailerOutlets.organizationId, access.access.organizationId), eq(b2bRetailerOutlets.customerId, access.customer.id), eq(b2bRetailerOutlets.status, "active"))).orderBy(asc(b2bRetailerOutlets.name));
+  const outletId = input.outletId ?? (outlets.length === 1 ? outlets[0]?.id : undefined);
+  if (outlets.length > 1 && !outletId) throw new Error("يجب اختيار منفذ التسليم عند وجود أكثر من منفذ نشط.");
+  const outlet = outletId ? outlets.find(item => item.id === outletId) : undefined;
+  if (outletId && !outlet) throw new Error("منفذ التسليم غير نشط أو لا يتبع التاجر الحالي.");
+  assertRetailerOutletScope(access.access, outletId);
   return db.transaction(async tx => {
-    const inserted = await tx.insert(b2bRetailerOrders).values({ organizationId: access.access.organizationId, accessId: access.access.id, customerId: access.customer.id, orderNumber: orderNumber(), currencyCode, subtotal: String(subtotal), taxAmount: String(taxAmount), totalAmount: String(totalAmount), requestedDeliveryDate: input.requestedDeliveryDate, notes: input.notes?.trim(), createdByUserId: userId });
+    const [existing] = await tx.select({ id: b2bRetailerOrders.id, totalAmount: b2bRetailerOrders.totalAmount, currencyCode: b2bRetailerOrders.currencyCode, status: b2bRetailerOrders.status }).from(b2bRetailerOrders).where(and(eq(b2bRetailerOrders.accessId, access.access.id), eq(b2bRetailerOrders.clientOperationId, input.clientOperationId.trim()))).limit(1);
+    if (existing) return { id: existing.id, totalAmount: Number(existing.totalAmount), currencyCode: existing.currencyCode, status: existing.status, idempotentReplay: true };
+    const inserted = await tx.insert(b2bRetailerOrders).values({ organizationId: access.access.organizationId, accessId: access.access.id, customerId: access.customer.id, outletId, clientOperationId: input.clientOperationId.trim(), orderNumber: orderNumber(), currencyCode, subtotal: String(subtotal), taxAmount: String(taxAmount), totalAmount: String(totalAmount), requestedDeliveryDate: input.requestedDeliveryDate, notes: input.notes?.trim(), createdByUserId: userId });
     const orderId = Number(inserted[0].insertId);
     await tx.insert(b2bRetailerOrderItems).values(normalized.map(line => ({ organizationId: access.access.organizationId, orderId, productId: line.productId, unit: line.unit, quantity: String(line.quantity), paidQuantity: String(line.paidQuantity), freeQuantity: String(line.freeQuantity), promotionId: line.promotionId, unitPrice: String(line.unitPrice), taxRate: String(line.taxRate), lineTotal: String(line.lineTotal), pricingSource: line.pricingSource, promotionLabel: line.promotionLabel })));
-    return { id: orderId, totalAmount, currencyCode, status: "new" as const };
+    await tx.insert(auditLogs).values({ organizationId: access.access.organizationId, actorUserId: userId, action: "b2b_order.submitted", entityType: "b2b_order", entityId: String(orderId), metadata: { accessId: access.access.id, customerId: access.customer.id, outletId, clientOperationId: input.clientOperationId.trim() } });
+    return { id: orderId, totalAmount, currencyCode, status: "new" as const, idempotentReplay: false };
   });
 }
 
 export async function reorderRetailerOrder(userId: number, accessId: number, orderId: number) {
   const access = await requireRetailerAccess(userId, accessId);
+  assertRetailerPermission(access.access, "retail.orders.create");
   const db = await getDb();
   if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
   const [order] = await db.select().from(b2bRetailerOrders).where(and(eq(b2bRetailerOrders.id, orderId), eq(b2bRetailerOrders.organizationId, access.access.organizationId), eq(b2bRetailerOrders.accessId, access.access.id), eq(b2bRetailerOrders.customerId, access.customer.id))).limit(1);
   if (!order) throw new Error("الطلب السابق غير متاح لإعادة الطلب.");
   const items = await db.select().from(b2bRetailerOrderItems).where(and(eq(b2bRetailerOrderItems.organizationId, access.access.organizationId), eq(b2bRetailerOrderItems.orderId, orderId)));
-  return createRetailerOrder(userId, accessId, { lines: items.map(item => ({ productId: item.productId, quantity: Number(item.quantity), unit: item.unit })), notes: `إعادة طلب من ${order.orderNumber}` });
+  return createRetailerOrder(userId, accessId, { lines: items.map(item => ({ productId: item.productId, quantity: Number(item.quantity), unit: item.unit })), outletId: order.outletId ?? undefined, clientOperationId: `reorder-${orderId}-${Date.now()}`, notes: `إعادة طلب من ${order.orderNumber}` });
 }
 
 export async function listRetailerDocuments(userId: number, accessId: number) {
   const access = await requireRetailerAccess(userId, accessId);
+  assertRetailerPermission(access.access, "retail.invoices.view");
   const db = await getDb();
   if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
   return db.select({ id: salesInvoices.id, invoiceNumber: salesInvoices.invoiceNumber, status: salesInvoices.status, currencyCode: salesInvoices.currencyCode, grandTotal: salesInvoices.grandTotal, amountPaid: salesInvoices.amountPaid, dueDate: salesInvoices.dueDate, issuedAt: salesInvoices.issuedAt }).from(salesInvoices).where(and(eq(salesInvoices.organizationId, access.access.organizationId), eq(salesInvoices.customerId, access.customer.id))).orderBy(desc(salesInvoices.createdAt)).limit(100);
@@ -284,6 +361,8 @@ export async function reviewAndConvertRetailerOrder(organizationId: number, acto
     const [order] = await tx.select().from(b2bRetailerOrders).where(and(eq(b2bRetailerOrders.id, input.orderId), eq(b2bRetailerOrders.organizationId, organizationId))).limit(1);
     if (!order) throw new Error("طلب B2B غير موجود ضمن المؤسسة.");
     if (order.status === "cancelled") throw new Error("لا يمكن مراجعة طلب ملغى.");
+    const [outlet] = order.outletId ? await tx.select().from(b2bRetailerOutlets).where(and(eq(b2bRetailerOutlets.id, order.outletId), eq(b2bRetailerOutlets.organizationId, organizationId), eq(b2bRetailerOutlets.customerId, order.customerId))).limit(1) : [];
+    if (order.outletId && !outlet) throw new Error("منفذ تسليم الطلب لم يعد تابعاً للتاجر ضمن المؤسسة.");
     const [existing] = await tx.select({ id: salesOrders.id }).from(salesOrders).where(and(eq(salesOrders.organizationId, organizationId), eq(salesOrders.b2bOrderId, order.id))).limit(1);
     if (existing) throw new Error("تم تحويل طلب B2B هذا إلى Sales Order مسبقاً.");
     const requestedItems = await tx.select().from(b2bRetailerOrderItems).where(and(eq(b2bRetailerOrderItems.organizationId, organizationId), eq(b2bRetailerOrderItems.orderId, order.id)));
@@ -308,7 +387,7 @@ export async function reviewAndConvertRetailerOrder(organizationId: number, acto
     const subtotal = roundMoney(confirmed.reduce((sum, line) => sum + line.quantity * line.unitPrice, 0));
     const taxAmount = roundMoney(confirmed.reduce((sum, line) => sum + line.lineTotal - line.quantity * line.unitPrice, 0));
     const totalAmount = roundMoney(subtotal + taxAmount);
-    const inserted = await tx.insert(salesOrders).values({ organizationId, b2bOrderId: order.id, customerId: order.customerId, orderNumber: salesOrderNumber(), source: "b2b", status: "confirmed", currencyCode: order.currencyCode, subtotal: String(subtotal), taxAmount: String(taxAmount), totalAmount: String(totalAmount), requestedDeliveryDate: order.requestedDeliveryDate, confirmedDeliveryDate: input.confirmedDeliveryDate ?? order.requestedDeliveryDate, notes: order.notes, createdByUserId: actorUserId, confirmedByUserId: actorUserId });
+    const inserted = await tx.insert(salesOrders).values({ organizationId, b2bOrderId: order.id, customerId: order.customerId, deliveryOutletId: outlet?.id, deliveryAddressSnapshot: outlet ? [outlet.name, outlet.address, outlet.commune, outlet.wilaya, outlet.deliveryInstructions].filter(Boolean).join(" · ") : undefined, deliveryLatitude: outlet?.latitude, deliveryLongitude: outlet?.longitude, deliveryTerritoryId: outlet?.territoryId, orderNumber: salesOrderNumber(), source: "b2b", status: "confirmed", currencyCode: order.currencyCode, subtotal: String(subtotal), taxAmount: String(taxAmount), totalAmount: String(totalAmount), requestedDeliveryDate: order.requestedDeliveryDate, confirmedDeliveryDate: input.confirmedDeliveryDate ?? order.requestedDeliveryDate, notes: order.notes, createdByUserId: actorUserId, confirmedByUserId: actorUserId });
     const salesOrderId = Number(inserted[0].insertId);
     await tx.insert(salesOrderItems).values(confirmed.map(line => {
       const requestedQuantity = Number(line.item.quantity);

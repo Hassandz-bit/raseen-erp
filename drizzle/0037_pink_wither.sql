@@ -1,0 +1,2 @@
+ALTER TABLE `b2b_retailer_accesses` ADD `retailerRole` enum('owner','buyer','accountant','store_manager','viewer') DEFAULT 'owner' NOT NULL;--> statement-breakpoint
+ALTER TABLE `b2b_retailer_accesses` ADD `outletIds` json;
