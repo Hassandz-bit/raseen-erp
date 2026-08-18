@@ -29,7 +29,7 @@ describe("مركز المالية", () => {
     render(<Finance />);
     expect(screen.getByText("مركز المالية والمحاسبة")).toBeTruthy();
     expect(screen.getByText("ذمم مدينة")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "تهيئة نواة المالية" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "تهيئة رصين المالية" })).toBeTruthy();
     expect(screen.queryByRole("tab", { name: "دليل الحسابات" })).toBeNull();
   });
 });

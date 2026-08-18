@@ -20,9 +20,9 @@ describe("صفحة بوابات Nawa", () => {
     expect(appSource).toContain('path="/executive" component={Home}');
   });
 
-  it("يقدّم بوابة Nawa AI في ترتيب البطاقات", () => {
+  it("يقدّم بوابة RASEEN AI في ترتيب البطاقات", () => {
     expect(portalsSource).toContain('a.id === "ai" ? -1');
-    expect(portalsSource).toContain('isAiPortal ? "Nawa AI"');
+    expect(portalsSource).toContain("portal.name[language]");
   });
 
   it("يعرض دليل Demo ومؤشراته فقط عند وسم المؤسسة الخادمي", () => {

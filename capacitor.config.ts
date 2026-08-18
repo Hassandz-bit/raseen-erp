@@ -5,7 +5,7 @@ const appHost = new URL(appUrl).hostname;
 
 const config: CapacitorConfig = {
   appId: "com.nawa.erp",
-  appName: "Nawa ERP",
+  appName: "RASEEN ERP",
   webDir: "dist/public",
   server: {
     url: appUrl,

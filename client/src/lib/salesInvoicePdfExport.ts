@@ -11,9 +11,9 @@ export type SalesInvoicePrintData = {
 };
 
 const copy = {
-  ar: { title: "فاتورة ضريبية", invoice: "رقم الفاتورة", customer: "العميل", status: "الحالة", created: "تاريخ الإنشاء", due: "تاريخ الاستحقاق", priceMode: "طريقة عرض السعر", inclusive: "شامل الضريبة", exclusive: "غير شامل الضريبة", items: "تفاصيل البنود", net: "صافي المبلغ", tax: "ضريبة القيمة المضافة", discount: "الخصم", total: "الإجمالي المستحق", signature: "ختم وتوقيع الجهة المصدرة", footer: "هذه فاتورة صادرة من نظام Nawa ERP." },
-  fr: { title: "Facture fiscale", invoice: "Numéro de facture", customer: "Client", status: "Statut", created: "Date de création", due: "Date d’échéance", priceMode: "Mode de prix", inclusive: "TTC", exclusive: "Hors taxe", items: "Détail des lignes", net: "Montant net", tax: "TVA", discount: "Remise", total: "Total dû", signature: "Cachet et signature de l’émetteur", footer: "Facture émise depuis Nawa ERP." },
-  en: { title: "Tax invoice", invoice: "Invoice number", customer: "Customer", status: "Status", created: "Created on", due: "Due date", priceMode: "Price mode", inclusive: "Tax inclusive", exclusive: "Tax exclusive", items: "Line items", net: "Net amount", tax: "VAT", discount: "Discount", total: "Total due", signature: "Issuer stamp and signature", footer: "Invoice issued from Nawa ERP." },
+  ar: { title: "فاتورة ضريبية", invoice: "رقم الفاتورة", customer: "العميل", status: "الحالة", created: "تاريخ الإنشاء", due: "تاريخ الاستحقاق", priceMode: "طريقة عرض السعر", inclusive: "شامل الضريبة", exclusive: "غير شامل الضريبة", items: "تفاصيل البنود", net: "صافي المبلغ", tax: "ضريبة القيمة المضافة", discount: "الخصم", total: "الإجمالي المستحق", signature: "ختم وتوقيع الجهة المصدرة", footer: "هذه فاتورة صادرة من نظام رصين." },
+  fr: { title: "Facture fiscale", invoice: "Numéro de facture", customer: "Client", status: "Statut", created: "Date de création", due: "Date d’échéance", priceMode: "Mode de prix", inclusive: "TTC", exclusive: "Hors taxe", items: "Détail des lignes", net: "Montant net", tax: "TVA", discount: "Remise", total: "Total dû", signature: "Cachet et signature de l’émetteur", footer: "Facture émise depuis RASEEN ERP." },
+  en: { title: "Tax invoice", invoice: "Invoice number", customer: "Customer", status: "Status", created: "Created on", due: "Due date", priceMode: "Price mode", inclusive: "Tax inclusive", exclusive: "Tax exclusive", items: "Line items", net: "Net amount", tax: "VAT", discount: "Discount", total: "Total due", signature: "Issuer stamp and signature", footer: "Invoice issued from RASEEN ERP." },
 } as const;
 
 function locale(language: AppLanguage) { return language === "ar" ? "ar-DZ" : language === "fr" ? "fr-FR" : "en-US"; }
@@ -54,7 +54,7 @@ export function buildSalesInvoicePdfInput(data: SalesInvoicePrintData, language:
 }
 
 export async function downloadSalesInvoicePdf(data: SalesInvoicePrintData, language: AppLanguage) {
-  const result = await createDocumentPreviewPdf(buildSalesInvoicePdfInput(data, language), `nawa-invoice-${data.invoice.invoiceNumber}.pdf`);
+  const result = await createDocumentPreviewPdf(buildSalesInvoicePdfInput(data, language), `raseen-invoice-${data.invoice.invoiceNumber}.pdf`);
   const url = URL.createObjectURL(result.blob);
   const anchor = document.createElement("a");
   anchor.href = url;

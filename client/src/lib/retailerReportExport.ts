@@ -9,7 +9,7 @@ const csv = (value: unknown) => `"${String(value ?? "").replaceAll('"', '""')}"`
 
 export function buildRetailerReportCsv(report: RetailerMonthlyReportExport) {
   const lines = [
-    ["Nawa Retail monthly report", `${report.period.year}-${String(report.period.month).padStart(2, "0")}`],
+    ["RASEEN Merchant Portal monthly report", `${report.period.year}-${String(report.period.month).padStart(2, "0")}`],
     ["Currency", report.currencyCode],
     ["Order count", report.summary.orderCount],
     ["Order total", report.summary.orderTotal],
@@ -31,7 +31,7 @@ export async function buildRetailerReportPdf(report: RetailerMonthlyReportExport
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
   const page = pdf.addPage([842, 595]);
-  page.drawText("Nawa Retail — Monthly report", { x: 42, y: 550, size: 18, font: bold, color: rgb(.12, .16, .22) });
+  page.drawText("RASEEN Merchant Portal — Monthly report", { x: 42, y: 550, size: 18, font: bold, color: rgb(.12, .16, .22) });
   page.drawText(`Period: ${report.period.year}-${String(report.period.month).padStart(2, "0")}  |  Currency: ${report.currencyCode}`, { x: 42, y: 528, size: 10, font });
   page.drawText(`Orders: ${report.summary.orderCount} (${report.summary.orderTotal})   Invoices: ${report.summary.invoiceCount} (${report.summary.invoicedTotal})   Outstanding: ${report.summary.outstandingBalance ?? "withheld"}`, { x: 42, y: 507, size: 10, font });
   page.drawText("Orders", { x: 42, y: 478, size: 12, font: bold });

@@ -21,7 +21,7 @@ export async function buildExchangeRatePdf(rows: ExchangeRateExportRow[], option
     const pageIndex = Math.floor(index / 25);
     if (position === 0) {
       const page = pdf.addPage([842, 595]);
-      page.drawText("Nawa ERP — Exchange rate history", { x: 42, y: 550, size: 18, font: bold, color: rgb(.12, .16, .22) });
+      page.drawText("RASEEN ERP — Exchange rate history", { x: 42, y: 550, size: 18, font: bold, color: rgb(.12, .16, .22) });
       page.drawText(`Page ${pageIndex + 1}`, { x: 755, y: 550, size: 9, font });
       page.drawText("Base     Quote     Rate                 Effective date             Source", { x: 42, y: 520, size: 10, font: bold });
     }

@@ -5,9 +5,9 @@ import { describe, expect, it } from "vitest";
 const manifest = JSON.parse(readFileSync(resolve(process.cwd(), "client/public/retail.webmanifest"), "utf8"));
 const worker = readFileSync(resolve(process.cwd(), "client/public/nawa-retail-sw.js"), "utf8");
 
-describe("Nawa Retail PWA", () => {
+describe("RASEEN Merchant Portal PWA", () => {
   it("يبدأ من بوابة التاجر المستقلة", () => {
-    expect(manifest.name).toBe("Nawa Retail");
+    expect(manifest.name).toBe("RASEEN Merchant Portal — بوابة التاجر");
     expect(manifest.start_url).toBe("/retailer");
     expect(manifest.display).toBe("standalone");
   });

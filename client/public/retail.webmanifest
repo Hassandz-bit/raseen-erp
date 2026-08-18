@@ -1,9 +1,9 @@
 {
-  "name": "Nawa Retail",
-  "short_name": "Nawa Retail",
+  "name": "RASEEN Merchant Portal — بوابة التاجر",
+  "short_name": "بوابة التاجر",
   "start_url": "/retailer",
   "display": "standalone",
   "background_color": "#0b0e14",
   "theme_color": "#0b0e14",
-  "description": "بوابة B2B مغلقة للتجار المعتمدين في Nawa ERP. لا يخزن التطبيق أي طلبات أو أسعار أو بيانات تجارية للاستخدام دون اتصال."
+  "description": "بوابة B2B مغلقة للتجار المعتمدين في رصين. لا يخزن التطبيق أي طلبات أو أسعار أو بيانات تجارية للاستخدام دون اتصال."
 }

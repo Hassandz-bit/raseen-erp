@@ -1,6 +1,6 @@
 {
-  "name": "Nawa ERP — منصة الأعمال الذكية",
-  "short_name": "Nawa ERP",
+  "name": "RASEEN ERP — منصة رصين لإدارة الأعمال",
+  "short_name": "RASEEN ERP",
   "id": "/",
   "start_url": "/",
   "scope": "/",
@@ -8,19 +8,19 @@
   "orientation": "any",
   "background_color": "#0b0e14",
   "theme_color": "#0b0e14",
-  "description": "منصة Nawa ERP لإدارة التجارة والمخزون والتوزيع والتصنيع والمالية والموارد البشرية ضمن مؤسسات معزولة.",
+  "description": "منصة رصين لإدارة التجارة والمخزون والتوزيع والتصنيع والمالية والموارد البشرية ضمن مؤسسات معزولة.",
   "categories": ["business", "productivity"],
   "lang": "ar",
   "dir": "rtl",
   "icons": [
     {
-      "src": "/manus-storage/nawa-pwa-192_0f466ee0.png",
+      "src": "/manus-storage/raseen-brand-mark_5c7cbd99.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/manus-storage/nawa-pwa-512_328e45fd.png",
+      "src": "/manus-storage/raseen-brand-mark_5c7cbd99.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
@@ -29,6 +29,6 @@
   "shortcuts": [
     { "name": "التجارة والمخزون", "url": "/commerce", "description": "فتح عمليات التجارة والمخزون" },
     { "name": "فواتير المبيعات", "url": "/commerce/sales", "description": "فتح فواتير المبيعات" },
-    { "name": "Nawa AI", "url": "/workspace", "description": "فتح مساحة Nawa AI" }
+    { "name": "ذكاء رصين", "url": "/workspace", "description": "فتح مساحة ذكاء رصين" }
   ]
 }

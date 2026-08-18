@@ -8,14 +8,14 @@ const statusSource = readFileSync(resolve(process.cwd(), "client/src/components/
 const offline = readFileSync(resolve(process.cwd(), "client/public/offline.html"), "utf8");
 const buildWriter = readFileSync(resolve(process.cwd(), "scripts/write-pwa-service-worker.mts"), "utf8");
 
-describe("Nawa ERP PWA", () => {
+describe("RASEEN ERP PWA", () => {
   it("يعرّف تطبيق ERP عاماً مستقلاً عن مانيـفست السائق", () => {
-    expect(manifest.name).toBe("Nawa ERP — منصة الأعمال الذكية");
+    expect(manifest.name).toBe("RASEEN ERP — منصة رصين لإدارة الأعمال");
     expect(manifest.start_url).toBe("/");
     expect(manifest.display).toBe("standalone");
     expect(manifest.icons).toEqual(expect.arrayContaining([
-      expect.objectContaining({ src: "/manus-storage/nawa-pwa-192_0f466ee0.png", sizes: "192x192", type: "image/png" }),
-      expect.objectContaining({ src: "/manus-storage/nawa-pwa-512_328e45fd.png", sizes: "512x512", purpose: "any maskable" }),
+      expect.objectContaining({ src: "/manus-storage/raseen-brand-mark_5c7cbd99.png", sizes: "192x192", type: "image/png" }),
+      expect.objectContaining({ src: "/manus-storage/raseen-brand-mark_5c7cbd99.png", sizes: "512x512", purpose: "any maskable" }),
     ]));
   });
 
@@ -35,7 +35,7 @@ describe("Nawa ERP PWA", () => {
     expect(statusSource).toContain('window.addEventListener("offline"');
     expect(statusSource).toContain('type: "SKIP_WAITING"');
     expect(statusSource).toContain('"nawa-pwa-open-install"');
-    expect(statusSource).toContain("ثبّت Nawa ERP كتطبيق");
+    expect(statusSource).toContain("ثبّت رصين كتطبيق");
     expect(offline).toContain("أنت الآن دون اتصال");
     expect(offline).toContain("لن تُخزَّن بيانات المؤسسة");
   });
