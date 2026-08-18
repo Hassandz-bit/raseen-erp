@@ -9,7 +9,7 @@ import { trpc } from "@/lib/trpc";
 import { CalendarCheck, Clock3, Download, FileText, RefreshCcw, ShieldCheck, UsersRound } from "lucide-react";
 import React from "react";
 import { toast } from "sonner";
-import { useSearch } from "wouter";
+import { useLocation, useSearch } from "wouter";
 
 const copy = {
   ar: { title: "مركز الموارد البشرية والرواتب", subtitle: "إدارة الموظفين والحضور والإجازات ضمن نطاق المؤسسة، مع حماية بيانات الأجور في إجراءات مستقلة.", overview: "نظرة عامة", employees: "الموظفون", attendance: "الحضور", leave: "الإجازات", overtime: "الساعات الإضافية", payroll: "الرواتب", payrollRegister: "سجل الرواتب", total: "إجمالي الموظفين", active: "نشطون", present: "حاضرون اليوم", absent: "غائبون اليوم", onLeave: "في إجازة", employee: "الموظف", number: "الرقم", department: "القسم", position: "المنصب", status: "الحالة", date: "التاريخ", type: "النوع", hours: "الساعات", currency: "العملة", gross: "إجمالي الرواتب", net: "صافي الرواتب", advances: "السلف القائمة", payrollAccess: "لا تملك صلاحية صريحة لعرض بيانات الرواتب.", exportExcel: "Excel", exportPdf: "PDF", bankCsv: "كشف البنك CSV", bankExcel: "كشف البنك Excel", empty: "لا توجد بيانات قابلة للعرض حالياً.", confidential: "بيانات الرواتب والرواتب الصافية لا تظهر هنا إلا عبر صلاحيات HR/Payroll الخادمية الصريحة.", loadError: "تعذر تحميل بعض بيانات الموارد البشرية. لا تعتمد القيم الظاهرة قبل إعادة المحاولة.", retry: "إعادة تحميل البيانات", bankExportError: "تعذر إنشاء الملف المطلوب." },
@@ -18,7 +18,8 @@ const copy = {
 } as const;
 
 function Tabs({ defaultValue, onValueChange, ...props }: React.ComponentProps<typeof RadixTabs>) {
-  const requestedTab = new URLSearchParams(useSearch()).get("tab") ?? defaultValue ?? "overview";
+  const [location] = useLocation();
+  const requestedTab = new URLSearchParams(useSearch()).get("tab") ?? location.split("/")[2] ?? defaultValue ?? "overview";
   const [value, setValue] = React.useState(requestedTab);
   React.useEffect(() => setValue(requestedTab), [requestedTab]);
   return <RadixTabs {...props} value={value} onValueChange={next => { setValue(next); onValueChange?.(next); }} />;
@@ -43,6 +44,7 @@ function Metric({ label, value }: { label: string; value: number }) {
 
 export default function HRPayroll() {
   const { language, direction } = useLanguage();
+  const [, setLocation] = useLocation();
   const text = copy[language];
   const dashboard = trpc.erp.hr.dashboard.useQuery();
   const directory = trpc.erp.hr.directory.useQuery();
@@ -91,7 +93,7 @@ export default function HRPayroll() {
     <section className="rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/15 via-card to-card p-6 shadow-2xl"><div className="flex flex-wrap items-start justify-between gap-4"><div><div className="mb-2 flex items-center gap-2 text-primary"><UsersRound className="h-5 w-5" /><span className="text-sm font-semibold">Nawa ERP</span></div><h1 className="text-3xl font-bold tracking-tight">{text.title}</h1><p className="mt-2 max-w-3xl text-sm text-muted-foreground">{text.subtitle}</p></div><div className="flex items-center gap-2"><Button variant="outline" onClick={refresh} disabled={isLoading}><RefreshCcw className={`me-2 h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />{text.retry}</Button><Badge className="bg-primary/15 text-primary hover:bg-primary/15">{text.confidential}</Badge></div></div></section>
     {hasLoadError ? <Card className="border-destructive/30 bg-destructive/[.03]"><CardContent className="flex flex-wrap items-center justify-between gap-3 p-4"><p className="text-sm text-destructive">{text.loadError}</p><Button variant="outline" size="sm" onClick={refresh}>{text.retry}</Button></CardContent></Card> : null}
     <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">{metrics.map(({ label, value, Icon }) => <Card key={label} className="border-white/10 bg-card/80"><CardContent className="flex items-center justify-between p-5"><div><p className="text-sm text-muted-foreground">{label}</p><p className="mt-1 text-2xl font-bold">{value}</p></div><Icon className="h-8 w-8 text-primary" /></CardContent></Card>)}</section>
-    <Tabs defaultValue="overview" className="space-y-5"><TabsList className="h-auto flex-wrap justify-start gap-1 bg-card p-1">{[["overview", text.overview], ["employees", text.employees], ["attendance", text.attendance], ["leave", text.leave], ["overtime", text.overtime], ["payroll", text.payroll]].map(([value, label]) => <TabsTrigger key={value} value={value}>{label}</TabsTrigger>)}</TabsList>
+    <Tabs defaultValue="overview" onValueChange={tab => setLocation(tab === "overview" ? "/hr" : `/hr/${tab}`)} className="space-y-5"><TabsList className="h-auto flex-wrap justify-start gap-1 bg-card p-1">{[["overview", text.overview], ["employees", text.employees], ["attendance", text.attendance], ["leave", text.leave], ["overtime", text.overtime], ["payroll", text.payroll]].map(([value, label]) => <TabsTrigger key={value} value={value}>{label}</TabsTrigger>)}</TabsList>
       <TabsContent value="overview"><Card><CardHeader><CardTitle>{text.overview}</CardTitle></CardHeader><CardContent className="grid gap-4 md:grid-cols-2"><Metric label={text.onLeave} value={dashboard.data?.onLeave ?? 0} /><Metric label={text.present} value={dashboard.data?.presentToday ?? 0} /></CardContent></Card></TabsContent>
       <TabsContent value="employees"><div className="space-y-4"><div className="flex flex-wrap justify-end gap-2"><Button variant="outline" onClick={exportDirectoryExcel}><Download className="me-2 h-4 w-4" />{text.exportExcel}</Button><Button variant="outline" onClick={exportDirectoryPdf}><FileText className="me-2 h-4 w-4" />{text.exportPdf}</Button></div><Table headers={[text.number, text.employee, text.department, text.position, text.status]} rows={employeeRows} empty={text.empty} /></div></TabsContent>
       <TabsContent value="attendance"><section className="grid gap-4 md:grid-cols-3"><Metric label={text.present} value={dashboard.data?.presentToday ?? 0} /><Metric label={text.absent} value={dashboard.data?.absentToday ?? 0} /><Metric label={text.onLeave} value={dashboard.data?.onLeave ?? 0} /></section></TabsContent>

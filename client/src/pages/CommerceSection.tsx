@@ -1,0 +1,72 @@
+import DashboardLayout from "@/components/DashboardLayout";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { trpc } from "@/lib/trpc";
+import { Boxes, ChevronLeft, Loader2, PackageSearch, ReceiptText, RefreshCw, ShoppingCart, Warehouse } from "lucide-react";
+import { useMemo, useState } from "react";
+import { useLocation } from "wouter";
+
+type CommerceSection = "products" | "warehouses" | "batches" | "sales" | "purchases";
+
+const sectionMeta: Record<CommerceSection, { ar: string; fr: string; en: string; description: { ar: string; fr: string; en: string }; icon: typeof Boxes }> = {
+  products: { ar: "المنتجات", fr: "Produits", en: "Products", description: { ar: "دليل المنتجات والأسعار وحالة الصنف.", fr: "Catalogue des produits, prix et statuts.", en: "Product catalog, prices, and item status." }, icon: Boxes },
+  warehouses: { ar: "المخازن", fr: "Entrepôts", en: "Warehouses", description: { ar: "قائمة مخازن المؤسسة وأكوادها التشغيلية.", fr: "Entrepôts et codes opérationnels de l’organisation.", en: "Organization warehouses and operating codes." }, icon: Warehouse },
+  batches: { ar: "الدفعات وFEFO", fr: "Lots et FEFO", en: "Batches & FEFO", description: { ar: "متابعة الدفعات والكميات وتواريخ الصلاحية وحالات الجودة.", fr: "Suivi des lots, quantités, péremption et qualité.", en: "Track lots, quantities, expiry dates, and quality states." }, icon: PackageSearch },
+  sales: { ar: "فواتير المبيعات", fr: "Factures de vente", en: "Sales invoices", description: { ar: "متابعة فواتير البيع ومراحل الإصدار والتحصيل.", fr: "Suivi des factures, émission et encaissement.", en: "Track sales invoices, issue flow, and collection." }, icon: ReceiptText },
+  purchases: { ar: "أوامر الشراء", fr: "Commandes d’achat", en: "Purchase orders", description: { ar: "متابعة أوامر الشراء وحالات الإرسال والاستلام.", fr: "Suivi des commandes, envoi et réception.", en: "Track purchase orders, sending, and receiving." }, icon: ShoppingCart },
+};
+
+const statusClass: Record<string, string> = {
+  active: "border-emerald-400/30 bg-emerald-400/10 text-emerald-700 dark:text-emerald-300",
+  issued: "border-sky-400/30 bg-sky-400/10 text-sky-700 dark:text-sky-300",
+  paid: "border-emerald-400/30 bg-emerald-400/10 text-emerald-700 dark:text-emerald-300",
+  received: "border-emerald-400/30 bg-emerald-400/10 text-emerald-700 dark:text-emerald-300",
+  draft: "border-slate-400/30 bg-slate-400/10 text-slate-700 dark:text-slate-300",
+  blocked: "border-rose-400/30 bg-rose-400/10 text-rose-700 dark:text-rose-300",
+  quarantined: "border-amber-400/30 bg-amber-400/10 text-amber-700 dark:text-amber-300",
+  expired: "border-rose-400/30 bg-rose-400/10 text-rose-700 dark:text-rose-300",
+  partial: "border-amber-400/30 bg-amber-400/10 text-amber-700 dark:text-amber-300",
+  sent: "border-sky-400/30 bg-sky-400/10 text-sky-700 dark:text-sky-300",
+};
+
+function statusBadge(status: string, label: string) {
+  return <Badge variant="outline" className={statusClass[status] ?? ""}>{label}</Badge>;
+}
+
+export default function CommerceSectionPage() {
+  const { language, direction, formatCurrency, formatDate, formatNumber, t } = useLanguage();
+  const [location, setLocation] = useLocation();
+  const section = (location.split("/").pop() || "products") as CommerceSection;
+  const meta = sectionMeta[section] ?? sectionMeta.products;
+  const Icon = meta.icon;
+  const [search, setSearch] = useState("");
+  const products = trpc.erp.inventory.listProducts.useQuery(undefined, { retry: false });
+  const warehouses = trpc.erp.inventory.listWarehouses.useQuery(undefined, { retry: false });
+  const batches = trpc.erp.inventory.listBatches.useQuery(undefined, { retry: false });
+  const invoices = trpc.erp.sales.listInvoices.useQuery(undefined, { retry: false });
+  const orders = trpc.erp.purchases.listOrders.useQuery(undefined, { retry: false });
+  const selectedQuery = section === "products" ? products : section === "warehouses" ? warehouses : section === "batches" ? batches : section === "sales" ? invoices : orders;
+  const normalizedSearch = search.trim().toLocaleLowerCase();
+  const displayedRows = useMemo(() => {
+    const rows = selectedQuery.data ?? [];
+    if (!normalizedSearch) return rows;
+    return rows.filter((row: any) => Object.values(row).some(value => String(value ?? "").toLocaleLowerCase().includes(normalizedSearch)));
+  }, [normalizedSearch, selectedQuery.data]);
+  const labels = language === "ar" ? { search: "ابحث في الجدول", refresh: "تحديث البيانات", openCenter: "فتح مركز العمليات", count: "سجل", empty: "لا توجد بيانات مطابقة.", scrollHint: "اسحب أفقياً لرؤية جميع الأعمدة", name: "الاسم", code: "الرمز", price: "السعر", status: "الحالة", quantity: "الكمية", expiry: "الصلاحية", document: "المستند", total: "الإجمالي" } : language === "fr" ? { search: "Rechercher dans le tableau", refresh: "Actualiser", openCenter: "Ouvrir le centre opérationnel", count: "lignes", empty: "Aucune donnée correspondante.", scrollHint: "Faites glisser pour voir toutes les colonnes", name: "Nom", code: "Code", price: "Prix", status: "Statut", quantity: "Quantité", expiry: "Expiration", document: "Document", total: "Total" } : { search: "Search this table", refresh: "Refresh data", openCenter: "Open operations center", count: "rows", empty: "No matching data.", scrollHint: "Swipe to view all columns", name: "Name", code: "Code", price: "Price", status: "Status", quantity: "Quantity", expiry: "Expiry", document: "Document", total: "Total" };
+  const refetch = () => void selectedQuery.refetch();
+
+  const table = () => {
+    if (selectedQuery.isLoading) return <div className="grid min-h-72 place-items-center"><Loader2 className="h-7 w-7 animate-spin text-primary" /></div>;
+    if (selectedQuery.isError) return <div className="grid min-h-72 place-items-center gap-3 p-8 text-center"><p className="text-sm text-destructive">{t("error")}</p><Button variant="outline" onClick={refetch}><RefreshCw className="me-2 h-4 w-4" />{labels.refresh}</Button></div>;
+    if (!displayedRows.length) return <div className="grid min-h-72 place-items-center text-sm text-muted-foreground">{labels.empty}</div>;
+    if (section === "products") return <table className="w-full min-w-[680px] text-sm"><thead><tr className="border-b bg-muted/30 text-start text-xs text-muted-foreground"><th className="p-4">{labels.name}</th><th className="p-4">SKU</th><th className="p-4">{labels.price}</th><th className="p-4">{labels.status}</th></tr></thead><tbody>{displayedRows.map((product: any) => <tr key={product.id} className="border-b border-border/60 hover:bg-muted/20"><td className="p-4 font-medium">{product.name}</td><td className="p-4 font-mono text-xs">{product.sku}</td><td className="p-4">{formatCurrency(Number(product.salePrice))}</td><td className="p-4">{statusBadge(product.status, t(product.status))}</td></tr>)}</tbody></table>;
+    if (section === "warehouses") return <table className="w-full min-w-[600px] text-sm"><thead><tr className="border-b bg-muted/30 text-start text-xs text-muted-foreground"><th className="p-4">{labels.code}</th><th className="p-4">{labels.name}</th><th className="p-4">{labels.status}</th></tr></thead><tbody>{displayedRows.map((warehouse: any) => <tr key={warehouse.id} className="border-b border-border/60 hover:bg-muted/20"><td className="p-4 font-mono text-xs">{warehouse.code}</td><td className="p-4 font-medium">{warehouse.name}</td><td className="p-4">{statusBadge(warehouse.status ?? "active", t(warehouse.status ?? "active"))}</td></tr>)}</tbody></table>;
+    if (section === "batches") return <table className="w-full min-w-[760px] text-sm"><thead><tr className="border-b bg-muted/30 text-start text-xs text-muted-foreground"><th className="p-4">{labels.code}</th><th className="p-4">{labels.quantity}</th><th className="p-4">{labels.expiry}</th><th className="p-4">{labels.status}</th></tr></thead><tbody>{displayedRows.map((batch: any) => <tr key={batch.id} className="border-b border-border/60 hover:bg-muted/20"><td className="p-4 font-mono text-xs">{batch.lotNumber}</td><td className="p-4">{formatNumber(Number(batch.currentQuantity))}</td><td className="p-4">{batch.expiryDate ? formatDate(batch.expiryDate) : "—"}</td><td className="p-4">{statusBadge(batch.status, t(batch.status))}</td></tr>)}</tbody></table>;
+    const documents = displayedRows as any[];
+    return <table className="w-full min-w-[760px] text-sm"><thead><tr className="border-b bg-muted/30 text-start text-xs text-muted-foreground"><th className="p-4">{labels.document}</th><th className="p-4">{labels.total}</th><th className="p-4">{labels.status}</th></tr></thead><tbody>{documents.map(document => <tr key={document.id} className="border-b border-border/60 hover:bg-muted/20"><td className="p-4 font-mono text-xs">{document.invoiceNumber ?? document.orderNumber}</td><td className="p-4">{formatCurrency(Number(document.grandTotal))}</td><td className="p-4">{statusBadge(document.status, t(document.status))}</td></tr>)}</tbody></table>;
+  };
+
+  return <DashboardLayout><main dir={direction} className="mx-auto max-w-7xl space-y-6"><header className="surface flex flex-col gap-5 rounded-3xl border p-6 md:flex-row md:items-end md:justify-between"><div className="flex items-start gap-4"><div className="grid h-12 w-12 place-items-center rounded-2xl bg-primary/10 text-primary"><Icon className="h-6 w-6" /></div><div><p className="text-sm text-primary">{language === "ar" ? "التجارة والمخزون" : language === "fr" ? "Commerce et stock" : "Commerce & inventory"}</p><h1 className="mt-1 text-2xl font-bold text-foreground">{meta[language]}</h1><p className="mt-2 text-sm leading-7 text-muted-foreground">{meta.description[language]}</p></div></div><Button variant="outline" onClick={() => setLocation(`/commerce#${section}`)}><ChevronLeft className="me-2 h-4 w-4" />{labels.openCenter}</Button></header><section className="surface overflow-hidden rounded-3xl border"><div className="flex flex-col gap-3 border-b border-border/70 p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-semibold text-foreground">{meta[language]}</p><p className="mt-1 text-xs text-muted-foreground">{displayedRows.length} {labels.count}</p></div><div className="flex gap-2"><Input value={search} onChange={event => setSearch(event.target.value)} placeholder={labels.search} className="h-10 w-full sm:w-64" /><Button variant="outline" size="icon" aria-label={labels.refresh} onClick={refetch}><RefreshCw className="h-4 w-4" /></Button></div></div><p className="border-b border-border/70 bg-muted/20 px-4 py-2 text-center text-xs text-muted-foreground sm:hidden">{labels.scrollHint}</p><div className="overflow-x-auto">{table()}</div></section></main></DashboardLayout>;
+}
