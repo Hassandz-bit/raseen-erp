@@ -132,11 +132,12 @@ function DashboardLayoutContent({
   const sidebarRef = useRef<HTMLDivElement>(null);
   const portalScrollRef = useRef<HTMLDivElement>(null);
   const previousPortalId = useRef<string | undefined>(undefined);
-  const pathWithoutQuery = location.split("?")[0];
+  const pathWithoutQuery = location.split(/[?#]/)[0];
+  const currentHash = window.location.hash;
   const activePortal = getPortalForPath(pathWithoutQuery);
   const chrome = portalChrome[language];
   const localItems = activePortal?.localNavigation ?? [];
-  const activeMenuItem = localItems.find(item => location === item.href || pathWithoutQuery === item.href.split("?")[0]);
+  const activeMenuItem = localItems.find(item => item.href.includes("#") ? `${pathWithoutQuery}${currentHash}` === item.href : item.href.includes("?") ? `${pathWithoutQuery}${search}` === item.href : !currentHash && (location === item.href || pathWithoutQuery === item.href));
   const isMobile = useIsMobile();
   const bootstrap = trpc.erp.bootstrap.useQuery(undefined, { retry: false, refetchOnWindowFocus: false });
   const branchQuery = trpc.erp.preferences.availableBranches.useQuery(undefined, { retry: false, refetchOnWindowFocus: false });
@@ -292,7 +293,7 @@ function DashboardLayoutContent({
               {activePortal ? <><SidebarMenuItem><SidebarMenuButton onClick={() => navigateTo("/", chrome.portals)} tooltip={chrome.portals} className="h-11 text-[15px] font-semibold text-muted-foreground hover:text-foreground min-[600px]:text-[16px]"><Grid2X2 className="h-[18px] w-[18px]" /><span>{chrome.portals}</span></SidebarMenuButton></SidebarMenuItem><div className="mx-2 mt-3 min-w-0 rounded-xl border border-primary/15 bg-primary/[.06] px-3 py-3 group-data-[collapsible=icon]:hidden"><p className="text-[11px] font-bold uppercase tracking-[.12em] text-primary">{chrome.navigation}</p><p className="mt-1 break-words text-[16px] font-bold text-foreground min-[600px]:text-[18px]">{activePortal.name[language]}</p></div></> : <><SidebarMenuItem><SidebarMenuButton onClick={() => navigateTo("/", chrome.portals)} tooltip={chrome.portals} className="h-12 text-[15px] font-semibold min-[600px]:text-[16px]"><Grid2X2 className="h-[19px] w-[19px] text-primary" /><span>{chrome.portals}</span></SidebarMenuButton></SidebarMenuItem><SidebarMenuItem><SidebarMenuButton onClick={() => navigateTo("/executive", chrome.executive)} tooltip={chrome.executive} className="h-12 text-[15px] font-medium min-[600px]:text-[16px]"><Home className="h-[19px] w-[19px]" /><span>{chrome.executive}</span></SidebarMenuButton></SidebarMenuItem><SidebarMenuItem><SidebarMenuButton onClick={() => navigateTo("/workspace", chrome.ai)} tooltip={chrome.ai} className="h-12 text-[15px] font-bold text-primary min-[600px]:text-[16px]"><Bot className="h-[19px] w-[19px] text-primary" /><span>{chrome.ai}</span><span className="sr-only">{chrome.workspace}</span></SidebarMenuButton></SidebarMenuItem></>}
               {activePortal ? <p className="px-2 pb-2 pt-5 text-[12px] font-semibold uppercase tracking-[.14em] text-muted-foreground group-data-[collapsible=icon]:hidden">{chrome.navigation}</p> : null}
               {localItems.map((item, index) => {
-                const isActive = item.href.includes("?") ? `${pathWithoutQuery}${search}` === item.href : pathWithoutQuery === item.href;
+                const isActive = item.href.includes("?") ? `${pathWithoutQuery}${search}` === item.href : item.href.includes("#") ? `${pathWithoutQuery}${currentHash}` === item.href : !currentHash && pathWithoutQuery === item.href;
                 const showGroup = index === 0 || item.group[language] !== localItems[index - 1]?.group[language];
                 return (
                   <SidebarMenuItem key={item.id}>

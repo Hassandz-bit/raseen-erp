@@ -26,5 +26,6 @@ describe("Nawa portals definition", () => {
     expect(byId("distribution").localNavigation.map(item => item.id)).toEqual(expect.arrayContaining(["control", "routes", "fleet", "territories", "driver"]));
     expect(byId("finance").localNavigation.map(item => item.id)).toEqual(expect.arrayContaining(["accounts", "entries", "aging", "treasury", "reports"]));
     expect(byId("hr").localNavigation.map(item => item.id)).toEqual(expect.arrayContaining(["employees", "attendance", "leave", "payroll"]));
+    expect(byId("commerce").localNavigation.map(item => item.id)).toEqual(expect.arrayContaining(["products", "warehouses", "batches", "sales", "purchases"]));
   });
 });
