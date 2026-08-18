@@ -1,5 +1,5 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
-import { auditLogs, branches, businessParties, demoSeedRuns, organizationMemberships, organizationModules, organizationRoles, organizationSettings, organizations, priceListItems, priceLists, productBrands, productCategories, productPackagingLevels, productUnitConversions, products, uomCatalog, userPreferences, warehouses } from "../drizzle/schema";
+import { auditLogs, b2bPromotions, branches, businessParties, demoSeedRuns, organizationMemberships, organizationModules, organizationRoles, organizationSettings, organizations, priceListItems, priceLists, productBatches, productBrands, productCategories, productPackagingLevels, productUnitConversions, products, uomCatalog, userPreferences, warehouses } from "../drizzle/schema";
 import { createBusinessParty, createProductBatch, defaultDocumentSettings, getDb, setActiveOrganizationForUser } from "./db";
 
 export const DEMO_ORGANIZATION = {
@@ -195,14 +195,46 @@ export async function seedDemoCommercialMaster(actorUserId: number) {
   const relativeDays = [180, 120, 60, 25, 12, 5, -3, 90, 45, 15];
   for (let index = 0; index < foodProducts.length; index += 1) {
     const product = foodProducts[index];
+    const lotNumber = `DEMO-LOT-${String(index + 1).padStart(3, "0")}`;
+    const [existingBatch] = await db.select({ id: productBatches.id }).from(productBatches).where(and(eq(productBatches.organizationId, organizationId), eq(productBatches.warehouseId, centralWarehouse.id), eq(productBatches.lotNumber, lotNumber))).limit(1);
+    if (existingBatch) continue;
     const expiryDate = new Date();
     expiryDate.setDate(expiryDate.getDate() + relativeDays[index]);
     const manufacturingDate = new Date(expiryDate);
     manufacturingDate.setDate(manufacturingDate.getDate() - 45);
-    await createProductBatch(organizationId, { productId: product.id, warehouseId: centralWarehouse.id, lotNumber: `DEMO-LOT-${String(index + 1).padStart(3, "0")}`, receivedQuantity: 180 + index * 25, cost: Number(product.purchasePrice), sourcePartyId: supplier.id, manufacturingDate, expiryDate, status: relativeDays[index] < 0 ? "expired" : "active", movementType: "opening_balance", sourceDocumentType: "demo_seed" });
+    await createProductBatch(organizationId, { productId: product.id, warehouseId: centralWarehouse.id, lotNumber, receivedQuantity: 180 + index * 25, cost: Number(product.purchasePrice), sourcePartyId: supplier.id, manufacturingDate, expiryDate, status: relativeDays[index] < 0 ? "expired" : "active", movementType: "opening_balance", sourceDocumentType: "demo_seed" });
   }
   await db.insert(auditLogs).values({ organizationId, actorUserId, action: "demo.commercial_master.seeded", entityType: "demo_seed", entityId: String(organizationId), metadata: { parties: DEMO_PARTIES.length, priceLists: DEMO_PRICE_LISTS.length, batches: foodProducts.length } });
   return { organizationId, parties: DEMO_PARTIES.length, priceLists: DEMO_PRICE_LISTS.length, batches: foodProducts.length };
+}
+
+export async function seedDemoPromotions(actorUserId: number) {
+  const commercial = await seedDemoCommercialMaster(actorUserId);
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const organizationId = commercial.organizationId;
+  const demoProducts = await db.select().from(products).where(eq(products.organizationId, organizationId));
+  const demoCustomers = await db.select().from(businessParties).where(eq(businessParties.organizationId, organizationId));
+  const bySku = new Map(demoProducts.map(product => [product.sku, product]));
+  const byCode = new Map(demoCustomers.map(party => [party.code, party]));
+  const now = new Date();
+  const activeUntil = new Date(now); activeUntil.setDate(activeUntil.getDate() + 18);
+  const nearEnd = new Date(now); nearEnd.setDate(nearEnd.getDate() + 2);
+  const expired = new Date(now); expired.setDate(expired.getDate() - 1);
+  const promotions = [
+    { name: "عرض إطلاق الحليب — خصم 12%", type: "percentage_discount" as const, productId: bySku.get("DEMO-001")?.id, discountPercentage: "12", startsAt: now, endsAt: activeUntil },
+    { name: "سعر VIP على القهوة", type: "special_price" as const, productId: bySku.get("DEMO-008")?.id, customerId: byCode.get("CUS-001")?.id, specialPrice: "250", startsAt: now, endsAt: activeUntil },
+    { name: "اشتر 10 واحصل على 1 بسكويت", type: "buy_x_get_y" as const, productId: bySku.get("DEMO-022")?.id, buyQuantity: "10", getQuantity: "1", startsAt: now, endsAt: nearEnd },
+    { name: "عرض منتهٍ للعرض فقط", type: "fixed_discount" as const, productId: bySku.get("DEMO-015")?.id, discountAmount: "20", startsAt: expired, endsAt: expired },
+  ];
+  for (const promotion of promotions) {
+    if (!promotion.productId) continue;
+    const [existing] = await db.select({ id: b2bPromotions.id }).from(b2bPromotions).where(and(eq(b2bPromotions.organizationId, organizationId), eq(b2bPromotions.name, promotion.name))).limit(1);
+    const values = { organizationId, name: promotion.name, status: promotion.endsAt < now ? "expired" as const : "active" as const, type: promotion.type, productId: promotion.productId, customerId: "customerId" in promotion ? promotion.customerId : undefined, minimumQuantity: "1", discountPercentage: "discountPercentage" in promotion ? promotion.discountPercentage : undefined, discountAmount: "discountAmount" in promotion ? promotion.discountAmount : undefined, specialPrice: "specialPrice" in promotion ? promotion.specialPrice : undefined, buyQuantity: "buyQuantity" in promotion ? promotion.buyQuantity : undefined, getQuantity: "getQuantity" in promotion ? promotion.getQuantity : undefined, startsAt: promotion.startsAt, endsAt: promotion.endsAt, visibleToB2b: "yes" as const, createdByUserId: actorUserId };
+    if (existing) await db.update(b2bPromotions).set(values).where(eq(b2bPromotions.id, existing.id)); else await db.insert(b2bPromotions).values(values);
+  }
+  await db.insert(auditLogs).values({ organizationId, actorUserId, action: "demo.promotions.seeded", entityType: "demo_seed", entityId: String(organizationId), metadata: { promotions: promotions.length } });
+  return { ...commercial, promotions: promotions.length };
 }
 
 async function listDemoOrganizationTables() {

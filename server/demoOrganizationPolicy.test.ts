@@ -38,4 +38,12 @@ describe("شركة Nawa Demo", () => {
     expect(source).toContain("productUnitConversions");
     expect(source).toContain("demo.catalog.seeded");
   });
+
+  it("يجهز عروضاً فعالة وقريبة الانتهاء ومنتهية لمحرك B2B", async () => {
+    const source = await import("node:fs/promises").then(fs => fs.readFile(new URL("./demo.ts", import.meta.url), "utf8"));
+    expect(source).toContain("seedDemoPromotions");
+    expect(source).toContain("b2bPromotions");
+    expect(source).toContain("buy_x_get_y");
+    expect(source).toContain("demo.promotions.seeded");
+  });
 });
