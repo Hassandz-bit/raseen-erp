@@ -78,4 +78,12 @@ describe("شركة Nawa Demo", () => {
     expect(source).toContain("payPayrollPeriod");
     expect(source).toContain("demo.retail_hr_payroll.seeded");
   });
+
+  it("يقيد مؤشرات العرض بالمؤسسة النشطة الموسومة Demo", async () => {
+    const source = await import("node:fs/promises").then(fs => fs.readFile(new URL("./demo.ts", import.meta.url), "utf8"));
+    expect(source).toContain("getDemoShowcaseMetricsForUser");
+    expect(source).toContain("getDefaultTenantContext(userId)");
+    expect(source).toContain('activeContext.organization.isDemo !== "yes"');
+    expect(source).toContain("demo.organization.id !== activeContext.organization.id");
+  });
 });

@@ -1,6 +1,6 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, count, eq, inArray, sql } from "drizzle-orm";
 import { auditLogs, b2bPromotions, b2bRetailerOrders, b2bRetailerOutlets, branches, businessParties, demoSeedRuns, distributionRoutes, employees, fleetVehicles, manufacturingBoms, organizationMemberships, organizationModules, organizationRoles, organizationSettings, organizations, priceListItems, priceLists, productBatches, productBrands, productCategories, productPackagingLevels, productUnitConversions, products, productionOrders, purchaseOrderItems, purchaseOrders, salesInvoices, uomCatalog, userPreferences, vehicleLoadItems, warehouses } from "../drizzle/schema";
-import { createBusinessParty, createProductBatch, createPurchaseOrder, createSalesInvoice, defaultDocumentSettings, getDb, issueSalesInvoiceWithFefo, receivePurchaseOrder, recordSalesInvoicePayment, sendPurchaseOrder, setActiveOrganizationForUser } from "./db";
+import { createBusinessParty, createProductBatch, createPurchaseOrder, createSalesInvoice, defaultDocumentSettings, getDb, getDefaultTenantContext, issueSalesInvoiceWithFefo, receivePurchaseOrder, recordSalesInvoicePayment, sendPurchaseOrder, setActiveOrganizationForUser } from "./db";
 import { createRetailerOrder, createRetailerOutlet, grantRetailerAccess } from "./b2b";
 import { createDistributionRoute, createDistributionTerritory, createFleetVehicle, createVehicleLoadOrder, logFuel, recordDistributionCollection, recordDistributionDelivery, transitionDistributionRoute, transitionVehicleLoadOrder } from "./distribution";
 import { createDepartment, createEmployee, createEmployeeContract, createEmployeeProfile, createLeaveType, createPosition, createWorkSchedule, decideLeaveRequest, recordAttendance, submitLeaveRequest } from "./hr";
@@ -97,6 +97,25 @@ export async function getDemoOrganizationForUser(userId: number) {
     .where(and(eq(organizations.slug, DEMO_ORGANIZATION.slug), eq(organizations.isDemo, "yes")))
     .limit(1);
   return rows[0] ?? null;
+}
+
+export async function getDemoShowcaseMetricsForUser(userId: number) {
+  const activeContext = await getDefaultTenantContext(userId);
+  if (!activeContext || activeContext.organization.isDemo !== "yes") return null;
+  const demo = await getDemoOrganizationForUser(userId);
+  if (!demo || demo.organization.id !== activeContext.organization.id) return null;
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const organizationId = demo.organization.id;
+  const [sales, production, routes, retailOrders, employeeRows, payrollRows] = await Promise.all([
+    db.select({ value: count() }).from(salesInvoices).where(eq(salesInvoices.organizationId, organizationId)),
+    db.select({ value: count() }).from(productionOrders).where(eq(productionOrders.organizationId, organizationId)),
+    db.select({ value: count() }).from(distributionRoutes).where(eq(distributionRoutes.organizationId, organizationId)),
+    db.select({ value: count() }).from(b2bRetailerOrders).where(eq(b2bRetailerOrders.organizationId, organizationId)),
+    db.select({ value: count() }).from(employees).where(eq(employees.organizationId, organizationId)),
+    db.select({ value: count() }).from(payrollPeriods).where(eq(payrollPeriods.organizationId, organizationId)),
+  ]);
+  return { organization: demo.organization, seededAt: demo.seedRun?.seededAt ?? null, metrics: { salesInvoices: Number(sales[0]?.value ?? 0), productionOrders: Number(production[0]?.value ?? 0), distributionRoutes: Number(routes[0]?.value ?? 0), retailOrders: Number(retailOrders[0]?.value ?? 0), employees: Number(employeeRows[0]?.value ?? 0), payrollPeriods: Number(payrollRows[0]?.value ?? 0) } };
 }
 
 export async function activateDemoOrganizationForUser(userId: number) {
