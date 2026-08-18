@@ -1,4 +1,4 @@
-const CACHE_NAME = "nawa-erp-shell-v1";
+const CACHE_NAME = "nawa-erp-shell-__NAWA_PWA_BUILD_ID__";
 const APP_SHELL = "/";
 const OFFLINE_PAGE = "/offline.html";
 
