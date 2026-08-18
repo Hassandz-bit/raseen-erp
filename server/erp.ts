@@ -30,6 +30,7 @@ import { getHrOperationalReports } from "./hrReports";
 import { canUseHrPermission, type HrPermission } from "./hrPermissionPolicy";
 import { assertHrEmployeeInScope, hasRestrictedHrScope, resolveHrEmployeeScope } from "./hrDataScope";
 import { decideTeamAdvanceRequest, decideTeamLeaveRequest, getEmployeeSelfService, submitSelfAdvanceRequest, submitSelfLeaveRequest } from "./hrSelfService";
+import { activateDemoOrganizationForUser, deleteDemoOrganization, ensureDemoOrganization, getDemoOrganizationForUser, resetDemoOrganization, seedDemoFoundation } from "./demo";
 
 type ModuleKey = "inventory" | "sales" | "purchases" | "finance" | "hr" | "reports" | "ai_assistant" | "distribution" | "manufacturing" | "nawa_retail";
 const operationalModuleKeys = ["inventory", "sales", "purchases", "finance", "hr"] as const;
@@ -139,6 +140,26 @@ function assertDistributionScope(context: Awaited<ReturnType<typeof getTenantCon
 
 
 export const erpRouter = router({
+  demo: router({
+    status: protectedProcedure.query(async ({ ctx }) => getDemoOrganizationForUser(ctx.user.id)),
+    ensure: protectedProcedure.mutation(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "يلزم مدير المنصة لإنشاء شركة العرض." });
+      return ensureDemoOrganization(ctx.user.id);
+    }),
+    seedFoundation: protectedProcedure.mutation(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "يلزم مدير المنصة لتهيئة شركة العرض." });
+      return seedDemoFoundation(ctx.user.id);
+    }),
+    reset: protectedProcedure.mutation(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "يلزم مدير المنصة لإعادة تهيئة شركة العرض." });
+      return resetDemoOrganization(ctx.user.id);
+    }),
+    delete: protectedProcedure.input(z.object({ confirmation: z.literal("DELETE NAWA DEMO") })).mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "يلزم مدير المنصة لحذف شركة العرض." });
+      return deleteDemoOrganization(ctx.user.id, input.confirmation);
+    }),
+    activate: protectedProcedure.mutation(async ({ ctx }) => activateDemoOrganizationForUser(ctx.user.id)),
+  }),
   onboarding: router({
     createOrganization: protectedProcedure
       .input(z.object({ name: z.string().trim().min(2, "اكتب اسم المؤسسة.").max(180) }))
