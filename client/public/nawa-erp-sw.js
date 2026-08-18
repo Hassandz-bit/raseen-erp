@@ -1,11 +1,12 @@
 const CACHE_NAME = "nawa-erp-shell-v1";
 const APP_SHELL = "/";
+const OFFLINE_PAGE = "/offline.html";
 
 const isSameOrigin = url => url.origin === self.location.origin;
 const isApiRequest = url => url.pathname.startsWith("/api/");
 
 self.addEventListener("install", event => {
-  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.add(APP_SHELL)).then(() => self.skipWaiting()));
+  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll([APP_SHELL, OFFLINE_PAGE])).then(() => self.skipWaiting()));
 });
 
 self.addEventListener("activate", event => {
@@ -27,7 +28,7 @@ self.addEventListener("fetch", event => {
       const copy = response.clone();
       caches.open(CACHE_NAME).then(cache => cache.put(APP_SHELL, copy));
       return response;
-    }).catch(() => caches.match(APP_SHELL)));
+    }).catch(() => caches.match(OFFLINE_PAGE)));
     return;
   }
 

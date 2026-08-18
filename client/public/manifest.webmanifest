@@ -14,7 +14,13 @@
   "dir": "rtl",
   "icons": [
     {
-      "src": "https://files.manuscdn.com/user_upload_by_module/web_dev_logo/310519663063374930/nDTjnNRICZOtwSCv.png",
+      "src": "/manus-storage/nawa-pwa-192_0f466ee0.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/manus-storage/nawa-pwa-512_328e45fd.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

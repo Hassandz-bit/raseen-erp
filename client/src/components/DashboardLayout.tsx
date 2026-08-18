@@ -9,7 +9,7 @@ import { startLogin } from "@/const";
 import { getPortalForPath, getPortalNavigationIcon, nawaPortals, type PortalNavigationItem } from "@/config/nawaPortals";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { trpc } from "@/lib/trpc";
-import { Bell, Bot, CheckCheck, ChevronDown, ChevronLeft, Grid2X2, Home, Inbox, Loader2, LogOut, Menu, Pin, PinOff, Plus, Search, Settings2, X } from "lucide-react";
+import { Bell, Bot, CheckCheck, ChevronDown, ChevronLeft, Download, Grid2X2, Home, Inbox, Loader2, LogOut, Menu, Pin, PinOff, Plus, Search, Settings2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { useLocation, useSearch } from "wouter";
@@ -149,6 +149,7 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
       <div className="nawa-command-actions">
         {canQuickCreate && quickActions.length ? <DropdownMenu><DropdownMenuTrigger asChild><Button size="sm" className="nawa-quick-create hidden gap-1.5 sm:inline-flex"><Plus className="h-4 w-4" />{chrome.quickCreate}</Button></DropdownMenuTrigger><DropdownMenuContent align={direction === "rtl" ? "start" : "end"} className="w-56 rounded-2xl p-1.5"><DropdownMenuLabel className="px-2.5 py-2 text-xs text-muted-foreground">{chrome.quickCreateHint}</DropdownMenuLabel><DropdownMenuSeparator />{quickActions.map(action => <DropdownMenuItem key={action.href} onClick={() => navigate(action.href)} className="cursor-pointer rounded-xl py-2.5"><Plus className="me-2 h-4 w-4 text-primary" />{action.label}</DropdownMenuItem>)}</DropdownMenuContent></DropdownMenu> : null}
         <Button variant="ghost" size="icon" onClick={() => setCommandOpen(true)} aria-label={chrome.portalSearch} className="nawa-header-icon lg:hidden"><Search className="h-5 w-5" /></Button>
+        <Button variant="ghost" size="icon" onClick={() => window.dispatchEvent(new Event("nawa-pwa-open-install"))} aria-label={language === "ar" ? "تثبيت التطبيق" : language === "fr" ? "Installer l’application" : "Install app"} className="nawa-header-icon"><Download className="h-5 w-5" /></Button>
         <Button variant="ghost" size="icon" onClick={() => navigate("/workspace")} aria-label={chrome.ai} className="nawa-header-icon"><Bot className="h-5 w-5" /></Button>
         <NotificationMenu />
         <div className="hidden min-w-0 lg:block"><OrganizationPicker /></div>

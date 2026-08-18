@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0b0e14" />
+    <title>Nawa ERP — دون اتصال</title>
+    <style>
+      :root { color-scheme: dark; font-family: Tahoma, Arial, sans-serif; }
+      * { box-sizing: border-box; }
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px; background: radial-gradient(circle at 50% 0%, #1d2635 0%, #0b0e14 58%); color: #f7f2e9; }
+      main { width: min(100%, 480px); border: 1px solid rgba(221, 177, 88, .28); border-radius: 28px; padding: 32px; text-align: center; background: rgba(18, 24, 34, .92); box-shadow: 0 24px 72px rgba(0, 0, 0, .28); }
+      .mark { width: 58px; height: 58px; margin: 0 auto 18px; display: grid; place-items: center; border-radius: 20px; background: #d9ae57; color: #111722; font-weight: 900; font-size: 25px; }
+      h1 { margin: 0; font-size: clamp(24px, 6vw, 32px); } p { margin: 15px 0 0; color: #c2c9d3; line-height: 1.9; font-size: 15px; }
+      button { margin-top: 26px; width: 100%; min-height: 48px; border: 0; border-radius: 14px; background: #d9ae57; color: #111722; font-weight: 800; font-size: 15px; cursor: pointer; }
+      small { display: block; margin-top: 17px; color: #8e98a8; line-height: 1.8; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="mark">N</div>
+      <h1>أنت الآن دون اتصال</h1>
+      <p>تظل واجهة Nawa ERP متاحة بأمان، لكن بيانات المؤسسة الحية والفواتير والعمليات الجديدة تحتاج اتصالاً بالإنترنت.</p>
+      <button type="button" onclick="window.location.reload()">إعادة المحاولة</button>
+      <small>لن تُخزَّن بيانات المؤسسة أو طلبات API في وضع عدم الاتصال.</small>
+    </main>
+  </body>
+</html>
