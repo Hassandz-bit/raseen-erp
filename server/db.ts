@@ -259,6 +259,13 @@ export async function createBusinessParty(organizationId: number, input: { name:
   return { id: Number(result[0].insertId) };
 }
 
+export async function listActiveCustomersForOrganization(organizationId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const parties = await db.select({ id: businessParties.id, code: businessParties.code, name: businessParties.name, address: businessParties.address, visitPriority: businessParties.visitPriority, types: businessParties.types }).from(businessParties).where(and(eq(businessParties.organizationId, organizationId), eq(businessParties.status, "active"))).orderBy(asc(businessParties.name)).limit(500);
+  return parties.filter(party => Array.isArray(party.types) && party.types.includes("customer"));
+}
+
 export async function listWarehousesForOrganization(organizationId: number) {
   const db = await getDb();
   if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
