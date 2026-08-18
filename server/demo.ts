@@ -1,9 +1,16 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
-import { auditLogs, b2bPromotions, branches, businessParties, demoSeedRuns, distributionRoutes, fleetVehicles, manufacturingBoms, organizationMemberships, organizationModules, organizationRoles, organizationSettings, organizations, priceListItems, priceLists, productBatches, productBrands, productCategories, productPackagingLevels, productUnitConversions, products, productionOrders, purchaseOrderItems, purchaseOrders, salesInvoices, uomCatalog, userPreferences, vehicleLoadItems, warehouses } from "../drizzle/schema";
+import { auditLogs, b2bPromotions, b2bRetailerOrders, b2bRetailerOutlets, branches, businessParties, demoSeedRuns, distributionRoutes, employees, fleetVehicles, manufacturingBoms, organizationMemberships, organizationModules, organizationRoles, organizationSettings, organizations, priceListItems, priceLists, productBatches, productBrands, productCategories, productPackagingLevels, productUnitConversions, products, productionOrders, purchaseOrderItems, purchaseOrders, salesInvoices, uomCatalog, userPreferences, vehicleLoadItems, warehouses } from "../drizzle/schema";
 import { createBusinessParty, createProductBatch, createPurchaseOrder, createSalesInvoice, defaultDocumentSettings, getDb, issueSalesInvoiceWithFefo, receivePurchaseOrder, recordSalesInvoicePayment, sendPurchaseOrder, setActiveOrganizationForUser } from "./db";
+import { createRetailerOrder, createRetailerOutlet, grantRetailerAccess } from "./b2b";
 import { createDistributionRoute, createDistributionTerritory, createFleetVehicle, createVehicleLoadOrder, logFuel, recordDistributionCollection, recordDistributionDelivery, transitionDistributionRoute, transitionVehicleLoadOrder } from "./distribution";
+import { createDepartment, createEmployee, createEmployeeContract, createEmployeeProfile, createLeaveType, createPosition, createWorkSchedule, decideLeaveRequest, recordAttendance, submitLeaveRequest } from "./hr";
 import { createManufacturingBom, createProductionOrder, issueMaterialsForProduction, recordProductionExpense, recordProductionOutput, recordProductionQualityCheck, recordProductionWaste, reserveProductionMaterials, saveManufacturingProductProfile, transitionProductionOrderStatus } from "./manufacturing";
+import { approvePayroll, assignAllowance, calculatePayroll, createAllowanceType, createCommissionEntry, createCommissionRule, createPayrollAdjustment, createPayrollPeriod } from "./payroll";
+import { createFiscalPeriod, createFiscalYear, seedDefaultChartOfAccounts } from "./finance";
+import { payPayrollPeriod, postPayrollPeriod } from "./payrollPostingRules";
+import { allowanceTypes, commissionEntries, commissionRules, employeeAllowances, employeeContracts, employeeProfiles, hrDepartments, hrPositions, leaveRequests, leaveTypes, payrollAdjustments, payrollPeriods, workSchedules } from "../drizzle/hrPayrollSchema";
 import { productionExpenses, productionOutputs } from "../drizzle/manufacturingSchema";
+import { fiscalPeriods, fiscalYears } from "../drizzle/financeSchema";
 
 export const DEMO_ORGANIZATION = {
   slug: "nawa-demo",
@@ -423,6 +430,121 @@ export async function seedDemoOperationsScenarios(actorUserId: number) {
   }
   await db.insert(auditLogs).values({ organizationId, actorUserId, action: "demo.operations.seeded", entityType: "demo_seed", entityId: String(organizationId), metadata: { production: true, vehicles: vehicleSpecs.length, route: "RTE-DEMO-001" } });
   return { ...commerce, productionSeeded: true, vehicles: vehicleSpecs.length, distributionRoute: "RTE-DEMO-001" };
+}
+
+export async function seedDemoRetailHrPayrollScenarios(actorUserId: number) {
+  const operations = await seedDemoOperationsScenarios(actorUserId);
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const organizationId = operations.organizationId;
+  const [hqBranch] = await db.select().from(branches).where(and(eq(branches.organizationId, organizationId), eq(branches.code, "DEMO-HQ"))).limit(1);
+  const [retailCustomer, vipPriceList, centerTerritory] = await Promise.all([
+    db.select().from(businessParties).where(and(eq(businessParties.organizationId, organizationId), eq(businessParties.code, "CUS-001"))).limit(1).then(rows => rows[0]),
+    db.select().from(priceLists).where(and(eq(priceLists.organizationId, organizationId), eq(priceLists.name, "VIP DZD"))).limit(1).then(rows => rows[0]),
+    db.execute(sql`SELECT id FROM distribution_territories WHERE organizationId = ${organizationId} AND code = 'DEMO-CENTER' LIMIT 1`).then(result => ((result as unknown as [Array<{ id: number }>])[0] ?? [])[0]),
+  ]);
+  if (!retailCustomer || !vipPriceList) throw new Error("بيانات عميل Retail أو قائمة الأسعار لشركة العرض غير مكتملة.");
+  let [outlet] = await db.select().from(b2bRetailerOutlets).where(and(eq(b2bRetailerOutlets.organizationId, organizationId), eq(b2bRetailerOutlets.code, "OUT-DEMO-001"))).limit(1);
+  if (!outlet) {
+    const created = await createRetailerOutlet(organizationId, actorUserId, { customerId: retailCustomer.id, code: "OUT-DEMO-001", name: "فرع السعادة المركزي", address: "حي الأعمال، الجزائر", wilaya: "الجزائر", commune: "الجزائر الوسطى", deliveryInstructions: "التسليم بين 09:00 و12:00", latitude: 36.7538, longitude: 3.0588, territoryId: centerTerritory?.id });
+    [outlet] = await db.select().from(b2bRetailerOutlets).where(and(eq(b2bRetailerOutlets.organizationId, organizationId), eq(b2bRetailerOutlets.id, created.id))).limit(1);
+  }
+  const access = await grantRetailerAccess(organizationId, actorUserId, { customerId: retailCustomer.id, userId: actorUserId, retailerRole: "owner", outletIds: outlet ? [outlet.id] : [], priceListId: vipPriceList.id, territoryId: centerTerritory?.id, customerSegment: "VIP", deliveryTrackingPolicy: "status_only", availabilityDisclosure: "available", visibilityPolicy: { showCatalog: true, showPrices: true, showPromotions: true, showInvoices: true, showDeliveryNotes: false, showStatement: false, stockVisibility: "availability_only", debtVisibility: "total_only", deliveryTracking: "status_only", allowRequestedDeliveryDate: true, allowReturnRequest: true, allowRetailerUserManagement: false } });
+  if (!access) throw new Error("تعذر إنشاء علاقة وصول Retail لشركة العرض.");
+  const demoProducts = await db.select().from(products).where(eq(products.organizationId, organizationId));
+  const milk = demoProducts.find(product => product.sku === "DEMO-001");
+  const juice = demoProducts.find(product => product.sku === "DEMO-005");
+  if (!milk || !juice) throw new Error("منتجات Retail التجريبية غير مكتملة.");
+  const [existingRetailOrder] = await db.select({ id: b2bRetailerOrders.id }).from(b2bRetailerOrders).where(and(eq(b2bRetailerOrders.organizationId, organizationId), eq(b2bRetailerOrders.accessId, access.id), eq(b2bRetailerOrders.clientOperationId, "demo-retail-order-001"))).limit(1);
+  const retailOrder = existingRetailOrder ? { id: existingRetailOrder.id } : await createRetailerOrder(actorUserId, access.id, { outletId: outlet?.id, clientOperationId: "demo-retail-order-001", notes: "طلب Retail تجريبي — السعر يعاد احتسابه في الخادم.", requestedDeliveryDate: new Date(Date.now() + 2 * 86_400_000), lines: [{ productId: milk.id, quantity: 6 }, { productId: juice.id, quantity: 12 }] });
+
+  const departments = [["DEMO-HR", "الموارد البشرية"], ["DEMO-SALES", "المبيعات"], ["DEMO-OPS", "العمليات والتوزيع"]] as const;
+  for (const [code, name] of departments) {
+    const [existing] = await db.select({ id: hrDepartments.id }).from(hrDepartments).where(and(eq(hrDepartments.organizationId, organizationId), eq(hrDepartments.code, code))).limit(1);
+    if (!existing) await createDepartment(organizationId, actorUserId, { code, name, branchId: hqBranch?.id });
+  }
+  const departmentRows = await db.select().from(hrDepartments).where(eq(hrDepartments.organizationId, organizationId));
+  const departmentByCode = new Map(departmentRows.map(department => [department.code, department]));
+  const positions = [["DEMO-HRM", "مدير موارد بشرية", "DEMO-HR"], ["DEMO-SREP", "مندوب مبيعات", "DEMO-SALES"], ["DEMO-DRV", "سائق توزيع", "DEMO-OPS"], ["DEMO-WCL", "أمين مخزن", "DEMO-OPS"]] as const;
+  for (const [code, name, departmentCode] of positions) {
+    const [existing] = await db.select({ id: hrPositions.id }).from(hrPositions).where(and(eq(hrPositions.organizationId, organizationId), eq(hrPositions.code, code))).limit(1);
+    if (!existing) await createPosition(organizationId, actorUserId, { code, name, departmentId: departmentByCode.get(departmentCode)?.id });
+  }
+  const positionRows = await db.select().from(hrPositions).where(eq(hrPositions.organizationId, organizationId));
+  const positionByCode = new Map(positionRows.map(position => [position.code, position]));
+  let [schedule] = await db.select().from(workSchedules).where(and(eq(workSchedules.organizationId, organizationId), eq(workSchedules.code, "DEMO-STD"))).limit(1);
+  if (!schedule) {
+    const created = await createWorkSchedule(organizationId, actorUserId, { code: "DEMO-STD", name: "دوام Demo القياسي", workDays: [0, 1, 2, 3, 4], startTime: "08:00", endTime: "16:30", breakMinutes: 30, weeklyHours: 40, branchId: hqBranch?.id });
+    [schedule] = await db.select().from(workSchedules).where(and(eq(workSchedules.organizationId, organizationId), eq(workSchedules.id, created.id))).limit(1);
+  }
+  const employeeSpecs = [
+    ["DEMO-EMP-001", "ليلى بن صالح", "مديرة الموارد البشرية", "DEMO-HR", "DEMO-HRM", 125000],
+    ["DEMO-EMP-002", "أمين رحماني", "مندوب مبيعات", "DEMO-SALES", "DEMO-SREP", 90000],
+    ["DEMO-EMP-003", "سمير بوشارب", "سائق توزيع", "DEMO-OPS", "DEMO-DRV", 78000],
+    ["DEMO-EMP-004", "نوال قاسم", "أمينة مخزن", "DEMO-OPS", "DEMO-WCL", 82000],
+  ] as const;
+  for (const [employeeNumber, fullName, jobTitle, departmentCode, positionCode, baseSalary] of employeeSpecs) {
+    let [employee] = await db.select().from(employees).where(and(eq(employees.organizationId, organizationId), eq(employees.employeeNumber, employeeNumber))).limit(1);
+    if (!employee) {
+      const created = await createEmployee(organizationId, actorUserId, { employeeNumber, fullName, department: departmentByCode.get(departmentCode)?.name, jobTitle, joinedAt: new Date(Date.now() - 400 * 86_400_000) });
+      [employee] = await db.select().from(employees).where(and(eq(employees.organizationId, organizationId), eq(employees.id, created.id))).limit(1);
+    }
+    if (!employee) throw new Error(`تعذر إنشاء موظف Demo: ${employeeNumber}`);
+    const [profile] = await db.select({ id: employeeProfiles.id }).from(employeeProfiles).where(and(eq(employeeProfiles.organizationId, organizationId), eq(employeeProfiles.employeeId, employee.id))).limit(1);
+    if (!profile) await createEmployeeProfile(organizationId, actorUserId, { employeeId: employee.id, branchId: hqBranch?.id, departmentId: departmentByCode.get(departmentCode)?.id, positionId: positionByCode.get(positionCode)?.id, fullNameAr: fullName, payrollCurrency: "DZD", bankAccountReference: `DEMO-BANK-${employeeNumber.slice(-3)}`, workLocation: "الإدارة المركزية" });
+    const [contract] = await db.select({ id: employeeContracts.id }).from(employeeContracts).where(and(eq(employeeContracts.organizationId, organizationId), eq(employeeContracts.employeeId, employee.id), eq(employeeContracts.status, "active"))).limit(1);
+    if (!contract) await createEmployeeContract(organizationId, actorUserId, { employeeId: employee.id, workScheduleId: schedule?.id, contractType: "permanent", startsAt: new Date(Date.now() - 400 * 86_400_000), salaryBasis: "monthly", baseSalary, absenceDeductionPerDay: baseSalary / 30, currencyCode: "DZD" });
+    await recordAttendance(organizationId, actorUserId, { employeeId: employee.id, attendanceDate: new Date(), status: "present", workingMinutes: 480, source: "supervisor", notes: "حضور Demo" });
+  }
+  const employeeRows = await db.select().from(employees).where(eq(employees.organizationId, organizationId));
+  const employeeByNumber = new Map(employeeRows.map(employee => [employee.employeeNumber, employee]));
+  const salesRepresentative = employeeByNumber.get("DEMO-EMP-002");
+  const hrManager = employeeByNumber.get("DEMO-EMP-001");
+  if (!salesRepresentative || !hrManager) throw new Error("موظفو Demo المطلوبون للرواتب غير مكتملين.");
+  let [annualLeave] = await db.select().from(leaveTypes).where(and(eq(leaveTypes.organizationId, organizationId), eq(leaveTypes.code, "DEMO-ANNUAL"))).limit(1);
+  if (!annualLeave) {
+    const created = await createLeaveType(organizationId, actorUserId, { code: "DEMO-ANNUAL", name: "إجازة سنوية Demo", defaultDays: 24, isPaid: "yes" });
+    [annualLeave] = await db.select().from(leaveTypes).where(and(eq(leaveTypes.organizationId, organizationId), eq(leaveTypes.id, created.id))).limit(1);
+  }
+  const [existingLeave] = await db.select().from(leaveRequests).where(and(eq(leaveRequests.organizationId, organizationId), eq(leaveRequests.employeeId, hrManager.id), eq(leaveRequests.leaveTypeId, annualLeave!.id), eq(leaveRequests.reason, "إجازة عائلية ضمن سيناريو Demo"))).limit(1);
+  if (!existingLeave) {
+    const request = await submitLeaveRequest(organizationId, actorUserId, { employeeId: hrManager.id, leaveTypeId: annualLeave!.id, startsAt: new Date(Date.now() + 14 * 86_400_000), endsAt: new Date(Date.now() + 15 * 86_400_000), days: 2, reason: "إجازة عائلية ضمن سيناريو Demo" });
+    await decideLeaveRequest(organizationId, actorUserId, request.id, "approved", "اعتماد Demo" );
+  }
+  let [transportAllowance] = await db.select().from(allowanceTypes).where(and(eq(allowanceTypes.organizationId, organizationId), eq(allowanceTypes.code, "DEMO-TRANSPORT"))).limit(1);
+  if (!transportAllowance) {
+    const created = await createAllowanceType(organizationId, actorUserId, { code: "DEMO-TRANSPORT", name: "بدل نقل Demo", calculationType: "fixed", defaultValue: 8000 });
+    [transportAllowance] = await db.select().from(allowanceTypes).where(and(eq(allowanceTypes.organizationId, organizationId), eq(allowanceTypes.id, created.id))).limit(1);
+  }
+  const [assignedAllowance] = await db.select({ id: employeeAllowances.id }).from(employeeAllowances).where(and(eq(employeeAllowances.organizationId, organizationId), eq(employeeAllowances.employeeId, salesRepresentative.id), eq(employeeAllowances.allowanceTypeId, transportAllowance!.id))).limit(1);
+  if (!assignedAllowance) await assignAllowance(organizationId, actorUserId, { employeeId: salesRepresentative.id, allowanceTypeId: transportAllowance!.id, amount: 8000, startsAt: new Date(Date.now() - 30 * 86_400_000) });
+  let [salesCommissionRule] = await db.select().from(commissionRules).where(and(eq(commissionRules.organizationId, organizationId), eq(commissionRules.name, "عمولة طلب Retail Demo"))).limit(1);
+  if (!salesCommissionRule) {
+    const created = await createCommissionRule(organizationId, actorUserId, { name: "عمولة طلب Retail Demo", sourceType: "sales", calculationType: "percentage", value: 2 });
+    [salesCommissionRule] = await db.select().from(commissionRules).where(and(eq(commissionRules.organizationId, organizationId), eq(commissionRules.id, created.id))).limit(1);
+  }
+  const [commission] = await db.select({ id: commissionEntries.id }).from(commissionEntries).where(and(eq(commissionEntries.organizationId, organizationId), eq(commissionEntries.employeeId, salesRepresentative.id), eq(commissionEntries.sourceModule, "nawa_retail"), eq(commissionEntries.sourceDocumentType, "b2b_retailer_order"), eq(commissionEntries.sourceDocumentId, retailOrder.id))).limit(1);
+  if (!commission) await createCommissionEntry(organizationId, actorUserId, { employeeId: salesRepresentative.id, commissionRuleId: salesCommissionRule!.id, sourceModule: "nawa_retail", sourceDocumentType: "b2b_retailer_order", sourceDocumentId: retailOrder.id, occurredAt: new Date(), amount: 1500, currencyCode: "DZD" });
+
+  await seedDefaultChartOfAccounts(organizationId);
+  const now = new Date(); const year = now.getUTCFullYear(); const month = now.getUTCMonth();
+  const fiscalYearName = `سنة Demo ${year}`; let [fiscalYear] = await db.select().from(fiscalYears).where(and(eq(fiscalYears.organizationId, organizationId), eq(fiscalYears.name, fiscalYearName))).limit(1);
+  if (!fiscalYear) { const created = await createFiscalYear(organizationId, { name: fiscalYearName, startsAt: new Date(Date.UTC(year, 0, 1)), endsAt: new Date(Date.UTC(year, 11, 31, 23, 59, 59)) }); [fiscalYear] = await db.select().from(fiscalYears).where(and(eq(fiscalYears.organizationId, organizationId), eq(fiscalYears.id, created.id))).limit(1); }
+  const periodName = `فترة Demo ${year}-${String(month + 1).padStart(2, "0")}`; const periodStart = new Date(Date.UTC(year, month, 1)); const periodEnd = new Date(Date.UTC(year, month + 1, 0, 23, 59, 59)); let [fiscalPeriod] = await db.select().from(fiscalPeriods).where(and(eq(fiscalPeriods.organizationId, organizationId), eq(fiscalPeriods.name, periodName))).limit(1);
+  if (!fiscalPeriod) { const created = await createFiscalPeriod(organizationId, { fiscalYearId: fiscalYear!.id, name: periodName, startsAt: periodStart, endsAt: periodEnd }); [fiscalPeriod] = await db.select().from(fiscalPeriods).where(and(eq(fiscalPeriods.organizationId, organizationId), eq(fiscalPeriods.id, created.id))).limit(1); }
+  let [payrollPeriod] = await db.select().from(payrollPeriods).where(and(eq(payrollPeriods.organizationId, organizationId), eq(payrollPeriods.name, `رواتب Demo ${year}-${String(month + 1).padStart(2, "0")}`))).limit(1);
+  if (!payrollPeriod) { const created = await createPayrollPeriod(organizationId, actorUserId, { name: `رواتب Demo ${year}-${String(month + 1).padStart(2, "0")}`, startsAt: periodStart, endsAt: periodEnd, paymentDate: periodEnd }); [payrollPeriod] = await db.select().from(payrollPeriods).where(and(eq(payrollPeriods.organizationId, organizationId), eq(payrollPeriods.id, created.id))).limit(1); }
+  const [adjustment] = await db.select({ id: payrollAdjustments.id }).from(payrollAdjustments).where(and(eq(payrollAdjustments.organizationId, organizationId), eq(payrollAdjustments.employeeId, salesRepresentative.id), eq(payrollAdjustments.payrollPeriodId, payrollPeriod!.id), eq(payrollAdjustments.reason, "حافز Retail Demo"))).limit(1);
+  if (!adjustment) await createPayrollAdjustment(organizationId, actorUserId, { employeeId: salesRepresentative.id, payrollPeriodId: payrollPeriod!.id, adjustmentType: "bonus", amount: 2500, reason: "حافز Retail Demo" });
+  if (payrollPeriod!.status === "draft") await calculatePayroll(organizationId, actorUserId, payrollPeriod!.id);
+  const [freshPayroll] = await db.select().from(payrollPeriods).where(and(eq(payrollPeriods.organizationId, organizationId), eq(payrollPeriods.id, payrollPeriod!.id))).limit(1);
+  if (freshPayroll?.status === "calculated" || freshPayroll?.status === "under_review") await approvePayroll(organizationId, actorUserId, freshPayroll.id);
+  const [approvedPayroll] = await db.select().from(payrollPeriods).where(and(eq(payrollPeriods.organizationId, organizationId), eq(payrollPeriods.id, payrollPeriod!.id))).limit(1);
+  if (approvedPayroll?.status === "approved") await postPayrollPeriod(organizationId, actorUserId, approvedPayroll.id);
+  const [postedPayroll] = await db.select().from(payrollPeriods).where(and(eq(payrollPeriods.organizationId, organizationId), eq(payrollPeriods.id, payrollPeriod!.id))).limit(1);
+  if (postedPayroll?.status === "posted") await payPayrollPeriod(organizationId, actorUserId, postedPayroll.id);
+  await db.insert(auditLogs).values({ organizationId, actorUserId, action: "demo.retail_hr_payroll.seeded", entityType: "demo_seed", entityId: String(organizationId), metadata: { retailOrderId: retailOrder.id, employees: employeeSpecs.length, payrollPeriodId: payrollPeriod!.id, fiscalPeriodId: fiscalPeriod?.id } });
+  return { ...operations, retailOrderId: retailOrder.id, retailAccessId: access.id, employees: employeeSpecs.length, payrollPeriodId: payrollPeriod!.id };
 }
 
 async function listDemoOrganizationTables() {

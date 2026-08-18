@@ -66,4 +66,16 @@ describe("شركة Nawa Demo", () => {
     expect(source).toContain("RTE-DEMO-001");
     expect(source).toContain("DEMO-TRK-01");
   });
+
+  it("يربط Retail والموارد البشرية والرواتب والمالية بسيناريو Demo قابل لإعادة التشغيل", async () => {
+    const source = await import("node:fs/promises").then(fs => fs.readFile(new URL("./demo.ts", import.meta.url), "utf8"));
+    expect(source).toContain("seedDemoRetailHrPayrollScenarios");
+    expect(source).toContain("grantRetailerAccess");
+    expect(source).toContain("createRetailerOrder");
+    expect(source).toContain("createEmployee");
+    expect(source).toContain("createPayrollPeriod");
+    expect(source).toContain("postPayrollPeriod");
+    expect(source).toContain("payPayrollPeriod");
+    expect(source).toContain("demo.retail_hr_payroll.seeded");
+  });
 });
