@@ -15,14 +15,14 @@ const copy = {
 } as const;
 
 const accentClass = {
-  gold: "from-primary/20 via-primary/5 to-transparent border-primary/25",
-  sky: "from-sky-400/20 via-sky-400/5 to-transparent border-sky-400/20",
-  violet: "from-violet-400/20 via-violet-400/5 to-transparent border-violet-400/20",
-  emerald: "from-emerald-400/20 via-emerald-400/5 to-transparent border-emerald-400/20",
-  rose: "from-rose-400/20 via-rose-400/5 to-transparent border-rose-400/20",
-  amber: "from-amber-400/20 via-amber-400/5 to-transparent border-amber-400/20",
-  cyan: "from-cyan-400/20 via-cyan-400/5 to-transparent border-cyan-400/20",
-  slate: "from-slate-300/20 via-slate-300/5 to-transparent border-slate-300/20",
+  gold: "from-primary/16 via-primary/[.035] to-transparent border-primary/28",
+  sky: "from-sky-500/12 via-sky-500/[.025] to-transparent border-sky-500/22",
+  violet: "from-violet-500/12 via-violet-500/[.025] to-transparent border-violet-500/22",
+  emerald: "from-emerald-500/12 via-emerald-500/[.025] to-transparent border-emerald-500/22",
+  rose: "from-rose-500/11 via-rose-500/[.022] to-transparent border-rose-500/20",
+  amber: "from-amber-500/12 via-amber-500/[.025] to-transparent border-amber-500/22",
+  cyan: "from-cyan-500/12 via-cyan-500/[.025] to-transparent border-cyan-500/22",
+  slate: "from-slate-500/10 via-slate-500/[.02] to-transparent border-slate-500/18",
 } as const;
 
 function PortalCard({ portal, active, onOpen }: { portal: NawaPortal; active: boolean; onOpen: () => void }) {
@@ -30,7 +30,7 @@ function PortalCard({ portal, active, onOpen }: { portal: NawaPortal; active: bo
   const labels = copy[language];
   const Icon = portal.icon;
   const isAiPortal = portal.id === "ai";
-  return <article className={`group relative overflow-hidden rounded-3xl border bg-gradient-to-br p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_36px_rgba(0,0,0,.16)] motion-reduce:hover:transform-none ${accentClass[portal.accent]}`} dir={direction}>
+  return <article className={`nawa-portal-card group relative overflow-hidden rounded-3xl border bg-gradient-to-br p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_36px_rgba(0,0,0,.16)] motion-reduce:hover:transform-none ${accentClass[portal.accent]}`} dir={direction}>
     <div className="absolute -left-8 -top-8 h-24 w-24 rounded-full bg-white/[.05] blur-2xl" />
     <div className="relative flex h-full flex-col"><div className="flex items-start justify-between gap-3"><div className="grid h-11 w-11 place-items-center rounded-2xl border border-white/10 bg-white/[.055] text-primary"><Icon className="h-5 w-5" /></div><Badge variant="outline" className={active ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300" : "border-white/10 bg-white/[.05] text-slate-300"}>{active ? <ShieldCheck className="me-1 h-3.5 w-3.5" /> : <LockKeyhole className="me-1 h-3.5 w-3.5" />}{active ? labels.active : labels.locked}</Badge></div>{isAiPortal ? <p className="mt-7 text-xs font-bold uppercase tracking-[.16em] text-primary">{portal.name[language]}</p> : null}<h2 className={`${isAiPortal ? "mt-2" : "mt-7"} text-lg font-bold text-white`}>{isAiPortal ? "Nawa AI" : portal.name[language]}</h2><p className="mt-2 min-h-12 text-sm leading-6 text-slate-300">{portal.description[language]}</p><div className="mt-auto flex items-center justify-between gap-3 pt-6"><span className="text-[11px] text-muted-foreground">{labels.guarded}</span><Button size="sm" variant={active ? "default" : "outline"} onClick={onOpen} className={active ? "rounded-xl bg-primary text-primary-foreground" : "rounded-xl border-white/10 bg-white/[.035] text-slate-200"}>{active ? labels.open : labels.explore}<ArrowLeft className={`ms-1 h-3.5 w-3.5 ${direction === "ltr" ? "rotate-180" : ""}`} /></Button></div></div>
   </article>;

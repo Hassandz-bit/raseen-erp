@@ -117,7 +117,7 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
         <DropdownMenu><DropdownMenuTrigger asChild><button type="button" className="rounded-xl p-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"><Avatar className="h-9 w-9 border border-primary/20"><AvatarFallback className="bg-primary/10 text-xs font-black text-primary">{user?.name?.charAt(0).toUpperCase() || "N"}</AvatarFallback></Avatar></button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-52 rounded-2xl p-1.5"><div className="px-2.5 py-2"><p className="truncate text-sm font-bold">{user?.name || "—"}</p><p className="mt-0.5 truncate text-xs text-muted-foreground">{user?.email || "—"}</p></div><DropdownMenuItem onClick={logout} className="cursor-pointer rounded-xl py-2.5 text-destructive focus:text-destructive"><LogOut className="me-2 h-4 w-4" />{t("signOut")}</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
       </div>
     </header>
-    <div className="nawa-shell-body">
+    <div className={`nawa-shell-body ${isPortalLauncher ? "nawa-shell-body-launcher" : ""}`}>
       {!isPortalLauncher ? <>
         <aside className={`nawa-navigation-rail ${isRailOpenOnMobile ? "nawa-navigation-rail-open" : ""}`} aria-label={chrome.tools}>
           <div className="nawa-rail-top"><RailButton label={chrome.portals} onClick={() => navigate("/")}><Grid2X2 className="h-5 w-5" /></RailButton><RailButton label={activePortal?.name[language] ?? chrome.executive} active={!activeMenuItem} onClick={() => activePortal ? navigate(activePortal.href) : navigate("/executive")}><Home className="h-5 w-5" /></RailButton></div>

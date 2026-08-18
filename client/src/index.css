@@ -52,8 +52,8 @@
 }
 
 html:not(.dark) {
-  --background: oklch(0.97 0.006 95);
-  --foreground: oklch(0.2 0.016 255);
+  --background: oklch(0.955 0.009 88);
+  --foreground: oklch(0.17 0.017 255);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.2 0.016 255);
   --popover: oklch(1 0 0);
@@ -229,7 +229,8 @@ html:not(.dark) .text-slate-300 { color: oklch(.36 .018 255) !important; }
 .nawa-global-header { position: sticky; top: 0; z-index: 80; display: flex; height: 64px; align-items: center; justify-content: space-between; gap: 1rem; border-bottom: 1px solid color-mix(in oklch, var(--border) 82%, transparent); padding-inline: 1rem; background: color-mix(in oklch, var(--background) 92%, transparent); backdrop-filter: blur(18px) saturate(1.1); }
 .nawa-wordmark { display: inline-flex; align-items: center; gap: .55rem; color: var(--foreground); transition: color .18s cubic-bezier(.23,1,.32,1); }
 .nawa-wordmark:hover { color: var(--primary); }
-.nawa-wordmark-mark { display: grid; width: 2rem; height: 2rem; place-items: center; border: 1px solid color-mix(in oklch, var(--primary) 34%, transparent); border-radius: .7rem; background: linear-gradient(145deg, color-mix(in oklch, var(--primary) 25%, transparent), color-mix(in oklch, var(--primary) 6%, transparent)); color: var(--primary); font-size: .92rem; font-weight: 900; box-shadow: inset 0 1px 0 color-mix(in oklch, white 18%, transparent); }
+.nawa-wordmark-mark { position: relative; display: grid; width: 2rem; height: 2rem; place-items: center; overflow: hidden; border: 1px solid color-mix(in oklch, var(--primary) 34%, transparent); border-radius: .7rem; background: linear-gradient(145deg, color-mix(in oklch, var(--primary) 25%, transparent), color-mix(in oklch, var(--primary) 6%, transparent)); color: var(--primary); font-size: .92rem; font-weight: 900; box-shadow: inset 0 1px 0 color-mix(in oklch, white 18%, transparent); isolation: isolate; }
+.nawa-wordmark-mark::before { position: absolute; inset: .28rem; z-index: -1; border: 1px solid color-mix(in oklch, var(--primary) 62%, transparent); border-radius: .32rem; content: ""; transform: rotate(45deg); }
 .nawa-current-portal, .nawa-header-icon { display: inline-grid; width: 2.45rem; height: 2.45rem; place-items: center; border-radius: .8rem; color: var(--muted-foreground); transition: color .18s cubic-bezier(.23,1,.32,1), background-color .18s cubic-bezier(.23,1,.32,1), transform .18s cubic-bezier(.23,1,.32,1); }
 .nawa-current-portal { border: 1px solid color-mix(in oklch, var(--primary) 24%, var(--border)); background: color-mix(in oklch, var(--primary) 8%, transparent); color: var(--primary); }
 .nawa-header-icon:hover, .nawa-current-portal:hover { background: color-mix(in oklch, var(--primary) 12%, transparent); color: var(--primary); }
@@ -238,6 +239,8 @@ html:not(.dark) .text-slate-300 { color: oklch(.36 .018 255) !important; }
 .nawa-organization-switcher:hover { color: var(--primary); }
 .nawa-mobile-rail-trigger { display: none; }
 .nawa-shell-body { display: flex; min-height: calc(100svh - 64px); }
+.nawa-shell-body-launcher { display: block; }
+.nawa-shell-body-launcher .nawa-workspace { width: 100%; }
 .nawa-navigation-rail { position: sticky; inset-block-start: 64px; z-index: 60; display: flex; width: 72px; height: calc(100dvh - 64px); flex: 0 0 72px; flex-direction: column; justify-content: space-between; border-inline-end: 1px solid color-mix(in oklch, var(--border) 75%, transparent); background: color-mix(in oklch, var(--background) 88%, transparent); padding: .7rem .55rem; backdrop-filter: blur(14px); }
 .nawa-rail-top, .nawa-rail-groups, .nawa-rail-bottom { display: grid; justify-items: center; gap: .45rem; }
 .nawa-rail-groups { flex: 1; align-content: start; overflow-y: auto; padding-top: 1.4rem; scrollbar-width: none; }
@@ -259,11 +262,29 @@ html:not(.dark) .text-slate-300 { color: oklch(.36 .018 255) !important; }
 .nawa-page-context { display: flex; align-items: center; gap: .45rem; width: 100%; max-width: 1600px; margin: 0 auto .6rem; padding-inline: .25rem; font-size: .73rem; font-weight: 700; }
 .nawa-portal-launcher { width: 100%; max-width: 1440px; margin-inline: auto; }
 .nawa-launcher-intro { display: flex; align-items: end; justify-content: space-between; gap: 1.5rem; border-bottom: 1px solid color-mix(in oklch, var(--border) 85%, transparent); padding: clamp(1rem, 3vw, 2rem) .25rem 1.25rem; }
+.nawa-launcher-intro h1 { letter-spacing: -.045em; line-height: 1.16; }
 .nawa-launcher-symbol { display: grid; width: 2.8rem; height: 2.8rem; flex: 0 0 auto; place-items: center; border: 1px solid color-mix(in oklch, var(--primary) 28%, transparent); border-radius: .9rem; background: color-mix(in oklch, var(--primary) 10%, transparent); color: var(--primary); }
 .nawa-portal-grid { display: grid; gap: .9rem; grid-template-columns: repeat(1, minmax(0, 1fr)); }
 .nawa-portal-grid > article { min-height: 240px; border-radius: 1.35rem; padding: 1.15rem; }
-.nawa-portal-grid > article h2 { font-size: 1.05rem; }
+.nawa-portal-card::after { position: absolute; inset: auto -1.7rem -2.4rem auto; width: 9.5rem; height: 9.5rem; border: 1px solid color-mix(in oklch, var(--primary) 18%, transparent); border-radius: 2rem; content: ""; opacity: .68; transform: rotate(18deg); }
+.nawa-portal-card > .relative { z-index: 1; }
+.nawa-portal-grid > article h2 { font-size: 1.12rem; letter-spacing: -.025em; }
 .nawa-portal-grid > article p { font-size: .82rem; }
+.nawa-workspace main > header.surface { position: relative; overflow: hidden; border-color: color-mix(in oklch, var(--primary) 16%, var(--border)); background: linear-gradient(110deg, color-mix(in oklch, var(--card) 94%, transparent), color-mix(in oklch, var(--primary) 7%, var(--card))); box-shadow: 0 16px 42px oklch(.14 .02 250 / .09); }
+.nawa-workspace main > header.surface::after { position: absolute; inset: 0; content: ""; opacity: .45; background-image: linear-gradient(color-mix(in oklch, var(--primary) 16%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in oklch, var(--primary) 16%, transparent) 1px, transparent 1px); background-size: 32px 32px; mask-image: linear-gradient(to left, black, transparent 62%); pointer-events: none; }
+.nawa-workspace main > header.surface > * { position: relative; z-index: 1; }
+.nawa-workspace table { border-collapse: separate; border-spacing: 0; font-variant-numeric: tabular-nums; }
+.nawa-workspace table thead tr { background: color-mix(in oklch, var(--muted) 66%, transparent); }
+.nawa-workspace table th { color: color-mix(in oklch, var(--foreground) 72%, var(--muted-foreground)); font-size: .73rem; font-weight: 800; letter-spacing: .01em; }
+.nawa-workspace table tbody tr { transition: background-color .16s cubic-bezier(.23,1,.32,1), box-shadow .16s cubic-bezier(.23,1,.32,1); }
+.nawa-workspace table tbody tr:hover { background: color-mix(in oklch, var(--primary) 5%, transparent); box-shadow: inset 3px 0 0 color-mix(in oklch, var(--primary) 62%, transparent); }
+[dir="ltr"] .nawa-workspace table tbody tr:hover { box-shadow: inset -3px 0 0 color-mix(in oklch, var(--primary) 62%, transparent); }
+.nawa-workspace table [data-slot="badge"] { border-radius: 999px; font-size: .7rem; font-weight: 800; letter-spacing: .01em; }
+.nawa-status-badge { min-height: 1.55rem; border-radius: 999px; padding-inline: .6rem; font-size: .7rem; font-weight: 800; letter-spacing: .01em; }
+.nawa-data-table { position: relative; min-width: 0; }
+.nawa-loading-canvas { position: relative; display: grid; min-height: 18rem; place-items: center; overflow: hidden; background: linear-gradient(110deg, color-mix(in oklch, var(--muted) 42%, transparent) 8%, color-mix(in oklch, var(--card) 84%, transparent) 18%, color-mix(in oklch, var(--muted) 42%, transparent) 33%); background-size: 240% 100%; }
+.nawa-loading-canvas::before { position: absolute; inset: 1.5rem; border-radius: 1rem; content: ""; background: linear-gradient(90deg, transparent 0 27%, color-mix(in oklch, var(--border) 48%, transparent) 27% 27.2%, transparent 27.2% 100%), linear-gradient(color-mix(in oklch, var(--border) 42%, transparent) 1px, transparent 1px); background-size: 100% 3.35rem; opacity: .45; }
+.nawa-loading-canvas > svg { position: relative; z-index: 1; }
 .nawa-auth-card { border: 1px solid color-mix(in oklch, var(--primary) 18%, var(--border)); background: color-mix(in oklch, var(--card) 94%, transparent); box-shadow: 0 24px 70px oklch(.04 .01 255 / .32); }
 @keyframes nawa-panel-in { from { opacity: 0; transform: translateX(10px) scale(.98); } to { opacity: 1; transform: translateX(0) scale(1); } }
 [dir="ltr"] .nawa-context-panel { animation-name: nawa-panel-in-ltr; }
@@ -271,16 +292,20 @@ html:not(.dark) .text-slate-300 { color: oklch(.36 .018 255) !important; }
 @media (min-width: 640px) { .nawa-global-header { padding-inline: 1.5rem; } .nawa-portal-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (min-width: 1100px) { .nawa-portal-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 @media (max-width: 900px) { .nawa-mobile-rail-trigger { display: inline-grid; } .nawa-navigation-rail { position: fixed; inset-block-start: 0; inset-inline-start: 0; z-index: 100; height: 100dvh; transform: translateX(var(--nawa-rail-hidden, 120%)); transition: transform .22s cubic-bezier(.23,1,.32,1); box-shadow: 0 20px 60px rgba(0,0,0,.28); } [dir="rtl"] .nawa-navigation-rail { --nawa-rail-hidden: 120%; } [dir="ltr"] .nawa-navigation-rail { --nawa-rail-hidden: -120%; } .nawa-navigation-rail-open { transform: translateX(0) !important; } .nawa-rail-backdrop { position: fixed; inset: 0; z-index: 90; background: rgba(3,6,12,.46); backdrop-filter: blur(2px); } .nawa-context-panel { inset-block-start: 72px; z-index: 110; width: min(300px, calc(100vw - 96px)); } [dir="rtl"] .nawa-context-panel { right: 84px; } [dir="ltr"] .nawa-context-panel { left: 84px; } }
-@media (max-width: 640px) { .nawa-global-header { height: 58px; padding-inline: .75rem; } .nawa-shell-body { min-height: calc(100svh - 58px); } .nawa-workspace { padding: .75rem; } .nawa-launcher-intro { align-items: start; flex-direction: column; gap: 1rem; padding-top: 1rem; } .nawa-portal-grid > article { min-height: 210px; } }
+@media (max-width: 640px) { .nawa-global-header { height: 58px; padding-inline: .75rem; } .nawa-shell-body { min-height: calc(100svh - 58px); } .nawa-workspace { padding: .75rem; } .nawa-launcher-intro { align-items: start; flex-direction: column; gap: 1rem; padding-top: 1rem; } .nawa-portal-grid > article { min-height: 210px; } .nawa-data-table::after { position: absolute; inset-block-start: .45rem; inset-inline-start: .45rem; z-index: 2; display: grid; width: 1.5rem; height: 1.5rem; place-items: center; border: 1px solid color-mix(in oklch, var(--primary) 22%, var(--border)); border-radius: .55rem; background: color-mix(in oklch, var(--card) 90%, transparent); color: var(--primary); content: "↔"; font-size: .72rem; font-weight: 900; pointer-events: none; box-shadow: 0 4px 12px oklch(.18 .02 250 / .12); } }
 :root[data-high-contrast="true"] .nawa-navigation-rail, :root[data-high-contrast="true"] .nawa-context-panel { border-color: #f3c94d; background: #07090d; }
 :root[data-high-contrast="true"] .nawa-rail-button, :root[data-high-contrast="true"] .nawa-context-tool { color: #fff; }
 :root[data-high-contrast="true"] .nawa-rail-button-active, :root[data-high-contrast="true"] .nawa-context-tool-active { border-color: #f3c94d; background: #222a37; color: #fff; }
 
-@media (prefers-reduced-motion: reduce) {
+@media (prefers-reduced-motion: no-preference) {
+  .nawa-loading-canvas { animation: nawa-shimmer 1.5s linear infinite; }
   .enter { animation: rise 420ms cubic-bezier(0.23, 1, 0.32, 1) both; }
   .enter-delay { animation: rise 520ms 70ms cubic-bezier(0.23, 1, 0.32, 1) both; }
   @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes nawa-shimmer { to { background-position: -140% 0; } }
 }
+
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
 
 @media print {
   body { background: white !important; color: black !important; }
