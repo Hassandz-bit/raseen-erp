@@ -244,6 +244,15 @@ export async function listProductsForOrganization(organizationId: number) {
   return db.select().from(products).where(eq(products.organizationId, organizationId)).orderBy(desc(products.updatedAt));
 }
 
+export async function findProductByBarcodeForOrganization(organizationId: number, rawBarcode: string) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const barcode = normalizeTextBarcode(rawBarcode);
+  if (!isValidTextBarcode(barcode)) throw new Error("صيغة الباركود أو رمز QR غير صالحة.");
+  const [product] = await db.select({ id: products.id, name: products.name, nameAr: products.nameAr, nameFr: products.nameFr, nameEn: products.nameEn, sku: products.sku, barcode: products.barcode, salePrice: products.salePrice, purchasePrice: products.purchasePrice, salesUnit: products.salesUnit, purchaseUnit: products.purchaseUnit }).from(products).where(and(eq(products.organizationId, organizationId), eq(products.barcode, barcode))).limit(1);
+  return product ?? null;
+}
+
 export async function createProductMaster(organizationId: number, values: { sku: string; name: string; nameAr?: string; nameFr?: string; nameEn?: string; barcode?: string; categoryId?: number; brandId?: number; productType: "standard" | "food" | "expiring" | "manufacturable"; baseUnit: string; purchaseUnit: string; salesUnit: string; unitsPerCarton: number; purchasePrice: number; salePrice: number; taxRate: number; minimumStock: number; reorderPoint: number; description?: string }) {
   const db = await getDb();
   if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");

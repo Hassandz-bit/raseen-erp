@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { addOrganizationExchangeRate, adjustProductBatchQuantity, approveInventoryCount, approveStockTransfer, createBranchForOrganization, createBusinessParty, createInventoryCount, createOperationalNotifications, createOperationalRecord, createOrganizationForUser, createProductBatch, createProductMaster, createPurchaseOrder, createSalesInvoice, createStockTransfer, createWarehouseForOrganization, dispatchStockTransfer, getCommerceReportSummary, getDashboardMetrics, getDefaultTenantContext, getFinancialReportSummary, getOrCreateOrganizationSettings, getOrCreateUserPreferences, getOrganizationRolePermissions, getSalesInvoicePrintDataForOrganization, issueSalesInvoiceWithFefo, issueStockByFefo, listActiveCustomersForOrganization, listBranchesForOrganization, listInventoryCountsForOrganization, listNotificationsForOrganization, listOperationalRecords, listOrganizationCurrencies, listOrganizationExchangeRates, listOrganizationMembersForOrganization, listProductBatchesForOrganization, listProductsForOrganization, listPurchaseOrdersForOrganization, listSalesInvoicesForOrganization, listStockMovementsForOrganization, listStockTransfersForOrganization, listWarehousesForOrganization, markAllNotificationsRead, markNotificationRead, previewFefoAllocation, receivePurchaseOrder, receiveStockTransfer, recordSalesInvoicePayment, recordStockMovement, saveOrganizationCurrency, searchCommandEntitiesForOrganization, sendPurchaseOrder, startInventoryCount, submitInventoryCount, updateOrganizationSettings, updateProductBatchStatus, updateUserPreferences, type OperationalModule } from "./db";
+import { addOrganizationExchangeRate, adjustProductBatchQuantity, approveInventoryCount, approveStockTransfer, createBranchForOrganization, createBusinessParty, createInventoryCount, createOperationalNotifications, createOperationalRecord, createOrganizationForUser, createProductBatch, createProductMaster, createPurchaseOrder, createSalesInvoice, createStockTransfer, createWarehouseForOrganization, dispatchStockTransfer, findProductByBarcodeForOrganization, getCommerceReportSummary, getDashboardMetrics, getDefaultTenantContext, getFinancialReportSummary, getOrCreateOrganizationSettings, getOrCreateUserPreferences, getOrganizationRolePermissions, getSalesInvoicePrintDataForOrganization, issueSalesInvoiceWithFefo, issueStockByFefo, listActiveCustomersForOrganization, listBranchesForOrganization, listInventoryCountsForOrganization, listNotificationsForOrganization, listOperationalRecords, listOrganizationCurrencies, listOrganizationExchangeRates, listOrganizationMembersForOrganization, listProductBatchesForOrganization, listProductsForOrganization, listPurchaseOrdersForOrganization, listSalesInvoicesForOrganization, listStockMovementsForOrganization, listStockTransfersForOrganization, listWarehousesForOrganization, markAllNotificationsRead, markNotificationRead, previewFefoAllocation, receivePurchaseOrder, receiveStockTransfer, recordSalesInvoicePayment, recordStockMovement, saveOrganizationCurrency, searchCommandEntitiesForOrganization, sendPurchaseOrder, startInventoryCount, submitInventoryCount, updateOrganizationSettings, updateProductBatchStatus, updateUserPreferences, type OperationalModule } from "./db";
 import { currencyCatalog } from "../shared/currencyCatalog";
 import { askNawaAI } from "./nawaAI";
 import { notifyOwner } from "./_core/notification";
@@ -140,6 +140,16 @@ function assertDistributionScope(context: Awaited<ReturnType<typeof getTenantCon
 
 
 export const erpRouter = router({
+  catalog: router({
+    findProductByBarcode: protectedProcedure.input(z.object({ barcode: z.string().trim().min(2).max(96) })).query(async ({ ctx, input }) => {
+      const context = await getTenantContext(ctx.user.id);
+      const inventoryStatus = context.modules.find(module => module.moduleKey === "inventory")?.status;
+      const salesStatus = context.modules.find(module => module.moduleKey === "sales")?.status;
+      const canUseCatalog = canAccessTenantModule({ membershipStatus: context.membership.status, moduleStatus: inventoryStatus }) || canAccessTenantModule({ membershipStatus: context.membership.status, moduleStatus: salesStatus });
+      if (!canUseCatalog) throw new TRPCError({ code: "FORBIDDEN", message: "لا تملك صلاحية الوصول إلى كتالوج المنتجات." });
+      return findProductByBarcodeForOrganization(context.organization.id, input.barcode);
+    }),
+  }),
   navigation: router({
     commandSearch: protectedProcedure.input(z.object({ query: z.string().trim().min(2).max(96) })).query(async ({ ctx, input }) => {
       const context = await getTenantContext(ctx.user.id);

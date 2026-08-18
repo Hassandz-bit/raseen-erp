@@ -1,3 +1,4 @@
+import { BarcodeScannerInput } from "@/components/BarcodeScannerInput";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -44,7 +45,7 @@ export function ProductCreationForm({ onCreated }: { onCreated: () => void }) {
   }}>
     <Input required value={name} onChange={event => setName(event.target.value)} placeholder={t("productName")} />
     <Input required value={sku} onChange={event => setSku(event.target.value)} placeholder={t("sku")} />
-    <Input dir="ltr" value={barcode} onChange={event => setBarcode(event.target.value)} placeholder={t("barcode")} />
+    <BarcodeScannerInput value={barcode} onValueChange={setBarcode} placeholder={t("barcode")} />
     <Input required min="0" step="0.01" type="number" value={salePrice} onChange={event => setSalePrice(event.target.value)} placeholder={t("salePrice")} />
     <Button disabled={create.isPending || !name.trim() || !sku.trim()} type="submit" className="gap-2">
       {create.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}

@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { BarcodeScannerInput } from "@/components/BarcodeScannerInput";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -37,6 +38,8 @@ export function CommerceOperationsPanel() {
   const [salesQuantity, setSalesQuantity] = useState("1");
   const [salesTaxMode, setSalesTaxMode] = useState<"exclusive" | "inclusive">("exclusive");
   const [salesTaxRate, setSalesTaxRate] = useState("0");
+  const [salesBarcodeInput, setSalesBarcodeInput] = useState("");
+  const [salesBarcodeLookupCode, setSalesBarcodeLookupCode] = useState("");
   const [purchaseProductId, setPurchaseProductId] = useState("");
   const [purchaseWarehouseId, setPurchaseWarehouseId] = useState("");
   const [purchaseQuantity, setPurchaseQuantity] = useState("1");
@@ -47,6 +50,8 @@ export function CommerceOperationsPanel() {
   const selectedPurchaseProduct = useMemo(() => products.data?.find(product => product.id === Number(purchaseProductId)), [products.data, purchaseProductId]);
   const canCreateDocument = Boolean(selectedSalesProduct && salesWarehouseId);
   const canCreateOrder = Boolean(selectedPurchaseProduct && purchaseWarehouseId);
+  const salesBarcodeLookupInput = useMemo(() => ({ barcode: salesBarcodeLookupCode }), [salesBarcodeLookupCode]);
+  const salesBarcodeLookup = trpc.erp.catalog.findProductByBarcode.useQuery(salesBarcodeLookupInput, { enabled: salesBarcodeLookupInput.barcode.length >= 2, retry: false, refetchOnWindowFocus: false });
 
   useEffect(() => {
     if (!salesProductId && products.data?.[0]) setSalesProductId(String(products.data[0].id));
@@ -71,6 +76,24 @@ export function CommerceOperationsPanel() {
     setSalesTaxMode(vat.priceMode ?? "exclusive");
     setSalesTaxRate(String(vat.defaultRate ?? 0));
   }, [organizationSettings.data]);
+
+  useEffect(() => {
+    if (!salesBarcodeLookupCode || !salesBarcodeLookup.isSuccess) return;
+    if (salesBarcodeLookup.data) {
+      setSalesProductId(String(salesBarcodeLookup.data.id));
+      toast.success(language === "ar" ? `تم اختيار المنتج: ${salesBarcodeLookup.data.nameAr || salesBarcodeLookup.data.name}` : language === "fr" ? `Produit sélectionné : ${salesBarcodeLookup.data.nameFr || salesBarcodeLookup.data.name}` : `Product selected: ${salesBarcodeLookup.data.nameEn || salesBarcodeLookup.data.name}`);
+    } else {
+      toast.error(language === "ar" ? "الرمز غير مسجل في كتالوج المؤسسة." : language === "fr" ? "Ce code n'est pas enregistré dans le catalogue de l'organisation." : "This code is not registered in the organization catalog.");
+    }
+    setSalesBarcodeInput("");
+    setSalesBarcodeLookupCode("");
+  }, [language, salesBarcodeLookup.data, salesBarcodeLookup.isSuccess, salesBarcodeLookupCode]);
+
+  useEffect(() => {
+    if (!salesBarcodeLookup.isError) return;
+    toast.error(salesBarcodeLookup.error.message || t("error"));
+    setSalesBarcodeLookupCode("");
+  }, [salesBarcodeLookup.error?.message, salesBarcodeLookup.isError, t]);
 
   const taxCopy = useMemo(() => language === "ar" ? {
     mode: "طريقة عرض السعر", exclusive: "غير شامل الضريبة", inclusive: "شامل الضريبة", rate: "نسبة الضريبة (%)", net: "الصافي", tax: "الضريبة", total: "الإجمالي", preview: "معاينة تقديرية — الحساب النهائي محفوظ خادمياً", included: "شامل", excluded: "غير شامل",
@@ -182,6 +205,7 @@ export function CommerceOperationsPanel() {
         <article id="sales" className="surface scroll-mt-24 rounded-3xl border p-5">
           <div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-2xl bg-sky-400/10 text-sky-300"><ReceiptText className="h-5 w-5" /></span><div><h2 className="font-semibold text-foreground">{t("salesInvoices")}</h2><p className="mt-1 text-xs text-muted-foreground">{t("fefo")}</p></div></div>
           <form className="mt-5 space-y-3" onSubmit={event => { event.preventDefault(); if (!selectedSalesProduct || !salesWarehouseId) return; createInvoice.mutate({ currencyCode: formatSettings.currencyCode, baseCurrencyCode: formatSettings.currencyCode, taxMode: salesTaxMode, taxRate: salesTaxRateValue, lines: [{ productId: selectedSalesProduct.id, warehouseId: Number(salesWarehouseId), quantity: Number(salesQuantity), unit: selectedSalesProduct.salesUnit }] }); }}>
+            <BarcodeScannerInput value={salesBarcodeInput} onValueChange={setSalesBarcodeInput} onDetected={setSalesBarcodeLookupCode} placeholder={language === "ar" ? "امسح رمز المنتج لاختياره" : language === "fr" ? "Scannez le code pour sélectionner un produit" : "Scan product code to select"} />
             <div className="grid gap-2 md:grid-cols-4">
               <select aria-label={t("product")} value={salesProductId} onChange={event => setSalesProductId(event.target.value)} className="h-10 rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/40">{products.data?.map(product => <option key={product.id} value={product.id}>{product.name}</option>)}</select>
               <select aria-label={t("warehouse")} value={salesWarehouseId} onChange={event => setSalesWarehouseId(event.target.value)} className="h-10 rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/40">{warehouses.data?.map(warehouse => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}</select>
