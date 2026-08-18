@@ -16,63 +16,54 @@ describe("تنقل بوابات Nawa", () => {
     expect(source).not.toContain("const menuItems = [");
   });
 
-  it("يحفظ آخر بوابة ويربط الرأس بسياق المؤسسة دون أي معرف عميل", () => {
-    expect(source).toContain('localStorage.setItem("nawa:last-portal"');
+  it("يربط الرأس بسياق المؤسسة دون أي معرف عميل", () => {
     expect(source).toContain("bootstrap.data?.organization?.name");
     expect(source).not.toContain("organizationId=");
   });
 
-  it("يبقي Nawa AI في الشريط الجانبي فقط ويحذف البحث ومبدل البوابات المكرر", () => {
+  it("يوفر انتقالاً واحداً واضحاً لمساحة Nawa AI ويحذف مبدل البوابات المكرر", () => {
     expect(source).toContain("chrome.ai");
-    expect(source.match(/navigateTo\("\/workspace", chrome\.ai\)/g)).toHaveLength(1);
-    expect(source).toContain("chrome.workspace");
+    expect(source).toContain('navigate("/workspace")');
     expect(source).not.toContain("placeholder={chrome.search}");
     expect(source).not.toContain("nawaPortals.map(portal");
   });
 
-  it("يعرض حالة نشاط وHover محسّنة لـ Nawa AI وعداد تنبيهات خادمي متحرك", () => {
-    expect(source).toContain("group-hover/ai:scale-110");
-    expect(source).toContain("shadow-[inset_3px_0_0_hsl(var(--primary))");
+  it("يعرض Rail نشطاً وعداد تنبيهات خادمي", () => {
+    expect(source).toContain("nawa-rail-button-active");
     expect(source).toContain("trpc.erp.notifications.list.useQuery");
     expect(source).toContain("refetchInterval: 30_000");
-    expect(source).toContain("previousUnreadCount");
-    expect(source).toContain('aria-live="polite"');
+    expect(source).toContain("unreadCount");
   });
 
   it("يعرض قائمة الإشعارات ويتيح تحديد الكل كمقروء", () => {
     expect(source).toContain("trpc.erp.notifications.markAllRead.useMutation");
-    expect(source).toContain("markAllNotificationsRead.mutate()");
+    expect(source).toContain("markAllRead.mutate()");
     expect(source).toContain("chrome.markAllRead");
     expect(source).toContain("chrome.emptyNotifications");
-    expect(source).toContain("markNotificationRead.mutate({ notificationId: notification.id })");
+    expect(source).toContain("markRead.mutate({ notificationId: notification.id })");
   });
 
-  it("يكبر هرمية عنوان الرأس وبيانات المؤسسة بوضوح", () => {
-    expect(source).toContain('md:h-[88px]');
-    expect(source).toContain('text-[21px] font-extrabold');
-    expect(source).toContain('md:text-[25px]');
-    expect(source).toContain('bg-primary/10 px-3 py-1.5');
-    expect(source).toContain('text-[16px] font-bold text-foreground md:text-[18px]');
+  it("يعرض رأساً عالمياً مقتضباً واسم المؤسسة بوضوح", () => {
+    expect(source).toContain("nawa-global-header");
+    expect(source).toContain("nawa-wordmark");
+    expect(source).toContain("nawa-organization-switcher");
   });
 
   it("يعرض منتقي الفروع من عقد محمي ويحفظ الاختيار المرئي", () => {
     expect(source).toContain("trpc.erp.preferences.availableBranches.useQuery");
     expect(source).toContain('const ACTIVE_BRANCH_KEY = "nawa:active-branch"');
     expect(source).toContain("setSelectedBranchId(branch.id)");
-    expect(source).toContain("availableBranches.map(branch");
-    expect(source).toContain('lg:hidden group-data-[collapsible=icon]:hidden');
+    expect(source).toContain("branches.data.map(branch");
+    expect(source).toContain("OrganizationPicker");
   });
 
-  it("يوفر البحث وطي المجموعات والمفضلات الشخصية داخل شريط البوابة", () => {
-    expect(source).toContain('const PORTAL_FAVORITES_KEY = "nawa:portal-sidebar-favorites"');
-    expect(source).toContain('const PORTAL_GROUPS_PREFIX = "nawa:portal-sidebar-groups:"');
+  it("يوفر بحثاً سياقياً ضمن لوحة أدوات البوابة", () => {
     expect(source).toContain('setToolQuery(event.target.value)');
-    expect(source).toContain('toggleFavoriteTool(item.id)');
-    expect(source).toContain('toggleGroup(groupKey)');
-    expect(source).toContain('chrome.favorites');
+    expect(source).toContain("nawa-context-panel");
+    expect(source).toContain("nawa-context-tool");
   });
 
   it("يثبت الرأس العلوي فوق المحتوى أثناء التمرير", () => {
-    expect(source).toContain('nawa-top-header sticky top-0 z-[60]');
+    expect(source).toContain("nawa-global-header");
   });
 });

@@ -20,5 +20,5 @@ vi.mock("@/lib/trpc", () => ({
 }));
 
 describe("مركز HR والرواتب", () => {
-  it("يعرض مؤشرات الموارد البشرية وتبويبات التشغيل ورسالة سرية الأجور", () => { render(<HRPayroll />); expect(screen.getByText("مركز الموارد البشرية والرواتب")).toBeTruthy(); expect(screen.getByText("إجمالي الموظفين")).toBeTruthy(); expect(screen.getByText("الموظفون")).toBeTruthy(); expect(screen.getByText("بيانات الرواتب والرواتب الصافية لا تظهر هنا إلا عبر صلاحيات HR/Payroll الخادمية الصريحة.")).toBeTruthy(); });
+  it("يعرض مؤشرات الموارد البشرية ورسالة سرية الأجور من دون تنقل تبويبات مكرر", () => { render(<HRPayroll />); expect(screen.getByText("مركز الموارد البشرية والرواتب")).toBeTruthy(); expect(screen.getByText("إجمالي الموظفين")).toBeTruthy(); expect(screen.queryByRole("tab", { name: "الموظفون" })).toBeNull(); expect(screen.getByText("بيانات الرواتب والرواتب الصافية لا تظهر هنا إلا عبر صلاحيات HR/Payroll الخادمية الصريحة.")).toBeTruthy(); });
 });

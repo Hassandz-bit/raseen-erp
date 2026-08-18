@@ -25,12 +25,11 @@ import Finance from "./Finance";
 afterEach(() => cleanup());
 
 describe("مركز المالية", () => {
-  it("يعرض المؤشرات المالية والتبويبات وإجراءات التصدير", () => {
+  it("يعرض المؤشرات المالية والإجراء التشغيلي من دون تنقل تبويبات مكرر", () => {
     render(<Finance />);
     expect(screen.getByText("مركز المالية والمحاسبة")).toBeTruthy();
     expect(screen.getByText("ذمم مدينة")).toBeTruthy();
-    expect(screen.getByRole("tab", { name: "دليل الحسابات" })).toBeTruthy();
-    expect(screen.getByRole("tab", { name: "التقارير" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "تهيئة نواة المالية" })).toBeTruthy();
+    expect(screen.queryByRole("tab", { name: "دليل الحسابات" })).toBeNull();
   });
 });

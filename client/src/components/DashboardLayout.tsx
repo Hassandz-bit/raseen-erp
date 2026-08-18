@@ -1,460 +1,137 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarHeader,
-  SidebarInset,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarProvider,
-  SidebarTrigger,
-  useSidebar,
-} from "@/components/ui/sidebar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { startLogin } from "@/const";
-import { getPortalForPath, getPortalNavigationIcon } from "@/config/nawaPortals";
+import { getPortalForPath, getPortalNavigationIcon, type PortalNavigationItem } from "@/config/nawaPortals";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { useTheme } from "@/contexts/ThemeContext";
-import { useIsMobile } from "@/hooks/useMobile";
-import { navigationFeedbackCopy } from "@/i18n/translations";
 import { trpc } from "@/lib/trpc";
-import { Bell, Bot, CheckCheck, ChevronDown, ChevronUp, Grid2X2, Home, Inbox, Loader2, LogOut, PanelLeft, Search, Settings2, Star, X } from "lucide-react";
-import { CSSProperties, useEffect, useRef, useState } from "react";
+import { Bell, Bot, CheckCheck, ChevronDown, Grid2X2, Home, Inbox, Loader2, LogOut, Menu, Pin, PinOff, Search, Settings2, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { useLocation, useSearch } from "wouter";
-import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
-import { Button } from "./ui/button";
-import { Badge } from "./ui/badge";
+import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 
-const SIDEBAR_WIDTH_KEY = "sidebar-width";
-const DEFAULT_WIDTH = 304;
-const MIN_WIDTH = 240;
-const MAX_WIDTH = 480;
 const ACTIVE_BRANCH_KEY = "nawa:active-branch";
-const PORTAL_SCROLL_PREFIX = "nawa:portal-sidebar-scroll:";
-const PORTAL_FAVORITES_KEY = "nawa:portal-sidebar-favorites";
-const PORTAL_GROUPS_PREFIX = "nawa:portal-sidebar-groups:";
+const PANEL_PIN_KEY = "nawa:navigation-panel-pinned";
 const portalChrome = {
-  ar: { portals: "الرئيسية", executive: "الملخص التنفيذي", workspace: "مساحة العمل", navigation: "تنقل البوابة", breadcrumbRoot: "نواة", defaultBranch: "الفرع الافتراضي", notifications: "التنبيهات", markAllRead: "تحديد الكل كمقروء", emptyNotifications: "لا توجد تنبيهات حديثة", settings: "الإعدادات", ai: "Nawa AI", demo: "بيانات Demo", searchTools: "ابحث في الأدوات والصفحات", favorites: "المفضلة", noTools: "لا توجد أداة مطابقة" },
-  fr: { portals: "Accueil", executive: "Vue exécutive", workspace: "Espace de travail", navigation: "Navigation du portail", breadcrumbRoot: "Nawa", defaultBranch: "Branche par défaut", notifications: "Notifications", markAllRead: "Tout marquer comme lu", emptyNotifications: "Aucune notification récente", settings: "Paramètres", ai: "Nawa AI", demo: "Données Demo", searchTools: "Rechercher un outil ou une page", favorites: "Favoris", noTools: "Aucun outil correspondant" },
-  en: { portals: "Home", executive: "Executive overview", workspace: "Workspace", navigation: "Portal navigation", breadcrumbRoot: "Nawa", defaultBranch: "Default branch", notifications: "Notifications", markAllRead: "Mark all as read", emptyNotifications: "No recent notifications", settings: "Settings", ai: "Nawa AI", demo: "Demo data", searchTools: "Search tools and pages", favorites: "Favorites", noTools: "No matching tools" },
+  ar: { portals: "بوابات نواة", executive: "الملخص التنفيذي", workspace: "مساحة العمل", tools: "أدوات البوابة", notifications: "التنبيهات", markAllRead: "تحديد الكل كمقروء", emptyNotifications: "لا توجد تنبيهات حديثة", settings: "الإعدادات", ai: "Nawa AI", demo: "بيانات Demo", searchTools: "ابحث في أدوات البوابة", pin: "تثبيت اللوحة", unpin: "إلغاء تثبيت اللوحة", close: "إغلاق", defaultBranch: "الفرع الافتراضي" },
+  fr: { portals: "Portails Nawa", executive: "Vue exécutive", workspace: "Espace de travail", tools: "Outils du portail", notifications: "Notifications", markAllRead: "Tout marquer comme lu", emptyNotifications: "Aucune notification récente", settings: "Paramètres", ai: "Nawa AI", demo: "Données Demo", searchTools: "Rechercher dans les outils", pin: "Épingler le panneau", unpin: "Désépingler le panneau", close: "Fermer", defaultBranch: "Branche par défaut" },
+  en: { portals: "Nawa portals", executive: "Executive overview", workspace: "Workspace", tools: "Portal tools", notifications: "Notifications", markAllRead: "Mark all as read", emptyNotifications: "No recent notifications", settings: "Settings", ai: "Nawa AI", demo: "Demo data", searchTools: "Search portal tools", pin: "Pin panel", unpin: "Unpin panel", close: "Close", defaultBranch: "Default branch" },
 } as const;
 
 function formatNotificationTime(value: Date | string | number, language: "ar" | "fr" | "en") {
-  const locale = language === "ar" ? "ar" : language === "fr" ? "fr-FR" : "en-US";
-  return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+  return new Intl.DateTimeFormat(language === "ar" ? "ar" : language === "fr" ? "fr-FR" : "en-US", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const [sidebarWidth, setSidebarWidth] = useState(() => {
-    const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
-    const parsed = saved ? parseInt(saved, 10) : DEFAULT_WIDTH;
-    return Number.isFinite(parsed) ? Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, parsed)) : DEFAULT_WIDTH;
-  });
+function RailButton({ label, active = false, onClick, badge, children }: { label: string; active?: boolean; onClick: () => void; badge?: number; children: ReactNode }) {
+  return <Tooltip><TooltipTrigger asChild><button type="button" aria-label={label} onClick={onClick} className={`nawa-rail-button relative ${active ? "nawa-rail-button-active" : ""}`}>{children}{badge ? <span className="absolute -end-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-primary px-1 text-[9px] font-extrabold text-primary-foreground">{badge > 99 ? "99+" : badge}</span> : null}</button></TooltipTrigger><TooltipContent side="left" className="font-semibold">{label}</TooltipContent></Tooltip>;
+}
+
+export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { loading, user } = useAuth();
   const { direction, t } = useLanguage();
-
-  useEffect(() => {
-    localStorage.setItem(SIDEBAR_WIDTH_KEY, sidebarWidth.toString());
-  }, [sidebarWidth]);
-
-  if (loading) {
-    return <DashboardLayoutSkeleton />
-  }
-
-  if (!user) {
-    return (
-      <div className="flex min-h-screen items-center justify-center" dir={direction}>
-        <div className="flex flex-col items-center gap-8 p-8 max-w-md w-full">
-          <div className="flex flex-col items-center gap-6">
-            <h1 className="text-2xl font-semibold tracking-tight text-center">
-              {t("signInToContinue")}
-            </h1>
-            <p className="text-sm text-muted-foreground text-center max-w-sm">
-              {t("workspaceAccountRequired")}
-            </p>
-          </div>
-          <Button
-            onClick={() => startLogin()}
-            size="lg"
-            className="w-full shadow-lg hover:shadow-xl transition-all"
-          >
-            {t("signIn")}
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <SidebarProvider
-      style={
-        {
-          "--sidebar-width": `${sidebarWidth}px`,
-        } as CSSProperties
-      }
-    >
-      <DashboardLayoutContent setSidebarWidth={setSidebarWidth}>
-        {children}
-      </DashboardLayoutContent>
-    </SidebarProvider>
-  );
+  if (loading) return <DashboardLayoutSkeleton />;
+  if (!user) return <div dir={direction} className="grid min-h-svh place-items-center p-6"><section className="nawa-auth-card w-full max-w-md rounded-[1.75rem] p-8 text-center"><p className="text-sm font-semibold text-primary">Nawa ERP</p><h1 className="mt-3 text-2xl font-black text-foreground">{t("signInToContinue")}</h1><p className="mt-3 text-sm leading-7 text-muted-foreground">{t("workspaceAccountRequired")}</p><Button onClick={() => startLogin()} size="lg" className="mt-7 w-full">{t("signIn")}</Button></section></div>;
+  return <DashboardLayoutContent>{children}</DashboardLayoutContent>;
 }
 
-type DashboardLayoutContentProps = {
-  children: React.ReactNode;
-  setSidebarWidth: (width: number) => void;
-};
-
-function DashboardLayoutContent({
-  children,
-  setSidebarWidth,
-}: DashboardLayoutContentProps) {
+function DashboardLayoutContent({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth();
   const { direction, language, t } = useLanguage();
-  const { preferences } = useTheme();
   const [location, setLocation] = useLocation();
   const search = useSearch();
-  const { state, toggleSidebar, setOpenMobile } = useSidebar();
-  const isCollapsed = state === "collapsed";
-  const [isResizing, setIsResizing] = useState(false);
-  const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
-  const sidebarRef = useRef<HTMLDivElement>(null);
-  const portalScrollRef = useRef<HTMLDivElement>(null);
-  const previousPortalId = useRef<string | undefined>(undefined);
   const pathWithoutQuery = location.split(/[?#]/)[0];
   const currentHash = window.location.hash;
   const activePortal = getPortalForPath(pathWithoutQuery);
   const chrome = portalChrome[language];
+  const isPortalLauncher = pathWithoutQuery === "/";
   const localItems = activePortal?.localNavigation ?? [];
-  const [toolQuery, setToolQuery] = useState("");
-  const [favoriteToolIds, setFavoriteToolIds] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem(PORTAL_FAVORITES_KEY);
-      const parsed = saved ? JSON.parse(saved) : [];
-      return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [];
-    } catch {
-      return [];
-    }
-  });
-  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>(() => {
-    try {
-      const saved = localStorage.getItem(`${PORTAL_GROUPS_PREFIX}${activePortal?.id ?? "home"}`);
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
-  });
-  const normalizedToolQuery = toolQuery.trim().toLocaleLowerCase(language === "ar" ? "ar" : language);
-  const navigationItems = localItems.filter(item => !(activePortal?.id === "administration" && item.id === "settings"));
-  const visibleLocalItems = normalizedToolQuery ? navigationItems.filter(item => `${item.label[language]} ${item.group[language]}`.toLocaleLowerCase(language === "ar" ? "ar" : language).includes(normalizedToolQuery)) : navigationItems;
-  const favoriteLocalItems = localItems.filter(item => favoriteToolIds.includes(`${activePortal?.id}:${item.id}`));
-  const activeMenuItem = localItems.find(item => item.href.includes("#") ? `${pathWithoutQuery}${currentHash}` === item.href : item.href.includes("?") ? `${pathWithoutQuery}${search}` === item.href : !currentHash && (location === item.href || pathWithoutQuery === item.href));
-  const isMobile = useIsMobile();
-  const bootstrap = trpc.erp.bootstrap.useQuery(undefined, { retry: false, refetchOnWindowFocus: false });
-  const branchQuery = trpc.erp.preferences.availableBranches.useQuery(undefined, { retry: false, refetchOnWindowFocus: false });
-  const [selectedBranchId, setSelectedBranchId] = useState<number | null>(() => {
-    const saved = localStorage.getItem(ACTIVE_BRANCH_KEY);
-    const parsed = saved ? Number(saved) : NaN;
-    return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
-  });
-  const availableBranches = branchQuery.data ?? [];
-  const selectedBranch = availableBranches.find(branch => branch.id === selectedBranchId) ?? availableBranches[0];
-  const isDemoOrganization = bootstrap.data?.organization?.isDemo === "yes";
-  const notifications = trpc.erp.notifications.list.useQuery(undefined, { retry: false, refetchInterval: 30_000, refetchOnWindowFocus: true });
-  const unreadCount = (notifications.data ?? []).filter(notification => notification.isRead === "no").length;
-  const notificationUtils = trpc.useUtils();
-  const markNotificationRead = trpc.erp.notifications.markRead.useMutation({ onSuccess: () => notificationUtils.erp.notifications.list.invalidate() });
-  const markAllNotificationsRead = trpc.erp.notifications.markAllRead.useMutation({ onSuccess: () => notificationUtils.erp.notifications.list.invalidate() });
-  const [notificationPulse, setNotificationPulse] = useState(false);
-  const previousUnreadCount = useRef<number | null>(null);
-
-  useEffect(() => {
-    if (previousUnreadCount.current !== null && unreadCount > previousUnreadCount.current) {
-      setNotificationPulse(true);
-      const timer = window.setTimeout(() => setNotificationPulse(false), 1_650);
-      previousUnreadCount.current = unreadCount;
-      return () => window.clearTimeout(timer);
-    }
-    previousUnreadCount.current = unreadCount;
-  }, [unreadCount]);
-
-  useEffect(() => {
-    if (activePortal) localStorage.setItem("nawa:last-portal", activePortal.id);
-  }, [activePortal]);
-
-  useEffect(() => {
-    setToolQuery("");
-    try {
-      const saved = localStorage.getItem(`${PORTAL_GROUPS_PREFIX}${activePortal?.id ?? "home"}`);
-      setCollapsedGroups(saved ? JSON.parse(saved) : {});
-    } catch {
-      setCollapsedGroups({});
-    }
-  }, [activePortal?.id]);
-
-  useEffect(() => {
-    localStorage.setItem(PORTAL_FAVORITES_KEY, JSON.stringify(favoriteToolIds));
-  }, [favoriteToolIds]);
-
-  useEffect(() => {
-    localStorage.setItem(`${PORTAL_GROUPS_PREFIX}${activePortal?.id ?? "home"}`, JSON.stringify(collapsedGroups));
-  }, [activePortal?.id, collapsedGroups]);
-
-  useEffect(() => {
-    const content = portalScrollRef.current;
-    if (!content) return;
-    const portalKey = activePortal?.id ?? "home";
-    const storageKey = `${PORTAL_SCROLL_PREFIX}${portalKey}`;
-    const restore = window.requestAnimationFrame(() => {
-      const savedTop = Number(localStorage.getItem(storageKey));
-      content.scrollTop = Number.isFinite(savedTop) && savedTop > 0 ? savedTop : 0;
+  const activeMenuItem = localItems.find(item => item.href.includes("#") ? `${pathWithoutQuery}${currentHash}` === item.href : item.href.includes("?") ? `${pathWithoutQuery}${search}` === item.href : !currentHash && pathWithoutQuery === item.href);
+  const groups = useMemo<Array<{ key: string; label: string; items: PortalNavigationItem[] }>>(() => {
+    const map = new Map<string, { key: string; label: string; items: PortalNavigationItem[] }>();
+    localItems.forEach(item => {
+      const key = item.group.ar;
+      const existing = map.get(key);
+      if (existing) existing.items.push(item);
+      else map.set(key, { key, label: item.group[language], items: [item] });
     });
-    const persist = () => localStorage.setItem(storageKey, String(content.scrollTop));
-    content.addEventListener("scroll", persist, { passive: true });
-    return () => {
-      window.cancelAnimationFrame(restore);
-      persist();
-      content.removeEventListener("scroll", persist);
-    };
-  }, [activePortal?.id]);
+    return Array.from(map.values());
+  }, [language, localItems]);
+  const [isPanelOpen, setPanelOpen] = useState(false);
+  const [activeGroupKey, setActiveGroupKey] = useState<string | null>(null);
+  const [isRailOpenOnMobile, setRailOpenOnMobile] = useState(false);
+  const [toolQuery, setToolQuery] = useState("");
+  const [pinnedPanel, setPinnedPanel] = useState(() => localStorage.getItem(PANEL_PIN_KEY) === "yes");
+  const bootstrap = trpc.erp.bootstrap.useQuery(undefined, { retry: false, refetchOnWindowFocus: false });
+  const branches = trpc.erp.preferences.availableBranches.useQuery(undefined, { retry: false, refetchOnWindowFocus: false });
+  const [selectedBranchId, setSelectedBranchId] = useState<number | null>(() => { const id = Number(localStorage.getItem(ACTIVE_BRANCH_KEY)); return Number.isInteger(id) && id > 0 ? id : null; });
+  const selectedBranch = (branches.data ?? []).find(branch => branch.id === selectedBranchId) ?? branches.data?.[0];
+  const notifications = trpc.erp.notifications.list.useQuery(undefined, { retry: false, refetchInterval: 30_000, refetchOnWindowFocus: true });
+  const utilities = trpc.useUtils();
+  const markRead = trpc.erp.notifications.markRead.useMutation({ onSuccess: () => utilities.erp.notifications.list.invalidate() });
+  const markAllRead = trpc.erp.notifications.markAllRead.useMutation({ onSuccess: () => utilities.erp.notifications.list.invalidate() });
+  const unreadCount = (notifications.data ?? []).filter(notification => notification.isRead === "no").length;
+  const previousPortal = useRef<string | undefined>(undefined);
 
+  useEffect(() => { if (selectedBranch) localStorage.setItem(ACTIVE_BRANCH_KEY, String(selectedBranch.id)); }, [selectedBranch]);
+  useEffect(() => { localStorage.setItem(PANEL_PIN_KEY, pinnedPanel ? "yes" : "no"); }, [pinnedPanel]);
   useEffect(() => {
-    const portalChanged = Boolean(activePortal?.id && activePortal.id !== previousPortalId.current);
-    if (portalChanged && !isMobile && isCollapsed) toggleSidebar();
-    previousPortalId.current = activePortal?.id;
-  }, [activePortal?.id, isCollapsed, isMobile, toggleSidebar]);
-
-  useEffect(() => {
-    if (selectedBranch) localStorage.setItem(ACTIVE_BRANCH_KEY, String(selectedBranch.id));
-  }, [selectedBranch]);
-
-  useEffect(() => {
-    if (isCollapsed) {
-      setIsResizing(false);
+    if (activePortal?.id !== previousPortal.current) {
+      setToolQuery("");
+      setActiveGroupKey(null);
+      setPanelOpen(pinnedPanel);
+      previousPortal.current = activePortal?.id;
     }
-  }, [isCollapsed]);
+  }, [activePortal?.id, pinnedPanel]);
 
-  useEffect(() => {
-    const shouldCollapse = preferences.sidebarMode === "collapsed";
-    if (shouldCollapse !== isCollapsed) toggleSidebar();
-  }, [preferences.sidebarMode, isCollapsed, toggleSidebar]);
-
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isResizing) return;
-
-      const bounds = sidebarRef.current?.getBoundingClientRect();
-      const newWidth = direction === "rtl"
-        ? (bounds?.right ?? window.innerWidth) - e.clientX
-        : e.clientX - (bounds?.left ?? 0);
-      if (newWidth >= MIN_WIDTH && newWidth <= MAX_WIDTH) {
-        setSidebarWidth(newWidth);
-      }
-    };
-
-    const handleMouseUp = () => {
-      setIsResizing(false);
-    };
-
-    if (isResizing) {
-      document.addEventListener("mousemove", handleMouseMove);
-      document.addEventListener("mouseup", handleMouseUp);
-      document.body.style.cursor = "col-resize";
-      document.body.style.userSelect = "none";
-    }
-
-    return () => {
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-    };
-  }, [direction, isResizing, setSidebarWidth]);
-
-  const navigateTo = (path: string, label: string) => {
-    if (path === location || navigatingTo) return;
-    setNavigatingTo(path);
-    window.setTimeout(() => {
-      setLocation(path);
-      setNavigatingTo(null);
-      toast.success(navigationFeedbackCopy[language].opened(label));
-    }, path === "/workspace" ? 220 : 180);
+  const navigate = (href: string) => {
+    setLocation(href);
+    if (!pinnedPanel) setPanelOpen(false);
+    setRailOpenOnMobile(false);
   };
+  const selectedGroup = groups.find(group => group.key === activeGroupKey) ?? groups.find(group => group.items.some(item => item.id === activeMenuItem?.id)) ?? groups[0];
+  const normalizedQuery = toolQuery.trim().toLocaleLowerCase(language === "ar" ? "ar" : language);
+  const filteredTools = (selectedGroup?.items ?? []).filter(item => `${item.label[language]} ${item.group[language]}`.toLocaleLowerCase(language === "ar" ? "ar" : language).includes(normalizedQuery));
+  const PortalIcon = activePortal?.icon ?? Grid2X2;
+  const isDemo = bootstrap.data?.organization?.isDemo === "yes";
 
-  const toggleFavoriteTool = (itemId: string) => {
-    const key = `${activePortal?.id}:${itemId}`;
-    setFavoriteToolIds(current => current.includes(key) ? current.filter(item => item !== key) : [...current, key]);
-  };
+  const OrganizationPicker = () => <DropdownMenu><DropdownMenuTrigger asChild><button type="button" className="nawa-organization-switcher"><span className="min-w-0"><span className="block truncate text-sm font-bold text-foreground">{bootstrap.data?.organization?.name ?? "—"}</span><span className="mt-0.5 flex items-center justify-center gap-1 text-[11px] text-muted-foreground">{selectedBranch?.name ?? chrome.defaultBranch}<ChevronDown className="h-3.5 w-3.5" /></span></span>{isDemo ? <Badge className="border-primary/25 bg-primary/10 text-[10px] text-primary hover:bg-primary/10">{chrome.demo}</Badge> : null}</button></DropdownMenuTrigger><DropdownMenuContent align="center" className="w-64 rounded-2xl p-1.5">{branches.isLoading ? <div className="grid min-h-20 place-items-center"><Loader2 className="h-4 w-4 animate-spin text-primary" /></div> : branches.data?.length ? branches.data.map(branch => <DropdownMenuItem key={branch.id} onClick={() => { setSelectedBranchId(branch.id); toast.success(branch.name); }} className={`mt-1 cursor-pointer rounded-xl py-2.5 ${selectedBranch?.id === branch.id ? "bg-primary/10 font-bold text-primary focus:bg-primary/10 focus:text-primary" : ""}`}><span className="min-w-0"><span className="block truncate">{branch.name}</span><span className="mt-0.5 block text-[11px] font-normal text-muted-foreground">{branch.code}</span></span></DropdownMenuItem>) : <p className="px-3 py-4 text-center text-xs text-muted-foreground">{chrome.defaultBranch}</p>}</DropdownMenuContent></DropdownMenu>;
 
-  const toggleGroup = (groupKey: string) => {
-    setCollapsedGroups(current => ({ ...current, [groupKey]: !current[groupKey] }));
-  };
+  const NotificationMenu = () => <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" aria-label={chrome.notifications} className="nawa-header-icon relative"><Bell className="h-5 w-5" />{unreadCount ? <span className="absolute end-0.5 top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-primary px-1 text-[9px] font-extrabold text-primary-foreground">{unreadCount > 99 ? "99+" : unreadCount}</span> : null}</Button></DropdownMenuTrigger><DropdownMenuContent align={direction === "rtl" ? "start" : "end"} className="w-[min(24rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl p-0"><div className="flex items-center justify-between border-b border-border/70 px-4 py-3"><p className="text-sm font-black">{chrome.notifications}</p><Button variant="ghost" size="sm" onClick={() => markAllRead.mutate()} disabled={!unreadCount || markAllRead.isPending} className="h-8 gap-1.5 text-xs text-primary"><CheckCheck className="h-4 w-4" />{chrome.markAllRead}</Button></div><div className="max-h-80 overflow-y-auto p-1.5">{notifications.isLoading ? <div className="grid min-h-28 place-items-center"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div> : notifications.data?.length ? notifications.data.slice(0, 6).map(notification => <button key={notification.id} type="button" onClick={() => notification.isRead === "no" && markRead.mutate({ notificationId: notification.id })} className={`w-full rounded-xl p-3 text-start transition-colors hover:bg-primary/[.06] ${notification.isRead === "no" ? "bg-primary/[.04]" : ""}`}><span className="flex gap-2.5"><span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${notification.isRead === "no" ? "bg-primary" : "bg-muted-foreground/30"}`} /><span className="min-w-0"><span className="block truncate text-sm font-bold">{notification.title}</span><span className="mt-1 block line-clamp-2 text-xs leading-5 text-muted-foreground">{notification.content}</span><span className="mt-1.5 block text-[10px] text-muted-foreground">{formatNotificationTime(notification.createdAt, language)}</span></span></span></button>) : <div className="grid min-h-28 place-items-center gap-2 text-center text-sm text-muted-foreground"><Inbox className="h-5 w-5 text-primary" />{chrome.emptyNotifications}</div>}</div></DropdownMenuContent></DropdownMenu>;
 
-  return (
-    <div dir={direction} className="flex min-h-svh w-full min-w-0 overflow-x-hidden">
-      <div className="relative shrink-0" ref={sidebarRef}>
-        <Sidebar
-          side={direction === "rtl" ? "right" : "left"}
-          collapsible="icon"
-          className={`nawa-portal-sidebar border-r-0 ${preferences.sidebarMode === "compact" ? "[--sidebar-width:220px]" : ""}`}
-          disableTransition={isResizing}
-        >
-          <SidebarHeader className="h-[72px] shrink-0 justify-center border-b border-white/[.06] md:h-[88px]">
-            <div className="flex min-w-0 items-center gap-3 px-2 transition-all w-full">
-              <button
-                onClick={toggleSidebar}
-                className="h-8 w-8 flex items-center justify-center hover:bg-accent rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring shrink-0"
-                  aria-label={t("navigation")}
-              >
-                <PanelLeft className="h-4 w-4 text-muted-foreground" />
-              </button>
-              {!isCollapsed ? <div className="flex min-w-0 items-center gap-2"><span className="truncate rounded-xl border border-primary/25 bg-primary/10 px-3 py-1.5 text-[18px] font-extrabold tracking-tight text-primary shadow-sm">{activePortal?.name[language] ?? chrome.portals}</span></div> : null}
-              {isMobile && !isCollapsed ? <Button type="button" variant="ghost" size="sm" onClick={() => setOpenMobile(false)} className="ms-auto h-9 shrink-0 gap-1.5 px-2.5 text-[13px] font-bold text-primary hover:bg-primary/10 hover:text-primary"><span>{language === "ar" ? "إغلاق" : language === "fr" ? "Fermer" : "Close"}</span></Button> : null}
-            </div>
-          </SidebarHeader>
-
-          <div className="shrink-0 border-b border-white/[.06] px-3 py-3 lg:hidden group-data-[collapsible=icon]:hidden">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button type="button" className="flex w-full items-center justify-between rounded-xl border border-border/70 bg-background/70 px-3 py-2.5 text-start transition-colors hover:border-primary/35 hover:bg-primary/[.05] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50">
-                  <span className="min-w-0"><span className="block text-[11px] font-semibold text-muted-foreground">{bootstrap.data?.organization?.name ?? "—"}</span><span className="mt-0.5 flex items-center gap-1 truncate text-[15px] font-bold text-foreground">{selectedBranch?.name ?? chrome.defaultBranch}<ChevronDown className="h-4 w-4 shrink-0 text-primary" /></span></span>
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align={direction === "rtl" ? "start" : "end"} className="w-[min(20rem,calc(100vw-2rem))] rounded-2xl p-1.5">
-                {branchQuery.isLoading ? <div className="grid min-h-20 place-items-center"><Loader2 className="h-4 w-4 animate-spin text-primary" /></div> : availableBranches.length ? availableBranches.map(branch => <DropdownMenuItem key={branch.id} onClick={() => { setSelectedBranchId(branch.id); toast.success(branch.name); }} className={`mt-1 cursor-pointer rounded-xl py-2.5 ${selectedBranch?.id === branch.id ? "bg-primary/10 font-bold text-primary focus:bg-primary/10 focus:text-primary" : ""}`}><span className="min-w-0"><span className="block truncate">{branch.name}</span><span className="mt-0.5 block text-[11px] font-normal text-muted-foreground">{branch.code}</span></span></DropdownMenuItem>) : <div className="px-3 py-4 text-center text-xs text-muted-foreground">{chrome.defaultBranch}</div>}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-
-          <SidebarContent ref={portalScrollRef} className="min-h-0 gap-0 overscroll-contain overflow-y-auto">
-            <SidebarMenu className="px-2 py-3">
-              {activePortal ? <SidebarMenuItem><SidebarMenuButton onClick={() => navigateTo("/", chrome.portals)} tooltip={chrome.portals} className="h-13 text-[18px] font-bold text-muted-foreground transition-all hover:bg-primary/[.07] hover:text-primary"><Grid2X2 className="h-5 w-5" /><span>{chrome.portals}</span></SidebarMenuButton></SidebarMenuItem> : <><SidebarMenuItem><SidebarMenuButton onClick={() => navigateTo("/", chrome.portals)} tooltip={chrome.portals} className="h-13 text-[18px] font-bold transition-all hover:bg-primary/[.07] hover:text-primary"><Grid2X2 className="h-5 w-5 text-primary" /><span>{chrome.portals}</span></SidebarMenuButton></SidebarMenuItem><SidebarMenuItem><SidebarMenuButton onClick={() => navigateTo("/executive", chrome.executive)} tooltip={chrome.executive} className="h-13 text-[18px] font-bold transition-all hover:bg-primary/[.07] hover:text-primary"><Home className="h-5 w-5" /><span>{chrome.executive}</span></SidebarMenuButton></SidebarMenuItem><SidebarMenuItem><SidebarMenuButton onClick={() => navigateTo("/workspace", chrome.ai)} tooltip={chrome.ai} className="h-13 text-[18px] font-extrabold text-primary transition-all hover:bg-primary/[.12] hover:shadow-[0_8px_18px_rgba(212,161,49,.12)]"><Bot className="h-5 w-5 text-primary" /><span>{chrome.ai}</span><span className="sr-only">{chrome.workspace}</span></SidebarMenuButton></SidebarMenuItem></>}
-              <SidebarMenuItem>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <SidebarMenuButton tooltip={chrome.notifications} className="relative h-13 text-[18px] font-bold transition-all hover:bg-primary/[.07] hover:text-primary hover:shadow-[0_8px_18px_rgba(212,161,49,.10)]"><Bell className={`h-5 w-5 ${notificationPulse ? "motion-safe:animate-[pulse_825ms_cubic-bezier(.23,1,.32,1)_2] text-primary" : ""}`} /><span>{chrome.notifications}</span>{unreadCount > 0 ? <span aria-live="polite" className="absolute end-2 top-2 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-[10px] font-extrabold leading-none text-primary-foreground group-data-[collapsible=icon]:end-0.5">{unreadCount > 99 ? "99+" : unreadCount}</span> : null}</SidebarMenuButton>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent side={direction === "rtl" ? "left" : "right"} align="start" className="w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-2xl p-0">
-                    <div className="flex items-center justify-between border-b border-border/70 px-4 py-3"><p className="text-[15px] font-bold">{chrome.notifications}</p><Button variant="ghost" size="sm" disabled={unreadCount === 0 || markAllNotificationsRead.isPending} onClick={() => markAllNotificationsRead.mutate()} className="h-8 gap-1.5 px-2 text-xs font-semibold text-primary"><CheckCheck className="h-4 w-4" />{chrome.markAllRead}</Button></div>
-                    <div className="max-h-[22rem] overflow-y-auto p-1.5">{notifications.isLoading ? <div className="grid min-h-28 place-items-center"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div> : notifications.data?.length ? notifications.data.slice(0, 10).map(notification => <button key={notification.id} type="button" onClick={() => notification.isRead === "no" && markNotificationRead.mutate({ notificationId: notification.id })} className={`w-full rounded-xl p-3 text-start transition-colors hover:bg-accent/70 ${notification.isRead === "no" ? "bg-primary/[.055]" : ""}`}><span className="flex items-start gap-2.5"><span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${notification.isRead === "no" ? "bg-primary" : "bg-muted-foreground/35"}`} /><span className="min-w-0 flex-1"><span className="block truncate text-[13px] font-bold">{notification.title}</span><span className="mt-1 block line-clamp-2 text-[12px] leading-5 text-muted-foreground">{notification.content}</span><span className="mt-1.5 block text-[10px] text-muted-foreground">{formatNotificationTime(notification.createdAt, language)}</span></span></span></button>) : <div className="grid min-h-32 place-items-center gap-2 px-4 text-center text-sm text-muted-foreground"><Inbox className="h-6 w-6 text-primary/70" />{chrome.emptyNotifications}</div>}</div>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </SidebarMenuItem>
-              {activePortal?.id !== "administration" ? <SidebarMenuItem><SidebarMenuButton onClick={() => navigateTo("/settings", chrome.settings)} tooltip={chrome.settings} className="h-13 text-[18px] font-bold transition-all hover:bg-primary/[.07] hover:text-primary hover:shadow-[0_8px_18px_rgba(212,161,49,.10)]"><Settings2 className="h-5 w-5" /><span>{chrome.settings}</span></SidebarMenuButton></SidebarMenuItem> : null}
-              {activePortal && !isCollapsed ? <>
-                <div className="px-2 pb-2 pt-4">
-                  <label className="relative block">
-                    <Search className="pointer-events-none absolute end-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <input value={toolQuery} onChange={event => setToolQuery(event.target.value)} placeholder={chrome.searchTools} className="h-11 w-full rounded-xl border border-border/70 bg-background/70 ps-3 pe-10 text-[14px] font-semibold outline-none transition-all placeholder:text-muted-foreground/80 focus:border-primary/45 focus:bg-primary/[.04] focus:ring-2 focus:ring-primary/20" />
-                    {toolQuery ? <button type="button" onClick={() => setToolQuery("")} aria-label="Clear" className="absolute start-2 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"><X className="h-4 w-4" /></button> : null}
-                  </label>
-                </div>
-                {favoriteLocalItems.length ? <><p className="px-2 pb-1.5 pt-2 text-[12px] font-bold uppercase tracking-[.12em] text-primary">{chrome.favorites}</p>{favoriteLocalItems.map(item => { const ItemIcon = getPortalNavigationIcon(item.id, activePortal.icon); const isActive = item.href.includes("?") ? `${pathWithoutQuery}${search}` === item.href : item.href.includes("#") ? `${pathWithoutQuery}${currentHash}` === item.href : !currentHash && pathWithoutQuery === item.href; return <SidebarMenuItem key={`favorite-${item.id}`} className="group/favorite relative"><SidebarMenuButton isActive={isActive} onClick={() => navigateTo(item.href, item.label[language])} tooltip={item.label[language]} className={`h-12 pe-10 text-[17px] font-bold transition-all hover:bg-primary/[.08] hover:text-primary ${isActive ? "bg-primary/15 text-primary ring-1 ring-primary/30" : ""}`}><ItemIcon className="h-5 w-5" /><span className="min-w-0 truncate">{item.label[language]}</span></SidebarMenuButton><button type="button" onClick={() => toggleFavoriteTool(item.id)} aria-label={`Unpin ${item.label[language]}`} className="absolute end-1 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg text-primary opacity-70 transition-all hover:bg-primary/10 hover:opacity-100"><Star className="h-4 w-4 fill-current" /></button></SidebarMenuItem>; })}</> : null}
-              </> : null}
-              {activePortal && normalizedToolQuery && !visibleLocalItems.length ? <p className="px-3 py-6 text-center text-sm font-semibold text-muted-foreground">{chrome.noTools}</p> : null}
-              {visibleLocalItems.map((item, index) => {
-                const isActive = item.href.includes("?") ? `${pathWithoutQuery}${search}` === item.href : item.href.includes("#") ? `${pathWithoutQuery}${currentHash}` === item.href : !currentHash && pathWithoutQuery === item.href;
-                const groupKey = item.group.ar;
-                const showGroup = index === 0 || groupKey !== visibleLocalItems[index - 1]?.group.ar;
-                const groupIsCollapsed = !normalizedToolQuery && Boolean(collapsedGroups[groupKey]);
-                const ItemIcon = getPortalNavigationIcon(item.id, activePortal?.icon ?? Grid2X2);
-                return (
-                  <SidebarMenuItem key={item.id}>
-                    {showGroup ? <button type="button" onClick={() => toggleGroup(groupKey)} aria-expanded={!groupIsCollapsed} className="flex w-full items-center justify-between px-2 pb-1.5 pt-5 text-[13px] font-bold uppercase tracking-[.1em] text-muted-foreground transition-colors hover:text-primary group-data-[collapsible=icon]:hidden"><span>{item.group[language]}</span>{groupIsCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}</button> : null}
-                    {!groupIsCollapsed ? <div className="group/tool relative"><SidebarMenuButton
-                      isActive={isActive}
-                      onClick={() => navigateTo(item.href, item.label[language])}
-                      tooltip={item.label[language]}
-                      className={`group/portal h-13 min-w-0 pe-10 text-[18px] font-bold transition-all duration-200 hover:-translate-y-px hover:bg-primary/[.08] hover:text-primary hover:shadow-[0_10px_22px_rgba(212,161,49,.12)] active:scale-[.98] ${isActive ? "bg-primary/15 text-primary ring-1 ring-primary/35 shadow-[inset_4px_0_0_hsl(var(--primary)),0_10px_22px_rgba(212,161,49,.16)]" : ""} ${activePortal?.id === "ai" ? `group/ai hover:bg-primary/12 ${isActive ? "shadow-[inset_3px_0_0_hsl(var(--primary))]" : ""}` : ""}`}
-                    >
-                      {navigatingTo === item.href ? <Loader2 className="h-5 w-5 animate-spin motion-reduce:animate-none" /> : <ItemIcon className={`h-5 w-5 ${isActive ? "text-primary" : ""} ${activePortal?.id === "ai" ? "group-hover/ai:scale-110 group-hover/ai:-rotate-3" : ""}`} />}
-                      <span className="min-w-0 truncate">{item.label[language]}</span>
-                    </SidebarMenuButton><button type="button" onClick={() => toggleFavoriteTool(item.id)} aria-label={favoriteToolIds.includes(`${activePortal?.id}:${item.id}`) ? `Unpin ${item.label[language]}` : `Pin ${item.label[language]}`} className={`absolute end-1 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg transition-all hover:bg-primary/10 ${favoriteToolIds.includes(`${activePortal?.id}:${item.id}`) ? "text-primary opacity-100" : "text-muted-foreground opacity-0 group-hover/tool:opacity-100 focus:opacity-100"}`}><Star className={`h-4 w-4 ${favoriteToolIds.includes(`${activePortal?.id}:${item.id}`) ? "fill-current" : ""}`} /></button></div> : null}
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
-            </SidebarContent>
-
-          <SidebarFooter className="shrink-0 p-3">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-3 rounded-lg px-1 py-1 hover:bg-accent/50 transition-colors w-full text-left group-data-[collapsible=icon]:justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                  <Avatar className="h-9 w-9 border shrink-0">
-                    <AvatarFallback className="text-xs font-medium">
-                      {user?.name?.charAt(0).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0 group-data-[collapsible=icon]:hidden">
-                    <p className="text-sm font-medium truncate leading-none">
-                      {user?.name || "-"}
-                    </p>
-                    <p className="text-xs text-muted-foreground truncate mt-1.5">
-                      {user?.email || "-"}
-                    </p>
-                  </div>
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem
-                  onClick={logout}
-                  className="cursor-pointer text-destructive focus:text-destructive"
-                >
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>{t("signOut")}</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </SidebarFooter>
-        </Sidebar>
-        <div
-          className={`group absolute top-0 ${direction === "rtl" ? "right-0" : "left-0"} h-full w-1 cursor-col-resize rounded-full bg-transparent outline-none transition-[width,background-color] duration-150 hover:w-2 hover:bg-primary/40 focus-visible:w-2 focus-visible:bg-primary/50 focus-visible:ring-2 focus-visible:ring-primary/50 ${isResizing ? "w-2 bg-primary/50" : ""} ${isCollapsed ? "hidden" : ""}`}
-          onMouseDown={() => {
-            if (isCollapsed) return;
-            setIsResizing(true);
-          }}
-          role="separator"
-          aria-orientation="vertical"
-          aria-label={direction === "rtl" ? "تغيير عرض الشريط الجانبي" : "Resize sidebar"}
-          title={direction === "rtl" ? "اسحب لتغيير العرض" : "Drag to resize"}
-          style={{ zIndex: 50 }}
-        />
+  return <div dir={direction} className="nawa-app-shell">
+    <header className="nawa-global-header">
+      <div className="flex min-w-0 items-center gap-2.5">
+        {!isPortalLauncher ? <Button variant="ghost" size="icon" onClick={() => setRailOpenOnMobile(true)} aria-label={chrome.tools} className="nawa-mobile-rail-trigger"><Menu className="h-5 w-5" /></Button> : null}
+        <button type="button" onClick={() => navigate("/")} className="nawa-wordmark" aria-label={chrome.portals}><span className="nawa-wordmark-mark">N</span><span className="hidden text-sm font-black tracking-tight sm:inline">Nawa ERP</span></button>
+        {!isPortalLauncher && activePortal ? <Tooltip><TooltipTrigger asChild><button type="button" onClick={() => navigate(activePortal.href)} className="nawa-current-portal"><PortalIcon className="h-4 w-4" /><span className="sr-only">{activePortal.name[language]}</span></button></TooltipTrigger><TooltipContent>{activePortal.name[language]}</TooltipContent></Tooltip> : null}
       </div>
-
-      <SidebarInset className="nawa-main-inset min-w-0 flex-1">
-        <div className="nawa-top-header sticky top-0 z-[60] flex h-[78px] items-center justify-between gap-3 border-b bg-background/95 px-4 shadow-[0_8px_20px_rgba(15,23,42,.06)] backdrop-blur supports-[backdrop-filter]:backdrop-blur md:h-[88px] md:gap-5 md:px-6">
-          <div className="flex min-w-0 flex-1 items-center gap-3 md:gap-5"><SidebarTrigger className="h-11 w-11 shrink-0 rounded-xl bg-background md:h-12 md:w-12" /><div className="min-w-0"><p className="inline-flex max-w-full truncate rounded-xl border border-primary/25 bg-primary/10 px-3 py-1.5 text-[21px] font-extrabold leading-tight text-primary shadow-sm md:text-[25px]">{activePortal?.name[language] ?? chrome.portals}</p><p className="mt-1 truncate text-[13px] font-medium text-muted-foreground md:text-[15px]">{chrome.breadcrumbRoot} / {activePortal?.name[language] ?? chrome.portals}{activeMenuItem ? ` / ${activeMenuItem.label[language]}` : ""}</p></div><DropdownMenu><DropdownMenuTrigger asChild><button type="button" className="ms-auto hidden min-w-0 items-center gap-2 border-s border-border/80 ps-8 text-start text-[13px] text-muted-foreground transition-colors hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 lg:flex md:text-[14px]"><span className="min-w-0"><span className="flex items-center gap-2 truncate text-[16px] font-bold text-foreground md:text-[18px]">{bootstrap.data?.organization?.name ?? "—"}{isDemoOrganization ? <Badge className="border-primary/30 bg-primary/10 text-[10px] text-primary hover:bg-primary/10">{chrome.demo}</Badge> : null}</span><span className="mt-1 flex items-center gap-1 truncate font-medium">{selectedBranch?.name ?? chrome.defaultBranch}<ChevronDown className="h-3.5 w-3.5 shrink-0" /></span></span></button></DropdownMenuTrigger><DropdownMenuContent align={direction === "rtl" ? "start" : "end"} className="w-64 rounded-2xl p-1.5"><div className="border-b border-border/70 px-3 py-2"><p className="flex items-center gap-2 text-sm font-bold text-foreground">{bootstrap.data?.organization?.name ?? "—"}{isDemoOrganization ? <Badge className="border-primary/30 bg-primary/10 text-[10px] text-primary hover:bg-primary/10">{chrome.demo}</Badge> : null}</p><p className="mt-0.5 text-xs text-muted-foreground">{chrome.defaultBranch}</p></div>{branchQuery.isLoading ? <div className="grid min-h-20 place-items-center"><Loader2 className="h-4 w-4 animate-spin text-primary" /></div> : availableBranches.length ? availableBranches.map(branch => <DropdownMenuItem key={branch.id} onClick={() => { setSelectedBranchId(branch.id); toast.success(branch.name); }} className={`mt-1 cursor-pointer rounded-xl py-2.5 ${selectedBranch?.id === branch.id ? "bg-primary/10 font-bold text-primary focus:bg-primary/10 focus:text-primary" : ""}`}><span className="min-w-0"><span className="block truncate">{branch.name}</span><span className="mt-0.5 block text-[11px] font-normal text-muted-foreground">{branch.code}</span></span></DropdownMenuItem>) : <div className="px-3 py-4 text-center text-xs text-muted-foreground">{chrome.defaultBranch}</div>}</DropdownMenuContent></DropdownMenu></div>
-          <div className="flex shrink-0 items-center gap-1.5"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" aria-label={unreadCount ? `${chrome.notifications}: ${unreadCount}` : chrome.notifications} className="relative h-11 w-11 rounded-xl transition-all duration-200 hover:bg-primary/10 hover:text-primary active:scale-95 md:h-12 md:w-12"><Bell className={`h-5 w-5 transition-transform duration-200 ${notificationPulse ? "motion-safe:animate-[pulse_825ms_cubic-bezier(.23,1,.32,1)_2] text-primary" : ""}`} />{unreadCount > 0 ? <span aria-live="polite" className={`absolute end-0.5 top-0.5 grid h-5 min-w-5 place-items-center rounded-full border-2 border-background bg-primary px-1 text-[10px] font-extrabold leading-none text-primary-foreground shadow-[0_0_14px_rgba(212,161,49,.42)] ${notificationPulse ? "motion-safe:animate-[pulse_825ms_cubic-bezier(.23,1,.32,1)_2]" : ""}`}>{unreadCount > 99 ? "99+" : unreadCount}</span> : null}</Button></DropdownMenuTrigger><DropdownMenuContent align={direction === "rtl" ? "start" : "end"} className="w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border-white/10 bg-popover p-0 text-popover-foreground shadow-2xl"><div className="flex items-center justify-between border-b border-white/[.07] px-4 py-3"><p className="text-[15px] font-bold">{chrome.notifications}</p><Button variant="ghost" size="sm" disabled={unreadCount === 0 || markAllNotificationsRead.isPending} onClick={() => markAllNotificationsRead.mutate()} className="h-8 gap-1.5 px-2 text-xs font-semibold text-primary hover:bg-primary/10 hover:text-primary"><CheckCheck className="h-4 w-4" />{chrome.markAllRead}</Button></div><div className="max-h-[22rem] overflow-y-auto p-1.5">{notifications.isLoading ? <div className="grid min-h-28 place-items-center"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div> : notifications.data?.length ? notifications.data.slice(0, 6).map(notification => <button key={notification.id} type="button" onClick={() => notification.isRead === "no" && markNotificationRead.mutate({ notificationId: notification.id })} className={`w-full rounded-xl p-3 text-start transition-colors hover:bg-accent/70 ${notification.isRead === "no" ? "bg-primary/[.055]" : ""}`}><div className="flex items-start gap-2.5"><span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${notification.isRead === "no" ? "bg-primary shadow-[0_0_10px_hsl(var(--primary))]" : "bg-muted-foreground/35"}`} /><span className="min-w-0 flex-1"><span className="block truncate text-[13px] font-bold">{notification.title}</span><span className="mt-1 block line-clamp-2 text-[12px] leading-5 text-muted-foreground">{notification.content}</span><span className="mt-1.5 block text-[10px] text-muted-foreground">{formatNotificationTime(notification.createdAt, language)}</span></span></div></button>) : <div className="grid min-h-32 place-items-center gap-2 px-4 text-center text-sm text-muted-foreground"><Inbox className="h-6 w-6 text-primary/70" />{chrome.emptyNotifications}</div>}</div></DropdownMenuContent></DropdownMenu><Button variant="ghost" size="icon" onClick={() => navigateTo("/settings", chrome.settings)} aria-label={chrome.settings} className="hidden h-11 w-11 rounded-xl sm:inline-flex md:h-12 md:w-12"><Settings2 className="h-5 w-5" /></Button><Avatar className="hidden h-10 w-10 border border-primary/20 sm:flex md:h-11 md:w-11"><AvatarFallback className="bg-primary/10 text-[13px] font-bold text-primary">{user?.name?.charAt(0).toUpperCase() || "N"}</AvatarFallback></Avatar></div>
-        </div>
-        {isMobile && (
-          <div className="hidden border-b h-14 items-center justify-between bg-background/95 px-2 backdrop-blur supports-[backdrop-filter]:backdrop-blur sticky top-0 z-40">
-            <div className="flex items-center gap-2">
-              <SidebarTrigger className="h-9 w-9 rounded-lg bg-background" />
-              <div className="flex items-center gap-3">
-                <div className="flex flex-col gap-1">
-                  <span className="tracking-tight text-foreground">
-                    {activeMenuItem?.label[language] ?? t("navigation")}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-        <main className="min-w-0 flex-1 overflow-x-clip p-4" aria-busy={Boolean(navigatingTo)}><div className="mx-auto w-full min-w-0 max-w-[1600px]">{navigatingTo && <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground" role="status"><Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" />{navigationFeedbackCopy[language].moving}</div>}{children}</div></main>
-      </SidebarInset>
+      <div className="hidden min-w-0 flex-1 justify-center lg:flex"><OrganizationPicker /></div>
+      <div className="flex items-center gap-1.5">
+        <Button variant="ghost" size="icon" onClick={() => navigate("/workspace")} aria-label={chrome.ai} className="nawa-header-icon"><Bot className="h-5 w-5" /></Button>
+        <NotificationMenu />
+        <Button variant="ghost" size="icon" onClick={() => navigate("/settings")} aria-label={chrome.settings} className="nawa-header-icon hidden sm:inline-flex"><Settings2 className="h-5 w-5" /></Button>
+        <DropdownMenu><DropdownMenuTrigger asChild><button type="button" className="rounded-xl p-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"><Avatar className="h-9 w-9 border border-primary/20"><AvatarFallback className="bg-primary/10 text-xs font-black text-primary">{user?.name?.charAt(0).toUpperCase() || "N"}</AvatarFallback></Avatar></button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-52 rounded-2xl p-1.5"><div className="px-2.5 py-2"><p className="truncate text-sm font-bold">{user?.name || "—"}</p><p className="mt-0.5 truncate text-xs text-muted-foreground">{user?.email || "—"}</p></div><DropdownMenuItem onClick={logout} className="cursor-pointer rounded-xl py-2.5 text-destructive focus:text-destructive"><LogOut className="me-2 h-4 w-4" />{t("signOut")}</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
+      </div>
+    </header>
+    <div className="nawa-shell-body">
+      {!isPortalLauncher ? <>
+        <aside className={`nawa-navigation-rail ${isRailOpenOnMobile ? "nawa-navigation-rail-open" : ""}`} aria-label={chrome.tools}>
+          <div className="nawa-rail-top"><RailButton label={chrome.portals} onClick={() => navigate("/")}><Grid2X2 className="h-5 w-5" /></RailButton><RailButton label={activePortal?.name[language] ?? chrome.executive} active={!activeMenuItem} onClick={() => activePortal ? navigate(activePortal.href) : navigate("/executive")}><Home className="h-5 w-5" /></RailButton></div>
+          <div className="nawa-rail-groups">{groups.map(group => { const GroupIcon = getPortalNavigationIcon(group.items[0]?.id ?? "", activePortal?.icon ?? Grid2X2); return <RailButton key={group.key} label={group.label} active={group.items.some(item => item.id === activeMenuItem?.id) || (isPanelOpen && selectedGroup?.key === group.key)} onClick={() => { setActiveGroupKey(group.key); setPanelOpen(true); }}><GroupIcon className="h-5 w-5" /></RailButton>; })}</div>
+          <div className="nawa-rail-bottom"><RailButton label={chrome.notifications} badge={unreadCount} onClick={() => toast.info(chrome.notifications)}><Bell className="h-5 w-5" /></RailButton><RailButton label={chrome.settings} active={pathWithoutQuery === "/settings"} onClick={() => navigate("/settings")}><Settings2 className="h-5 w-5" /></RailButton></div>
+        </aside>
+        {isRailOpenOnMobile ? <button aria-label={chrome.close} className="nawa-rail-backdrop" onClick={() => setRailOpenOnMobile(false)} /> : null}
+        {isPanelOpen && selectedGroup ? <aside className="nawa-context-panel" aria-label={chrome.tools}>
+          <div className="flex items-center justify-between gap-2 border-b border-border/70 px-4 py-3"><div className="min-w-0"><p className="text-[11px] font-bold uppercase tracking-[.12em] text-primary">{activePortal?.name[language]}</p><p className="mt-1 truncate text-base font-black text-foreground">{selectedGroup.label}</p></div><div className="flex items-center gap-1"><Button variant="ghost" size="icon" onClick={() => setPinnedPanel(value => !value)} aria-label={pinnedPanel ? chrome.unpin : chrome.pin} className="h-8 w-8">{pinnedPanel ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}</Button><Button variant="ghost" size="icon" onClick={() => setPanelOpen(false)} aria-label={chrome.close} className="h-8 w-8"><X className="h-4 w-4" /></Button></div></div>
+          <div className="border-b border-border/70 p-3"><label className="relative block"><Search className="pointer-events-none absolute end-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><input autoFocus value={toolQuery} onChange={event => setToolQuery(event.target.value)} placeholder={chrome.searchTools} className="h-10 w-full rounded-xl border border-border bg-muted/30 ps-3 pe-9 text-sm outline-none transition focus:border-primary/45 focus:ring-2 focus:ring-primary/15" /></label></div>
+          <div className="nawa-context-list">{filteredTools.length ? filteredTools.map(item => { const ItemIcon = getPortalNavigationIcon(item.id, activePortal?.icon ?? Grid2X2); const isActive = item.id === activeMenuItem?.id; return <button key={item.id} type="button" onClick={() => navigate(item.href)} className={`nawa-context-tool ${isActive ? "nawa-context-tool-active" : ""}`}><ItemIcon className="h-4 w-4" /><span className="min-w-0 flex-1 truncate">{item.label[language]}</span>{isActive ? <span className="h-1.5 w-1.5 rounded-full bg-primary" /> : null}</button>; }) : <p className="px-4 py-8 text-center text-sm text-muted-foreground">{chrome.searchTools}</p>}</div>
+        </aside> : null}
+      </> : null}
+      <div className="nawa-workspace"><div className="nawa-workspace-inner">{!isPortalLauncher && activeMenuItem ? <div className="nawa-page-context"><span className="text-primary">{activePortal?.name[language]}</span><span className="text-muted-foreground">/</span><span>{activeMenuItem.label[language]}</span></div> : null}{children}</div></div>
     </div>
-  );
+  </div>;
 }
