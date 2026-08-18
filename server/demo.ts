@@ -1,6 +1,6 @@
-import { and, eq, sql } from "drizzle-orm";
-import { auditLogs, branches, demoSeedRuns, organizationMemberships, organizationModules, organizationRoles, organizationSettings, organizations, userPreferences, warehouses } from "../drizzle/schema";
-import { defaultDocumentSettings, getDb, setActiveOrganizationForUser } from "./db";
+import { and, eq, inArray, sql } from "drizzle-orm";
+import { auditLogs, branches, businessParties, demoSeedRuns, organizationMemberships, organizationModules, organizationRoles, organizationSettings, organizations, priceListItems, priceLists, productBrands, productCategories, productPackagingLevels, productUnitConversions, products, uomCatalog, userPreferences, warehouses } from "../drizzle/schema";
+import { createBusinessParty, createProductBatch, defaultDocumentSettings, getDb, setActiveOrganizationForUser } from "./db";
 
 export const DEMO_ORGANIZATION = {
   slug: "nawa-demo",
@@ -22,6 +22,29 @@ const DEMO_WAREHOUSES = [
   { code: "DEMO-EAST", name: "مستودع فرع الشرق", branchCode: "DEMO-EAST" },
 ] as const;
 
+const DEMO_ROLES = [
+  ["owner", "مالك Demo", ["*"]], ["general_manager", "مدير عام", ["reports.view", "sales.view", "finance.view", "distribution.view"]], ["sales_manager", "مدير مبيعات", ["sales.*", "customer.*", "price.*"]], ["sales_representative", "مندوب مبيعات", ["sales.create", "sales.view", "customer.view"]], ["warehouse_manager", "مدير مخزن", ["inventory.*", "warehouse.view"]], ["warehouse_clerk", "أمين مخزن", ["inventory.view", "inventory.count", "inventory.transfer"]], ["procurement_manager", "مدير مشتريات", ["purchases.*", "supplier.*"]], ["finance_manager", "مدير مالي", ["finance.*", "treasury.*"]], ["accountant", "محاسب", ["finance.view", "finance.journal.post", "treasury.view"]], ["production_manager", "مدير إنتاج", ["manufacturing.*", "quality.*"]], ["quality_officer", "مسؤول جودة", ["quality.*", "manufacturing.view"]], ["distribution_manager", "مدير توزيع", ["distribution.*", "fleet.*"]], ["driver", "سائق", ["driver.route.view", "driver.delivery.complete"]], ["hr_manager", "مدير موارد بشرية", ["hr.*", "payroll.*"]],
+] as const;
+
+const DEMO_CATALOG = [
+  ["DEMO-001", "حليب نواة كامل الدسم 1 لتر", "Nawa Full Cream Milk 1L", "الألبان", "نواة", "food", 105, 145, 12], ["DEMO-002", "حليب نواة نصف الدسم 1 لتر", "Nawa Semi-Skimmed Milk 1L", "الألبان", "نواة", "food", 100, 140, 12], ["DEMO-003", "لبن نواة طبيعي 170غ", "Nawa Natural Yogurt 170g", "الألبان", "نواة", "food", 42, 62, 24], ["DEMO-004", "جبن نواة قابل للدهن 250غ", "Nawa Spread Cheese 250g", "الألبان", "نواة", "food", 175, 235, 12],
+  ["DEMO-005", "عصير نواة برتقال 1 لتر", "Nawa Orange Juice 1L", "المشروبات", "نواة", "food", 95, 135, 12], ["DEMO-006", "عصير نواة كوكتيل 1 لتر", "Nawa Cocktail Juice 1L", "المشروبات", "نواة", "food", 95, 135, 12], ["DEMO-007", "مياه نواة 1.5 لتر", "Nawa Water 1.5L", "المشروبات", "نواة", "standard", 25, 40, 6],
+  ["DEMO-008", "قهوة أطلس مطحونة 250غ", "Atlas Ground Coffee 250g", "البقالة", "أطلس", "standard", 210, 295, 12], ["DEMO-009", "سكر الواحة 1 كلغ", "Oasis Sugar 1kg", "البقالة", "الواحة", "standard", 92, 125, 10], ["DEMO-010", "أرز الواحة طويل 1 كلغ", "Oasis Long Rice 1kg", "البقالة", "الواحة", "standard", 130, 175, 10], ["DEMO-011", "معكرونة أطلس 500غ", "Atlas Pasta 500g", "البقالة", "أطلس", "standard", 55, 80, 20], ["DEMO-012", "طماطم معلبة أطلس 400غ", "Atlas Tomato 400g", "البقالة", "أطلس", "standard", 62, 88, 24], ["DEMO-013", "زيت نباتي الندى 1 لتر", "Nada Vegetable Oil 1L", "البقالة", "الندى", "standard", 215, 285, 12], ["DEMO-014", "شاي الصحراء 25 كيس", "Sahara Tea 25 Bags", "البقالة", "الصحراء", "standard", 85, 120, 12],
+  ["DEMO-015", "صابون نقي 1 كلغ", "Naki Detergent 1kg", "العناية المنزلية", "نقي", "standard", 160, 230, 8], ["DEMO-016", "سائل أطباق نقي 750مل", "Naki Dish Liquid 750ml", "العناية المنزلية", "نقي", "standard", 105, 155, 12], ["DEMO-017", "مناديل نقي 200 ورقة", "Naki Tissues 200", "العناية المنزلية", "نقي", "standard", 120, 170, 10], ["DEMO-018", "مطهر الندى 1 لتر", "Nada Disinfectant 1L", "العناية المنزلية", "الندى", "standard", 145, 205, 12],
+  ["DEMO-019", "شامبو لمسة 400مل", "Lamsa Shampoo 400ml", "العناية الشخصية", "لمسة", "standard", 185, 260, 12], ["DEMO-020", "صابون يدين لمسة 500مل", "Lamsa Hand Soap 500ml", "العناية الشخصية", "لمسة", "standard", 90, 135, 12], ["DEMO-021", "معجون أسنان لمسة 100مل", "Lamsa Toothpaste 100ml", "العناية الشخصية", "لمسة", "standard", 75, 110, 24],
+  ["DEMO-022", "بسكويت بهجة 100غ", "Bahja Biscuits 100g", "الوجبات الخفيفة", "بهجة", "food", 35, 55, 48], ["DEMO-023", "رقائق بهجة 90غ", "Bahja Chips 90g", "الوجبات الخفيفة", "بهجة", "food", 48, 70, 36], ["DEMO-024", "شوكولاتة بهجة 45غ", "Bahja Chocolate 45g", "الوجبات الخفيفة", "بهجة", "food", 55, 82, 30],
+  ["DEMO-025", "دقيق أطلس 1 كلغ", "Atlas Flour 1kg", "المواد الأولية", "أطلس", "manufacturable", 68, 95, 10], ["DEMO-026", "سكر أبيض خام 25 كلغ", "Raw White Sugar 25kg", "المواد الأولية", "الواحة", "manufacturable", 1900, 2400, 1], ["DEMO-027", "عبوة PET 1 لتر", "PET Bottle 1L", "مواد التعبئة", "نواة", "manufacturable", 18, 28, 100], ["DEMO-028", "غطاء عبوة أبيض", "White Bottle Cap", "مواد التعبئة", "نواة", "manufacturable", 3, 6, 500], ["DEMO-029", "ملصق نواة 1 لتر", "Nawa Label 1L", "مواد التعبئة", "نواة", "manufacturable", 2, 5, 500], ["DEMO-030", "كرتون شحن 12 وحدة", "Shipping Carton 12 Units", "مواد التعبئة", "نواة", "manufacturable", 45, 65, 20],
+] as const;
+
+const DEMO_PARTIES = [
+  ["SUP-001", "شركة الأطلس للمواد الغذائية", ["supplier"], "مورد مواد غذائية رئيسي", 30, 0], ["SUP-002", "مصانع الندى للتعبئة", ["supplier"], "مورد عبوات وتغليف", 45, 0], ["SUP-003", "تعاونية الواحة الزراعية", ["supplier"], "مورد مواد أولية", 30, 0], ["SUP-004", "مؤسسة الصحراء للشاي", ["supplier"], "مورد مشروبات ساخنة", 30, 0], ["SUP-005", "شركة لمسة للعناية", ["supplier"], "مورد عناية شخصية", 60, 0], ["SUP-006", "مصنع نقي للمنظفات", ["supplier"], "مورد عناية منزلية", 45, 0], ["SUP-007", "مورد محلي قيد التقييم", ["supplier"], "مورد احتياطي", 30, 0], ["SUP-008", "شركة الأمل للنقل", ["supplier"], "خدمات خارجية", 30, 0],
+  ["CUS-001", "سوبرماركت السعادة", ["customer"], "عميل VIP", 30, 750000], ["CUS-002", "متاجر النجاح", ["customer"], "عميل جملة", 21, 500000], ["CUS-003", "بقالة الأمان", ["customer"], "عميل نقدي", 0, 100000], ["CUS-004", "سوق الشرق المركزي", ["customer"], "عميل جملة", 30, 450000], ["CUS-005", "ميني ماركت الود", ["customer"], "عميل نقدي", 0, 75000], ["CUS-006", "توزيع الجنوب", ["customer"], "عميل موزع", 45, 950000], ["CUS-007", "هايبر ماركت المدينة", ["customer"], "عميل VIP", 30, 800000], ["CUS-008", "متجر العائلة", ["customer"], "عميل جملة", 15, 200000], ["CUS-009", "نقطة بيع الربيع", ["customer"], "عميل تجزئة", 0, 90000], ["CUS-010", "مؤسسة الشروق", ["customer"], "عميل جملة", 30, 360000], ["CUS-011", "متجر الوردة", ["customer"], "عميل تجزئة", 0, 85000], ["CUS-012", "مخزن الوفاق", ["customer"], "عميل موزع", 45, 700000], ["CUS-013", "بقالة النخبة", ["customer"], "عميل جملة", 15, 180000], ["CUS-014", "سوبر ماركت الأمل", ["customer"], "عميل VIP", 30, 600000], ["CUS-015", "متجر النور", ["customer"], "عميل تجزئة", 0, 80000], ["CUS-016", "نقطة توزيع الساحل", ["customer"], "عميل موزع", 45, 550000],
+] as const;
+
+const DEMO_PRICE_LISTS = [
+  ["Retail DZD", "retail", 100, 1], ["Wholesale DZD", "wholesale", 80, 0.9], ["Distributor DZD", "segment", 70, 0.84], ["VIP DZD", "customer", 60, 0.8],
+] as const;
+
 export async function ensureDemoOrganization(actorUserId: number) {
   const db = await getDb();
   if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
@@ -39,8 +62,11 @@ export async function ensureDemoOrganization(actorUserId: number) {
       monthlyBudget: "0",
     }))[0].insertId);
 
-    await tx.insert(organizationMemberships).values({ organizationId: id, userId: actorUserId, roleKey: "owner", status: "active" }).onDuplicateKeyUpdate({ set: { roleKey: "owner", status: "active" } });
-    await tx.insert(organizationRoles).values({ organizationId: id, key: "owner", name: "مالك شركة العرض", description: "دور كامل الصلاحية لشركة العرض المعزولة.", permissions: ["*"] }).onDuplicateKeyUpdate({ set: { name: "مالك شركة العرض", description: "دور كامل الصلاحية لشركة العرض المعزولة.", permissions: ["*"] } });
+    const now = new Date();
+    await tx.insert(organizationMemberships).values({ organizationId: id, userId: actorUserId, roleKey: "owner", status: "active", createdAt: now, updatedAt: now }).onDuplicateKeyUpdate({ set: { roleKey: "owner", status: "active", updatedAt: now } });
+    for (const [key, name, permissions] of DEMO_ROLES) {
+      await tx.insert(organizationRoles).values({ organizationId: id, key, name, description: `دور ${name} ضمن شركة العرض المعزولة.`, permissions: [...permissions] }).onDuplicateKeyUpdate({ set: { name, description: `دور ${name} ضمن شركة العرض المعزولة.`, permissions: [...permissions] } });
+    }
     await tx.insert(organizationModules).values(DEMO_ORGANIZATION.moduleKeys.map(moduleKey => ({ organizationId: id, moduleKey, status: "active" as const, changeSource: "demo_seed" }))).onDuplicateKeyUpdate({ set: { status: "active", changeSource: "demo_seed" } });
     await tx.insert(organizationSettings).values({ organizationId: id, currencyCode: "DZD", timeZone: "Africa/Algiers", documentSettings: { ...defaultDocumentSettings, headerText: "بيانات تجريبية — Nawa Demo" } }).onDuplicateKeyUpdate({ set: { currencyCode: "DZD", timeZone: "Africa/Algiers" } });
     await tx.insert(demoSeedRuns).values({ organizationId: id, datasetVersion: DEMO_ORGANIZATION.datasetVersion, status: "ready", lastActionByUserId: actorUserId }).onDuplicateKeyUpdate({ set: { datasetVersion: DEMO_ORGANIZATION.datasetVersion, status: "ready", lastActionByUserId: actorUserId } });
@@ -96,6 +122,87 @@ export async function seedDemoFoundation(actorUserId: number) {
 
   const warehousesCount = await db.select({ id: warehouses.id }).from(warehouses).where(eq(warehouses.organizationId, demo.organizationId));
   return { ...demo, branches: DEMO_BRANCHES.length, warehouses: warehousesCount.length };
+}
+
+export async function seedDemoCatalog(actorUserId: number) {
+  const foundation = await seedDemoFoundation(actorUserId);
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const organizationId = foundation.organizationId;
+  const categoryNames = Array.from(new Set(DEMO_CATALOG.map(item => item[3])));
+  const brandNames = Array.from(new Set(DEMO_CATALOG.map(item => item[4])));
+
+  for (let index = 0; index < categoryNames.length; index += 1) {
+    const name = categoryNames[index];
+    await db.insert(productCategories).values({ organizationId, name, color: ["#D7B56D", "#62C8D3", "#8DD6A5", "#B7A5E6"][index % 4], status: "active" }).onDuplicateKeyUpdate({ set: { status: "active" } });
+  }
+  for (const name of brandNames) await db.insert(productBrands).values({ organizationId, name, status: "active" }).onDuplicateKeyUpdate({ set: { status: "active" } });
+  await db.insert(uomCatalog).values([
+    { code: "DEMO-UNIT", canonicalType: "piece", nameAr: "وحدة", nameFr: "Unité", nameEn: "Unit", status: "active" },
+    { code: "DEMO-CARTON", canonicalType: "carton", nameAr: "كرتون", nameFr: "Carton", nameEn: "Carton", status: "active" },
+  ]).onDuplicateKeyUpdate({ set: { status: "active" } });
+
+  const categories = await db.select().from(productCategories).where(eq(productCategories.organizationId, organizationId));
+  const brands = await db.select().from(productBrands).where(eq(productBrands.organizationId, organizationId));
+  const categoryByName = new Map(categories.map(item => [item.name, item.id]));
+  const brandByName = new Map(brands.map(item => [item.name, item.id]));
+  const units = await db.select().from(uomCatalog).where(inArray(uomCatalog.code, ["DEMO-UNIT", "DEMO-CARTON"]));
+  const unitByCode = new Map(units.map(item => [item.code, item.id]));
+
+  for (let index = 0; index < DEMO_CATALOG.length; index += 1) {
+    const item = DEMO_CATALOG[index];
+    const [sku, nameAr, nameEn, categoryName, brandName, productType, purchasePrice, salePrice, unitsPerCarton] = item;
+    await db.insert(products).values({ organizationId, sku, name: nameAr, nameAr, nameFr: nameEn, nameEn, barcode: `613${String(index + 1).padStart(10, "0")}`, categoryId: categoryByName.get(categoryName), brandId: brandByName.get(brandName), productType, baseUnit: "وحدة", unit: "وحدة", purchaseUnit: "كرتون", salesUnit: "وحدة", unitsPerCarton: String(unitsPerCarton), purchasePrice: String(purchasePrice), salePrice: String(salePrice), taxRate: "19", minimumStock: String(Math.max(12, unitsPerCarton * 2)), reorderPoint: String(Math.max(24, unitsPerCarton * 4)), netWeight: "0.8", grossWeight: "0.9", volume: "0.002", status: "active" }).onDuplicateKeyUpdate({ set: { name: nameAr, nameAr, nameFr: nameEn, nameEn, categoryId: categoryByName.get(categoryName), brandId: brandByName.get(brandName), productType, purchasePrice: String(purchasePrice), salePrice: String(salePrice), unitsPerCarton: String(unitsPerCarton), status: "active" } });
+  }
+
+  const catalog = await db.select().from(products).where(eq(products.organizationId, organizationId));
+  for (const product of catalog) {
+    const source = DEMO_CATALOG.find(item => item[0] === product.sku);
+    if (!source) continue;
+    const cartonFactor = source[8];
+    await db.insert(productUnitConversions).values([{ organizationId, productId: product.id, fromUnit: "كرتون", toUnit: "وحدة", factor: String(cartonFactor) }, { organizationId, productId: product.id, fromUnit: "منصة", toUnit: "كرتون", factor: "48" }]).onDuplicateKeyUpdate({ set: { factor: sql`VALUES(factor)` } });
+    await db.insert(productPackagingLevels).values([
+      { organizationId, productId: product.id, uomId: unitByCode.get("DEMO-UNIT"), code: "UNIT", displayName: "وحدة", factorToBase: "1", barcode: `613${String(product.id).padStart(10, "0")}`, allowedPurchase: "no", allowedSales: "yes", allowedB2b: "yes", allowedDistribution: "yes", isDefaultSales: "yes", isDefaultB2b: "yes", isDefaultDistribution: "yes", status: "active" },
+      { organizationId, productId: product.id, uomId: unitByCode.get("DEMO-CARTON"), code: "CARTON", displayName: "كرتون", factorToBase: String(cartonFactor), netWeightKg: String(cartonFactor * 0.8), grossWeightKg: String(cartonFactor * 0.9), cartonsPerPallet: "48", unitsPerPallet: String(cartonFactor * 48), allowedPurchase: "yes", allowedSales: "yes", allowedB2b: "yes", allowedDistribution: "yes", isDefaultPurchase: "yes", status: "active" },
+    ]).onDuplicateKeyUpdate({ set: { status: "active", factorToBase: sql`VALUES(factorToBase)` } });
+  }
+  await db.insert(auditLogs).values({ organizationId, actorUserId, action: "demo.catalog.seeded", entityType: "demo_seed", entityId: String(organizationId), metadata: { categories: categoryNames.length, brands: brandNames.length, products: DEMO_CATALOG.length } });
+  return { organizationId, categories: categoryNames.length, brands: brandNames.length, products: DEMO_CATALOG.length };
+}
+
+export async function seedDemoCommercialMaster(actorUserId: number) {
+  const catalog = await seedDemoCatalog(actorUserId);
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const organizationId = catalog.organizationId;
+  for (const [code, name, types, notes, paymentTermsDays, creditLimit] of DEMO_PARTIES) {
+    const [existing] = await db.select({ id: businessParties.id }).from(businessParties).where(and(eq(businessParties.organizationId, organizationId), eq(businessParties.code, code))).limit(1);
+    if (!existing) await createBusinessParty(organizationId, { code, name, types: [...types], contactName: "جهة اتصال تجريبية", phone: `0550${String(Math.abs(code.split("-")[1] as unknown as number) || 1).padStart(6, "0")}`, email: `${code.toLowerCase()}@demo.invalid`, paymentTermsDays, creditLimit, preferredCurrencyCode: "DZD", customerSegment: notes });
+  }
+  const productsForDemo = await db.select().from(products).where(eq(products.organizationId, organizationId));
+  for (const [name, kind, priority, factor] of DEMO_PRICE_LISTS) {
+    const [existing] = await db.select().from(priceLists).where(and(eq(priceLists.organizationId, organizationId), eq(priceLists.name, name))).limit(1);
+    const listId = existing?.id ?? Number((await db.insert(priceLists).values({ organizationId, name, kind, priority, currencyCode: "DZD", status: "active" }))[0].insertId);
+    for (const product of productsForDemo) {
+      const retailPrice = Number(product.salePrice) * factor;
+      await db.insert(priceListItems).values({ organizationId, priceListId: listId, productId: product.id, unit: "وحدة", price: retailPrice.toFixed(2), minimumQuantity: "1" }).onDuplicateKeyUpdate({ set: { price: retailPrice.toFixed(2), minimumQuantity: "1" } });
+    }
+  }
+  const [centralWarehouse] = await db.select().from(warehouses).where(and(eq(warehouses.organizationId, organizationId), eq(warehouses.code, "DEMO-CENTRAL"))).limit(1);
+  const [supplier] = await db.select().from(businessParties).where(and(eq(businessParties.organizationId, organizationId), eq(businessParties.code, "SUP-001"))).limit(1);
+  if (!centralWarehouse || !supplier) throw new Error("بيانات العرض الأساسية غير مكتملة للدفعات.");
+  const foodProducts = productsForDemo.filter(product => product.productType === "food" || product.productType === "expiring").slice(0, 10);
+  const relativeDays = [180, 120, 60, 25, 12, 5, -3, 90, 45, 15];
+  for (let index = 0; index < foodProducts.length; index += 1) {
+    const product = foodProducts[index];
+    const expiryDate = new Date();
+    expiryDate.setDate(expiryDate.getDate() + relativeDays[index]);
+    const manufacturingDate = new Date(expiryDate);
+    manufacturingDate.setDate(manufacturingDate.getDate() - 45);
+    await createProductBatch(organizationId, { productId: product.id, warehouseId: centralWarehouse.id, lotNumber: `DEMO-LOT-${String(index + 1).padStart(3, "0")}`, receivedQuantity: 180 + index * 25, cost: Number(product.purchasePrice), sourcePartyId: supplier.id, manufacturingDate, expiryDate, status: relativeDays[index] < 0 ? "expired" : "active", movementType: "opening_balance", sourceDocumentType: "demo_seed" });
+  }
+  await db.insert(auditLogs).values({ organizationId, actorUserId, action: "demo.commercial_master.seeded", entityType: "demo_seed", entityId: String(organizationId), metadata: { parties: DEMO_PARTIES.length, priceLists: DEMO_PRICE_LISTS.length, batches: foodProducts.length } });
+  return { organizationId, parties: DEMO_PARTIES.length, priceLists: DEMO_PRICE_LISTS.length, batches: foodProducts.length };
 }
 
 async function listDemoOrganizationTables() {
