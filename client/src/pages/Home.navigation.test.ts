@@ -12,8 +12,8 @@ describe("الملخص التنفيذي ضمن معمارية البوابات",
   });
 
   it("يقدم روابط عميقة إلى مصادر الإجراءات الحقيقية", () => {
-    expect(source).toContain('setLocation("/commerce?tab=sales")');
-    expect(source).toContain('setLocation("/finance")');
+    expect(source).toContain('setLocation("/commerce/sales")');
+    expect(source).toContain('setLocation("/alerts")');
     expect(source).not.toContain("organizationId=");
   });
 });

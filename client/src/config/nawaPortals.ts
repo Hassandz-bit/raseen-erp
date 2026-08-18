@@ -1,4 +1,4 @@
-import { ArrowDownUp, BadgeCheck, BadgePercent, Banknote, BookOpen, Bot, Boxes, CalendarCheck2, CalendarDays, CarFront, ChartNoAxesCombined, ClipboardCheck, ClipboardList, Clock3, Coins, Contact, Factory, FileText, Gauge, GitBranch, Landmark, LayoutDashboard, MapPin, MapPinned, NotebookPen, Package, PackageCheck, PackageSearch, ReceiptText, Route, RotateCcw, ScanLine, Scale, Settings2, ShieldAlert, ShoppingBag, ShoppingCart, Store, Truck, type LucideIcon, UserCog, UserRoundCheck, UsersRound, WalletCards, Warehouse, Workflow } from "lucide-react";
+import { AlertTriangle, ArrowDownUp, BadgeCheck, BadgePercent, Banknote, BookOpen, Bot, Boxes, CalendarCheck2, CalendarDays, CarFront, ChartNoAxesCombined, ClipboardCheck, ClipboardList, Clock3, Coins, Contact, Factory, FileText, Gauge, GitBranch, Landmark, LayoutDashboard, MapPin, MapPinned, NotebookPen, Package, PackageCheck, PackageSearch, ReceiptText, Route, RotateCcw, ScanLine, Scale, Settings2, ShieldAlert, ShoppingBag, ShoppingCart, Store, Truck, type LucideIcon, UserCog, UserRoundCheck, UsersRound, WalletCards, Warehouse, Workflow } from "lucide-react";
 
 export type SupportedLanguage = "ar" | "fr" | "en";
 export type PortalId = "commerce" | "manufacturing" | "distribution" | "retail" | "finance" | "hr" | "ai" | "administration";
@@ -31,7 +31,7 @@ const navigationIcons: Record<string, LucideIcon> = {
   supplier: Store, accesses: UsersRound, outlets: MapPin, "retail-users": UserCog, promotions: BadgePercent, "retail-orders": ClipboardList, returns: RotateCcw, retailer: ShoppingBag,
   accounts: BookOpen, entries: NotebookPen, aging: Scale, treasury: WalletCards, reports: ChartNoAxesCombined,
   employees: Contact, attendance: CalendarCheck2, overtime: Clock3, leave: CalendarDays, payroll: Banknote, "self-service": UserRoundCheck,
-  workspace: Bot, flow: Workflow, settings: Settings2, modules: Boxes, security: ShieldAlert, details: FileText,
+  workspace: Bot, flow: Workflow, settings: Settings2, modules: Boxes, security: ShieldAlert, details: FileText, "decision-alerts": AlertTriangle,
 };
 
 export function getPortalNavigationIcon(itemId: string, fallback: LucideIcon) {
@@ -173,6 +173,7 @@ export const nawaPortals: NawaPortal[] = [
     accent: "slate",
     requiredModules: [],
     localNavigation: [
+      { id: "decision-alerts", label: text("تنبيهات تحتاج قرار", "Alertes à décider", "Decision alerts"), href: "/alerts", group: text("الإدارة", "Administration", "Administration") },
       { id: "organization", label: text("المؤسسة", "Organisation", "Organization"), href: "/settings?section=organization", group: text("الإدارة", "Administration", "Administration") },
       { id: "language", label: text("اللغة", "Langue", "Language"), href: "/settings?section=language", group: text("التفضيلات", "Préférences", "Preferences") },
       { id: "currencies", label: text("العملات", "Devises", "Currencies"), href: "/settings?section=currencies", group: text("التفضيلات", "Préférences", "Preferences") },
@@ -204,6 +205,6 @@ export function getPortalForPath(path: string) {
   if (path.startsWith("/manufacturing")) return getPortal("manufacturing");
   if (path.startsWith("/finance")) return getPortal("finance");
   if (path.startsWith("/workspace")) return getPortal("ai");
-  if (path.startsWith("/settings") || path.startsWith("/modules")) return getPortal("administration");
+  if (path.startsWith("/settings") || path.startsWith("/modules") || path.startsWith("/alerts")) return getPortal("administration");
   return undefined;
 }

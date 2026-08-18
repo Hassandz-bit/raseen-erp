@@ -1239,6 +1239,22 @@ export const erpRouter = router({
   }),
 
   alerts: router({
+    listDecisionAlerts: protectedProcedure.query(async ({ ctx }) => {
+      const context = await getTenantContext(ctx.user.id);
+      const [metrics, notifications, distributionReasons] = await Promise.all([
+        getDashboardMetrics(context.organization.id),
+        listNotificationsForOrganization(context.organization.id),
+        getDistributionOwnerAlertReasons(context.organization.id),
+      ]);
+      const generated = [
+        ...(metrics.lowStockProducts > 0 ? [{ id: "inventory-low-stock", type: "inventory", priority: "high" as const, title: `مخزون منخفض: ${metrics.lowStockProducts} منتج`, detail: "تحتاج المنتجات عند أو دون نقطة إعادة الطلب إلى مراجعة وتوريد.", destination: "/commerce/products", actionLabel: "مراجعة المنتجات" }] : []),
+        ...(metrics.overdueInvoices > 0 ? [{ id: "finance-overdue", type: "finance", priority: "high" as const, title: `فواتير متأخرة: ${metrics.overdueInvoices}`, detail: "تتطلب الفواتير المتأخرة متابعة التحصيل أو التسوية.", destination: "/finance/aging", actionLabel: "مراجعة الذمم" }] : []),
+        ...(metrics.budgetExceeded ? [{ id: "finance-budget", type: "finance", priority: "high" as const, title: "تجاوز الميزانية الشهرية", detail: "المصروفات الشهرية المسجلة تجاوزت السقف المعتمد للمؤسسة.", destination: "/finance/reports", actionLabel: "مراجعة التقارير" }] : []),
+        ...distributionReasons.map((detail, index) => ({ id: `distribution-${index}`, type: "distribution", priority: "medium" as const, title: "تنبيه أسطول وتشغيل", detail, destination: "/distribution/alerts", actionLabel: "مراجعة الأسطول" })),
+      ];
+      const persisted = notifications.map(notification => ({ id: `notification-${notification.id}`, notificationId: notification.id, type: notification.type, priority: notification.severity === "critical" ? "critical" as const : notification.severity === "warning" ? "high" as const : "medium" as const, title: notification.title, detail: notification.content, destination: notification.content.includes("مركبة") || notification.content.includes("صيانة") ? "/distribution/alerts" : notification.content.includes("فاتورة") ? "/finance/aging" : "/commerce/products", actionLabel: "فتح المعالجة", isRead: notification.isRead }));
+      return [...generated, ...persisted];
+    }),
     evaluate: protectedProcedure.mutation(async ({ ctx }) => {
       const context = await getTenantContext(ctx.user.id);
       const metrics = await getDashboardMetrics(context.organization.id);
