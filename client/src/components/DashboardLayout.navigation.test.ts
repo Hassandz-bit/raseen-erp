@@ -53,4 +53,12 @@ describe("تنقل بوابات Nawa", () => {
     expect(source).toContain('md:text-[26px]');
     expect(source).toContain('text-[16px] font-bold text-foreground md:text-[18px]');
   });
+
+  it("يعرض منتقي الفروع من عقد محمي ويحفظ الاختيار المرئي", () => {
+    expect(source).toContain("trpc.erp.preferences.availableBranches.useQuery");
+    expect(source).toContain('const ACTIVE_BRANCH_KEY = "nawa:active-branch"');
+    expect(source).toContain("setSelectedBranchId(branch.id)");
+    expect(source).toContain("availableBranches.map(branch");
+    expect(source).toContain('lg:hidden group-data-[collapsible=icon]:hidden');
+  });
 });

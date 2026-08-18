@@ -241,6 +241,14 @@ export const erpRouter = router({
       const context = await requireOrganizationOwner(ctx.user.id);
       return listBranchesForOrganization(context.organization.id);
     }),
+    availableBranches: protectedProcedure.query(async ({ ctx }) => {
+      const context = await getTenantContext(ctx.user.id);
+      const allowedBranchIds = context.membership.dataScope?.branchIds ?? [];
+      const organizationBranches = await listBranchesForOrganization(context.organization.id);
+      return organizationBranches
+        .filter(branch => branch.status === "active" && (!allowedBranchIds.length || allowedBranchIds.includes(branch.id)))
+        .map(branch => ({ id: branch.id, code: branch.code, name: branch.name }));
+    }),
     members: protectedProcedure.query(async ({ ctx }) => {
       const context = await requireOrganizationOwner(ctx.user.id);
       return listOrganizationMembersForOrganization(context.organization.id);
