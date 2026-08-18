@@ -353,6 +353,17 @@ export const erpRouter = router({
       const context = await requireModule(ctx.user.id, "inventory");
       return updateProductBatchStatus(context.organization.id, ctx.user.id, input.batchId, input.status);
     }),
+    batchBulkCapabilities: protectedProcedure.query(async ({ ctx }) => {
+      const context = await requireModule(ctx.user.id, "inventory");
+      return { canManageBatchStatus: isOrganizationOwner(context.membership.roleKey) };
+    }),
+    bulkUpdateBatchStatus: protectedProcedure.input(z.object({ batchIds: z.array(z.number().int().positive()).min(1).max(100), status: z.enum(["active", "blocked", "quarantined"]) })).mutation(async ({ ctx, input }) => {
+      const context = await requireOrganizationOwner(ctx.user.id);
+      await requireModule(ctx.user.id, "inventory");
+      const uniqueBatchIds = input.batchIds.filter((batchId, index, values) => values.indexOf(batchId) === index);
+      await Promise.all(uniqueBatchIds.map(batchId => updateProductBatchStatus(context.organization.id, ctx.user.id, batchId, input.status)));
+      return { updatedCount: uniqueBatchIds.length, status: input.status };
+    }),
     adjustBatchQuantity: protectedProcedure.input(z.object({ batchId: z.number().int().positive(), quantity: z.number().finite().refine(value => value !== 0, "كمية التسوية لا يمكن أن تكون صفراً."), reason: z.string().trim().max(300).optional() })).mutation(async ({ ctx, input }) => {
       const context = await requireModule(ctx.user.id, "inventory");
       const adjustment = await adjustProductBatchQuantity(context.organization.id, ctx.user.id, input.batchId, input.quantity, input.reason);

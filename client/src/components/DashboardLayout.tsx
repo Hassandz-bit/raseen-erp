@@ -20,7 +20,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { startLogin } from "@/const";
-import { getPortalForPath } from "@/config/nawaPortals";
+import { getPortalForPath, getPortalNavigationIcon } from "@/config/nawaPortals";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useIsMobile } from "@/hooks/useMobile";
@@ -295,6 +295,7 @@ function DashboardLayoutContent({
               {localItems.map((item, index) => {
                 const isActive = item.href.includes("?") ? `${pathWithoutQuery}${search}` === item.href : item.href.includes("#") ? `${pathWithoutQuery}${currentHash}` === item.href : !currentHash && pathWithoutQuery === item.href;
                 const showGroup = index === 0 || item.group[language] !== localItems[index - 1]?.group[language];
+                const ItemIcon = getPortalNavigationIcon(item.id, activePortal?.icon ?? Grid2X2);
                 return (
                   <SidebarMenuItem key={item.id}>
                     {showGroup ? <p className="px-2 pb-1.5 pt-5 text-[13px] font-bold uppercase tracking-[.1em] text-muted-foreground group-data-[collapsible=icon]:hidden">{item.group[language]}</p> : null}
@@ -304,7 +305,7 @@ function DashboardLayoutContent({
                       tooltip={item.label[language]}
                       className={`group/portal h-12 min-w-0 text-[16px] font-semibold transition-all min-[600px]:h-14 min-[600px]:text-[18px] ${isActive ? "bg-primary/12 text-primary ring-1 ring-primary/30 shadow-[inset_4px_0_0_hsl(var(--primary)),0_8px_20px_rgba(212,161,49,.12)]" : ""} ${activePortal?.id === "ai" ? `group/ai hover:-translate-y-px hover:bg-primary/12 hover:shadow-[0_10px_22px_rgba(212,161,49,.14)] ${isActive ? "shadow-[inset_3px_0_0_hsl(var(--primary))]" : ""}` : ""}`}
                     >
-                      {navigatingTo === item.href ? <Loader2 className="h-5 w-5 animate-spin motion-reduce:animate-none" /> : activePortal ? <activePortal.icon className={`h-5 w-5 ${isActive ? "text-primary" : ""} ${activePortal.id === "ai" ? "group-hover/ai:scale-110 group-hover/ai:-rotate-3" : ""}`} /> : <Grid2X2 className="h-5 w-5" />}
+                      {navigatingTo === item.href ? <Loader2 className="h-5 w-5 animate-spin motion-reduce:animate-none" /> : <ItemIcon className={`h-5 w-5 ${isActive ? "text-primary" : ""} ${activePortal?.id === "ai" ? "group-hover/ai:scale-110 group-hover/ai:-rotate-3" : ""}`} />}
                       <span className="min-w-0 truncate">{item.label[language]}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

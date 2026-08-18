@@ -1,4 +1,4 @@
-import { Bot, Boxes, Factory, Landmark, Settings2, Store, Truck, type LucideIcon, UsersRound } from "lucide-react";
+import { ArrowDownUp, BadgeCheck, BadgePercent, Banknote, BookOpen, Bot, Boxes, CalendarCheck2, CalendarDays, CarFront, ChartNoAxesCombined, ClipboardCheck, ClipboardList, Clock3, Coins, Contact, Factory, FileText, Gauge, GitBranch, Landmark, LayoutDashboard, MapPin, MapPinned, NotebookPen, Package, PackageCheck, PackageSearch, ReceiptText, Route, RotateCcw, ScanLine, Scale, Settings2, ShieldAlert, ShoppingBag, ShoppingCart, Store, Truck, type LucideIcon, UserCog, UserRoundCheck, UsersRound, WalletCards, Warehouse, Workflow } from "lucide-react";
 
 export type SupportedLanguage = "ar" | "fr" | "en";
 export type PortalId = "commerce" | "manufacturing" | "distribution" | "retail" | "finance" | "hr" | "ai" | "administration";
@@ -23,6 +23,20 @@ export type NawaPortal = {
   requiredModules: string[];
   localNavigation: PortalNavigationItem[];
 };
+
+const navigationIcons: Record<string, LucideIcon> = {
+  overview: LayoutDashboard, products: Boxes, warehouses: Warehouse, batches: PackageSearch, sales: ReceiptText, purchases: ShoppingCart, operations: Workflow,
+  orders: ClipboardList, materials: Package, consumption: ArrowDownUp, stages: GitBranch, output: PackageCheck, quality: BadgeCheck, traceability: ScanLine, costs: Coins,
+  control: Gauge, routes: Route, fleet: CarFront, territories: MapPinned, compliance: ShieldAlert, "logistics-check": ClipboardCheck, driver: CarFront,
+  supplier: Store, accesses: UsersRound, outlets: MapPin, "retail-users": UserCog, promotions: BadgePercent, "retail-orders": ClipboardList, returns: RotateCcw, retailer: ShoppingBag,
+  accounts: BookOpen, entries: NotebookPen, aging: Scale, treasury: WalletCards, reports: ChartNoAxesCombined,
+  employees: Contact, attendance: CalendarCheck2, overtime: Clock3, leave: CalendarDays, payroll: Banknote, "self-service": UserRoundCheck,
+  workspace: Bot, flow: Workflow, settings: Settings2, modules: Boxes, security: ShieldAlert, details: FileText,
+};
+
+export function getPortalNavigationIcon(itemId: string, fallback: LucideIcon) {
+  return navigationIcons[itemId] ?? fallback;
+}
 
 const text = (ar: string, fr: string, en: string): LocalizedPortalText => ({ ar, fr, en });
 
