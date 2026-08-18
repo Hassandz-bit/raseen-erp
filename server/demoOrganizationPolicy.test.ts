@@ -46,4 +46,13 @@ describe("شركة Nawa Demo", () => {
     expect(source).toContain("buy_x_get_y");
     expect(source).toContain("demo.promotions.seeded");
   });
+
+  it("ينشئ سيناريوهات التجارة عبر FEFO والفاتورة والتحصيل والاستلام الجزئي", async () => {
+    const source = await import("node:fs/promises").then(fs => fs.readFile(new URL("./demo.ts", import.meta.url), "utf8"));
+    expect(source).toContain("seedDemoCommerceScenarios");
+    expect(source).toContain("issueSalesInvoiceWithFefo");
+    expect(source).toContain("recordSalesInvoicePayment");
+    expect(source).toContain("receivePurchaseOrder");
+    expect(source).toContain("INV-DEMO-OVERDUE-001");
+  });
 });

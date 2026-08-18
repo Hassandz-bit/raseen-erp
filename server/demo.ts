@@ -1,6 +1,6 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
-import { auditLogs, b2bPromotions, branches, businessParties, demoSeedRuns, organizationMemberships, organizationModules, organizationRoles, organizationSettings, organizations, priceListItems, priceLists, productBatches, productBrands, productCategories, productPackagingLevels, productUnitConversions, products, uomCatalog, userPreferences, warehouses } from "../drizzle/schema";
-import { createBusinessParty, createProductBatch, defaultDocumentSettings, getDb, setActiveOrganizationForUser } from "./db";
+import { auditLogs, b2bPromotions, branches, businessParties, demoSeedRuns, organizationMemberships, organizationModules, organizationRoles, organizationSettings, organizations, priceListItems, priceLists, productBatches, productBrands, productCategories, productPackagingLevels, productUnitConversions, products, purchaseOrderItems, purchaseOrders, salesInvoices, uomCatalog, userPreferences, warehouses } from "../drizzle/schema";
+import { createBusinessParty, createProductBatch, createPurchaseOrder, createSalesInvoice, defaultDocumentSettings, getDb, issueSalesInvoiceWithFefo, receivePurchaseOrder, recordSalesInvoicePayment, sendPurchaseOrder, setActiveOrganizationForUser } from "./db";
 
 export const DEMO_ORGANIZATION = {
   slug: "nawa-demo",
@@ -235,6 +235,51 @@ export async function seedDemoPromotions(actorUserId: number) {
   }
   await db.insert(auditLogs).values({ organizationId, actorUserId, action: "demo.promotions.seeded", entityType: "demo_seed", entityId: String(organizationId), metadata: { promotions: promotions.length } });
   return { ...commercial, promotions: promotions.length };
+}
+
+async function seedDemoInvoice(actorUserId: number, organizationId: number, input: { number: string; customerId: number; productId: number; warehouseId: number; quantity: number; dueDays: number; payment: "full" | "partial" | "none"; overdue?: boolean }) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const [existing] = await db.select().from(salesInvoices).where(and(eq(salesInvoices.organizationId, organizationId), eq(salesInvoices.invoiceNumber, input.number))).limit(1);
+  if (existing) return existing.id;
+  const dueDate = new Date(); dueDate.setDate(dueDate.getDate() + input.dueDays);
+  const created = await createSalesInvoice(organizationId, actorUserId, { invoiceNumber: input.number, customerId: input.customerId, currencyCode: "DZD", baseCurrencyCode: "DZD", dueDate, lines: [{ productId: input.productId, warehouseId: input.warehouseId, quantity: input.quantity }] });
+  await issueSalesInvoiceWithFefo(organizationId, actorUserId, created.id);
+  if (input.payment === "full") await recordSalesInvoicePayment(organizationId, actorUserId, created.id);
+  if (input.payment === "partial") await recordSalesInvoicePayment(organizationId, actorUserId, created.id, Math.max(1, Math.round(created.grandTotal * 0.4)));
+  if (input.overdue) {
+    await db.update(salesInvoices).set({ status: "overdue" }).where(and(eq(salesInvoices.id, created.id), eq(salesInvoices.organizationId, organizationId), eq(salesInvoices.status, "issued")));
+    await db.insert(auditLogs).values({ organizationId, actorUserId, action: "demo.sales_invoice.marked_overdue", entityType: "sales_invoice", entityId: String(created.id), metadata: { dueDate } });
+  }
+  return created.id;
+}
+
+export async function seedDemoCommerceScenarios(actorUserId: number) {
+  const master = await seedDemoPromotions(actorUserId);
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const organizationId = master.organizationId;
+  const [centralWarehouse] = await db.select().from(warehouses).where(and(eq(warehouses.organizationId, organizationId), eq(warehouses.code, "DEMO-CENTRAL"))).limit(1);
+  const demoProducts = await db.select().from(products).where(eq(products.organizationId, organizationId));
+  const parties = await db.select().from(businessParties).where(eq(businessParties.organizationId, organizationId));
+  if (!centralWarehouse) throw new Error("المستودع المركزي لشركة العرض غير متاح.");
+  const productBySku = new Map(demoProducts.map(product => [product.sku, product]));
+  const partyByCode = new Map(parties.map(party => [party.code, party]));
+  const must = <T>(value: T | undefined, label: string): T => { if (!value) throw new Error(`بيانات Demo ناقصة: ${label}`); return value; };
+  await seedDemoInvoice(actorUserId, organizationId, { number: "INV-DEMO-PAID-001", customerId: must(partyByCode.get("CUS-001"), "CUS-001").id, productId: must(productBySku.get("DEMO-001"), "DEMO-001").id, warehouseId: centralWarehouse.id, quantity: 20, dueDays: -10, payment: "full" });
+  await seedDemoInvoice(actorUserId, organizationId, { number: "INV-DEMO-PARTIAL-001", customerId: must(partyByCode.get("CUS-002"), "CUS-002").id, productId: must(productBySku.get("DEMO-002"), "DEMO-002").id, warehouseId: centralWarehouse.id, quantity: 18, dueDays: 7, payment: "partial" });
+  await seedDemoInvoice(actorUserId, organizationId, { number: "INV-DEMO-OVERDUE-001", customerId: must(partyByCode.get("CUS-004"), "CUS-004").id, productId: must(productBySku.get("DEMO-003"), "DEMO-003").id, warehouseId: centralWarehouse.id, quantity: 14, dueDays: -18, payment: "none", overdue: true });
+
+  const [existingPurchase] = await db.select().from(purchaseOrders).where(and(eq(purchaseOrders.organizationId, organizationId), eq(purchaseOrders.orderNumber, "PO-DEMO-PARTIAL-001"))).limit(1);
+  if (!existingPurchase) {
+    const expectedAt = new Date(); expectedAt.setDate(expectedAt.getDate() + 5);
+    const purchase = await createPurchaseOrder(organizationId, actorUserId, { orderNumber: "PO-DEMO-PARTIAL-001", supplierId: must(partyByCode.get("SUP-003"), "SUP-003").id, currencyCode: "DZD", baseCurrencyCode: "DZD", expectedAt, lines: [{ productId: must(productBySku.get("DEMO-025"), "DEMO-025").id, warehouseId: centralWarehouse.id, quantity: 120, unit: "كرتون", unitCost: 68 }, { productId: must(productBySku.get("DEMO-027"), "DEMO-027").id, warehouseId: centralWarehouse.id, quantity: 300, unit: "وحدة", unitCost: 18 }] });
+    await sendPurchaseOrder(organizationId, actorUserId, purchase.id);
+    const items = await db.select().from(purchaseOrderItems).where(and(eq(purchaseOrderItems.organizationId, organizationId), eq(purchaseOrderItems.purchaseOrderId, purchase.id)));
+    await receivePurchaseOrder(organizationId, actorUserId, purchase.id, [{ purchaseOrderItemId: must(items[0], "سطر PO").id, quantity: 60, lotNumber: "PO-DEMO-2026-001", cost: 68, expiryDate: new Date(Date.now() + 180 * 86400000) }]);
+  }
+  await db.insert(auditLogs).values({ organizationId, actorUserId, action: "demo.commerce.scenarios.seeded", entityType: "demo_seed", entityId: String(organizationId), metadata: { salesInvoices: 3, purchaseOrders: 1 } });
+  return { ...master, salesInvoices: 3, purchaseOrders: 1 };
 }
 
 async function listDemoOrganizationTables() {
