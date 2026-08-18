@@ -50,7 +50,8 @@ describe("تنقل بوابات Nawa", () => {
   it("يكبر هرمية عنوان الرأس وبيانات المؤسسة بوضوح", () => {
     expect(source).toContain('md:h-[88px]');
     expect(source).toContain('text-[21px] font-extrabold');
-    expect(source).toContain('md:text-[26px]');
+    expect(source).toContain('md:text-[25px]');
+    expect(source).toContain('bg-primary/10 px-3 py-1.5');
     expect(source).toContain('text-[16px] font-bold text-foreground md:text-[18px]');
   });
 
