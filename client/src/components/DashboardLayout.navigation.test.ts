@@ -62,4 +62,13 @@ describe("تنقل بوابات Nawa", () => {
     expect(source).toContain("availableBranches.map(branch");
     expect(source).toContain('lg:hidden group-data-[collapsible=icon]:hidden');
   });
+
+  it("يوفر البحث وطي المجموعات والمفضلات الشخصية داخل شريط البوابة", () => {
+    expect(source).toContain('const PORTAL_FAVORITES_KEY = "nawa:portal-sidebar-favorites"');
+    expect(source).toContain('const PORTAL_GROUPS_PREFIX = "nawa:portal-sidebar-groups:"');
+    expect(source).toContain('setToolQuery(event.target.value)');
+    expect(source).toContain('toggleFavoriteTool(item.id)');
+    expect(source).toContain('toggleGroup(groupKey)');
+    expect(source).toContain('chrome.favorites');
+  });
 });
