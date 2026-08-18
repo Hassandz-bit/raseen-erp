@@ -242,7 +242,7 @@ function DashboardLayoutContent({
               >
                 <PanelLeft className="h-4 w-4 text-muted-foreground" />
               </button>
-              {!isCollapsed ? <div className="flex min-w-0 items-center gap-2"><span className="truncate text-[17px] font-bold tracking-tight md:text-[19px]">{activePortal?.name[language] ?? chrome.portals}</span></div> : null}
+              {!isCollapsed ? <div className="flex min-w-0 items-center gap-2"><span className="truncate text-[19px] font-bold tracking-tight md:text-[22px]">{activePortal?.name[language] ?? chrome.portals}</span></div> : null}
             </div>
           </SidebarHeader>
 
@@ -261,21 +261,21 @@ function DashboardLayoutContent({
 
           <SidebarContent className="gap-0 overflow-y-auto">
             <SidebarMenu className="px-2 py-3">
-              {activePortal ? <><SidebarMenuItem><SidebarMenuButton onClick={() => navigateTo("/", chrome.portals)} tooltip={chrome.portals} className="h-10 text-[14px] font-semibold text-muted-foreground hover:text-foreground"><Grid2X2 className="h-[17px] w-[17px]" /><span>{chrome.portals}</span></SidebarMenuButton></SidebarMenuItem><div className="mx-2 mt-3 rounded-xl border border-primary/15 bg-primary/[.06] px-3 py-2.5 group-data-[collapsible=icon]:hidden"><p className="text-[10px] font-bold uppercase tracking-[.12em] text-primary">{chrome.navigation}</p><p className="mt-1 text-[15px] font-bold text-foreground">{activePortal.name[language]}</p></div></> : <><SidebarMenuItem><SidebarMenuButton onClick={() => navigateTo("/", chrome.portals)} tooltip={chrome.portals} className="h-11 text-[15px] font-semibold"><Grid2X2 className="h-[18px] w-[18px] text-primary" /><span>{chrome.portals}</span></SidebarMenuButton></SidebarMenuItem><SidebarMenuItem><SidebarMenuButton onClick={() => navigateTo("/executive", chrome.executive)} tooltip={chrome.executive} className="h-11 text-[15px] font-medium"><Home className="h-[18px] w-[18px]" /><span>{chrome.executive}</span></SidebarMenuButton></SidebarMenuItem><SidebarMenuItem><SidebarMenuButton onClick={() => navigateTo("/workspace", chrome.ai)} tooltip={chrome.ai} className="h-11 text-[15px] font-bold text-primary"><Bot className="h-[18px] w-[18px] text-primary" /><span>{chrome.ai}</span><span className="sr-only">{chrome.workspace}</span></SidebarMenuButton></SidebarMenuItem></>}
-              {activePortal ? <p className="px-2 pb-2 pt-4 text-[10px] font-semibold uppercase tracking-[.14em] text-muted-foreground group-data-[collapsible=icon]:hidden">{chrome.navigation}</p> : null}
+              {activePortal ? <><SidebarMenuItem><SidebarMenuButton onClick={() => navigateTo("/", chrome.portals)} tooltip={chrome.portals} className="h-11 text-[16px] font-semibold text-muted-foreground hover:text-foreground"><Grid2X2 className="h-[18px] w-[18px]" /><span>{chrome.portals}</span></SidebarMenuButton></SidebarMenuItem><div className="mx-2 mt-3 rounded-xl border border-primary/15 bg-primary/[.06] px-3 py-3 group-data-[collapsible=icon]:hidden"><p className="text-[11px] font-bold uppercase tracking-[.12em] text-primary">{chrome.navigation}</p><p className="mt-1 text-[18px] font-bold text-foreground">{activePortal.name[language]}</p></div></> : <><SidebarMenuItem><SidebarMenuButton onClick={() => navigateTo("/", chrome.portals)} tooltip={chrome.portals} className="h-12 text-[16px] font-semibold"><Grid2X2 className="h-[19px] w-[19px] text-primary" /><span>{chrome.portals}</span></SidebarMenuButton></SidebarMenuItem><SidebarMenuItem><SidebarMenuButton onClick={() => navigateTo("/executive", chrome.executive)} tooltip={chrome.executive} className="h-12 text-[16px] font-medium"><Home className="h-[19px] w-[19px]" /><span>{chrome.executive}</span></SidebarMenuButton></SidebarMenuItem><SidebarMenuItem><SidebarMenuButton onClick={() => navigateTo("/workspace", chrome.ai)} tooltip={chrome.ai} className="h-12 text-[16px] font-bold text-primary"><Bot className="h-[19px] w-[19px] text-primary" /><span>{chrome.ai}</span><span className="sr-only">{chrome.workspace}</span></SidebarMenuButton></SidebarMenuItem></>}
+              {activePortal ? <p className="px-2 pb-2 pt-5 text-[12px] font-semibold uppercase tracking-[.14em] text-muted-foreground group-data-[collapsible=icon]:hidden">{chrome.navigation}</p> : null}
               {localItems.map((item, index) => {
                 const isActive = item.href.includes("?") ? `${pathWithoutQuery}${search}` === item.href : pathWithoutQuery === item.href;
                 const showGroup = index === 0 || item.group[language] !== localItems[index - 1]?.group[language];
                 return (
                   <SidebarMenuItem key={item.id}>
-                    {showGroup ? <p className="px-2 pb-1 pt-4 text-[11px] font-bold uppercase tracking-[.1em] text-muted-foreground group-data-[collapsible=icon]:hidden">{item.group[language]}</p> : null}
+                    {showGroup ? <p className="px-2 pb-1.5 pt-5 text-[13px] font-bold uppercase tracking-[.1em] text-muted-foreground group-data-[collapsible=icon]:hidden">{item.group[language]}</p> : null}
                     <SidebarMenuButton
                       isActive={isActive}
                       onClick={() => navigateTo(item.href, item.label[language])}
                       tooltip={item.label[language]}
-                      className={`group/portal h-12 text-[16px] font-medium transition-all ${activePortal?.id === "ai" ? `group/ai hover:-translate-y-px hover:bg-primary/12 hover:shadow-[0_10px_22px_rgba(212,161,49,.14)] ${isActive ? "shadow-[inset_3px_0_0_hsl(var(--primary))]" : ""}` : ""}`}
+                      className={`group/portal h-14 text-[18px] font-semibold transition-all ${activePortal?.id === "ai" ? `group/ai hover:-translate-y-px hover:bg-primary/12 hover:shadow-[0_10px_22px_rgba(212,161,49,.14)] ${isActive ? "shadow-[inset_3px_0_0_hsl(var(--primary))]" : ""}` : ""}`}
                     >
-                      {navigatingTo === item.href ? <Loader2 className="h-[18px] w-[18px] animate-spin motion-reduce:animate-none" /> : activePortal ? <activePortal.icon className={`h-[18px] w-[18px] ${isActive ? "text-primary" : ""} ${activePortal.id === "ai" ? "group-hover/ai:scale-110 group-hover/ai:-rotate-3" : ""}`} /> : <Grid2X2 className="h-[18px] w-[18px]" />}
+                      {navigatingTo === item.href ? <Loader2 className="h-5 w-5 animate-spin motion-reduce:animate-none" /> : activePortal ? <activePortal.icon className={`h-5 w-5 ${isActive ? "text-primary" : ""} ${activePortal.id === "ai" ? "group-hover/ai:scale-110 group-hover/ai:-rotate-3" : ""}`} /> : <Grid2X2 className="h-5 w-5" />}
                       <span>{item.label[language]}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
