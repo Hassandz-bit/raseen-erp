@@ -6,7 +6,8 @@ const layoutSource = readFileSync(resolve(process.cwd(), "client/src/components/
 
 describe("Rail التنقل في الوضع اللوحي", () => {
   it("يعتمد Rail مضغوطاً ولوحة سياقية مؤقتة بدلاً من شريط عريض دائم", () => {
-    expect(layoutSource).toContain('className={`nawa-navigation-rail ${isRailOpenOnMobile ? "nawa-navigation-rail-open" : ""}`}');
+    expect(layoutSource).toContain('className={`nawa-navigation-rail ${navigationRendersExpanded ? "nawa-navigation-rail-expanded" : ""} ${isRailOpenOnMobile ? "nawa-navigation-rail-open" : ""}`}');
+    expect(layoutSource).toContain("const navigationRendersExpanded = navigationIsExpanded || isRailOpenOnMobile");
     expect(layoutSource).toContain('className="nawa-context-panel"');
     expect(layoutSource).toContain('className="nawa-rail-backdrop"');
   });

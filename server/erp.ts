@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { addOrganizationExchangeRate, adjustProductBatchQuantity, approveInventoryCount, approveStockTransfer, createBranchForOrganization, createBusinessParty, createInventoryCount, createOperationalNotifications, createOperationalRecord, createOrganizationForUser, createProductBatch, createProductMaster, createPurchaseOrder, createSalesInvoice, createStockTransfer, createWarehouseForOrganization, dispatchStockTransfer, getCommerceReportSummary, getDashboardMetrics, getDefaultTenantContext, getFinancialReportSummary, getOrCreateOrganizationSettings, getOrCreateUserPreferences, getOrganizationRolePermissions, getSalesInvoicePrintDataForOrganization, issueSalesInvoiceWithFefo, issueStockByFefo, listActiveCustomersForOrganization, listBranchesForOrganization, listInventoryCountsForOrganization, listNotificationsForOrganization, listOperationalRecords, listOrganizationCurrencies, listOrganizationExchangeRates, listOrganizationMembersForOrganization, listProductBatchesForOrganization, listProductsForOrganization, listPurchaseOrdersForOrganization, listSalesInvoicesForOrganization, listStockMovementsForOrganization, listStockTransfersForOrganization, listWarehousesForOrganization, markAllNotificationsRead, markNotificationRead, previewFefoAllocation, receivePurchaseOrder, receiveStockTransfer, recordSalesInvoicePayment, recordStockMovement, saveOrganizationCurrency, sendPurchaseOrder, startInventoryCount, submitInventoryCount, updateOrganizationSettings, updateProductBatchStatus, updateUserPreferences, type OperationalModule } from "./db";
+import { addOrganizationExchangeRate, adjustProductBatchQuantity, approveInventoryCount, approveStockTransfer, createBranchForOrganization, createBusinessParty, createInventoryCount, createOperationalNotifications, createOperationalRecord, createOrganizationForUser, createProductBatch, createProductMaster, createPurchaseOrder, createSalesInvoice, createStockTransfer, createWarehouseForOrganization, dispatchStockTransfer, getCommerceReportSummary, getDashboardMetrics, getDefaultTenantContext, getFinancialReportSummary, getOrCreateOrganizationSettings, getOrCreateUserPreferences, getOrganizationRolePermissions, getSalesInvoicePrintDataForOrganization, issueSalesInvoiceWithFefo, issueStockByFefo, listActiveCustomersForOrganization, listBranchesForOrganization, listInventoryCountsForOrganization, listNotificationsForOrganization, listOperationalRecords, listOrganizationCurrencies, listOrganizationExchangeRates, listOrganizationMembersForOrganization, listProductBatchesForOrganization, listProductsForOrganization, listPurchaseOrdersForOrganization, listSalesInvoicesForOrganization, listStockMovementsForOrganization, listStockTransfersForOrganization, listWarehousesForOrganization, markAllNotificationsRead, markNotificationRead, previewFefoAllocation, receivePurchaseOrder, receiveStockTransfer, recordSalesInvoicePayment, recordStockMovement, saveOrganizationCurrency, searchCommandEntitiesForOrganization, sendPurchaseOrder, startInventoryCount, submitInventoryCount, updateOrganizationSettings, updateProductBatchStatus, updateUserPreferences, type OperationalModule } from "./db";
 import { currencyCatalog } from "../shared/currencyCatalog";
 import { askNawaAI } from "./nawaAI";
 import { notifyOwner } from "./_core/notification";
@@ -140,6 +140,17 @@ function assertDistributionScope(context: Awaited<ReturnType<typeof getTenantCon
 
 
 export const erpRouter = router({
+  navigation: router({
+    commandSearch: protectedProcedure.input(z.object({ query: z.string().trim().min(2).max(96) })).query(async ({ ctx, input }) => {
+      const context = await getTenantContext(ctx.user.id);
+      const moduleStatus = (moduleKey: ModuleKey) => context.modules.find(module => module.moduleKey === moduleKey)?.status;
+      return searchCommandEntitiesForOrganization(context.organization.id, {
+        query: input.query,
+        includeInventory: canAccessTenantModule({ membershipStatus: context.membership.status, moduleStatus: moduleStatus("inventory") }),
+        includeSales: canAccessTenantModule({ membershipStatus: context.membership.status, moduleStatus: moduleStatus("sales") }),
+      });
+    }),
+  }),
   demo: router({
     status: protectedProcedure.query(async ({ ctx }) => getDemoOrganizationForUser(ctx.user.id)),
     metrics: protectedProcedure.query(async ({ ctx }) => getDemoShowcaseMetricsForUser(ctx.user.id)),

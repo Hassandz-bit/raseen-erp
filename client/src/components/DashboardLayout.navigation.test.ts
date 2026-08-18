@@ -66,4 +66,34 @@ describe("تنقل بوابات Nawa", () => {
   it("يثبت الرأس العلوي فوق المحتوى أثناء التمرير", () => {
     expect(source).toContain("nawa-global-header");
   });
+
+  it("يدعم أوضاع AUTO وEXPANDED وCOMPACT كتفضيل شخصي محفوظ", () => {
+    expect(source).toContain('const NAVIGATION_MODE_KEY = "nawa:navigation-mode"');
+    expect(source).toContain('type NavigationMode = "auto" | "expanded" | "compact"');
+    expect(source).toContain("effectiveNavigationMode");
+    expect(source).toContain("localStorage.setItem(preferenceKey, navigationMode)");
+  });
+
+  it("يوسع بوابة النظرة العامة ويصغر صفحات العمل تلقائياً مع تثبيت اختياري", () => {
+    expect(source).toContain("const isPortalOverview");
+    expect(source).toContain('isPortalOverview ? "expanded" : "compact"');
+    expect(source).toContain("nawa-navigation-rail-expanded");
+    expect(source).toContain("chrome.pinNav");
+    expect(source).toContain("chrome.unpinNav");
+  });
+
+  it("يفتح أدوات المجموعة بالنقر والتمرير ويجعل Drawer الهاتف نصياً", () => {
+    expect(source).toContain("onPointerEnter");
+    expect(source).toContain("setTimeout(() => openGroup(group.key), 240)");
+    expect(source).toContain("navigationRendersExpanded");
+    expect(source).toContain("setRailOpenOnMobile(true)");
+  });
+
+  it("يوفر Command Palette واختصار Ctrl أو Cmd مع بحث صفحات محكوم", () => {
+    expect(source).toContain("CommandDialog");
+    expect(source).toContain("event.ctrlKey || event.metaKey");
+    expect(source).toContain('event.key.toLowerCase() === "k"');
+    expect(source).toContain("allowedPortals");
+    expect(source).not.toContain("trpc.erp.globalSearch");
+  });
 });

@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, gte, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, like, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   auditLogs,
@@ -333,6 +333,30 @@ export async function listSalesInvoicesForOrganization(organizationId: number) {
   const db = await getDb();
   if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
   return db.select().from(salesInvoices).where(eq(salesInvoices.organizationId, organizationId)).orderBy(desc(salesInvoices.updatedAt), desc(salesInvoices.id)).limit(100);
+}
+
+export type CommandEntitySearchResult = {
+  products: Array<{ id: number; label: string; detail: string }>;
+  customers: Array<{ id: number; label: string; detail: string }>;
+  invoices: Array<{ id: number; label: string; detail: string }>;
+};
+
+export async function searchCommandEntitiesForOrganization(organizationId: number, input: { query: string; includeInventory: boolean; includeSales: boolean }): Promise<CommandEntitySearchResult> {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const query = input.query.trim().slice(0, 96);
+  if (query.length < 2) return { products: [], customers: [], invoices: [] };
+  const pattern = `%${query}%`;
+  const [productRows, customerRows, invoiceRows] = await Promise.all([
+    input.includeInventory ? db.select({ id: products.id, name: products.name, nameAr: products.nameAr, nameFr: products.nameFr, nameEn: products.nameEn, sku: products.sku }).from(products).where(and(eq(products.organizationId, organizationId), or(like(products.name, pattern), like(products.nameAr, pattern), like(products.nameFr, pattern), like(products.nameEn, pattern), like(products.sku, pattern), like(products.barcode, pattern)))).orderBy(desc(products.updatedAt)).limit(8) : Promise.resolve([]),
+    input.includeSales ? db.select({ id: businessParties.id, name: businessParties.name, code: businessParties.code, types: businessParties.types }).from(businessParties).where(and(eq(businessParties.organizationId, organizationId), eq(businessParties.status, "active"), or(like(businessParties.name, pattern), like(businessParties.code, pattern)))).orderBy(asc(businessParties.name)).limit(24) : Promise.resolve([]),
+    input.includeSales ? db.select({ id: salesInvoices.id, invoiceNumber: salesInvoices.invoiceNumber, status: salesInvoices.status, grandTotal: salesInvoices.grandTotal, currencyCode: salesInvoices.currencyCode }).from(salesInvoices).where(and(eq(salesInvoices.organizationId, organizationId), like(salesInvoices.invoiceNumber, pattern))).orderBy(desc(salesInvoices.updatedAt), desc(salesInvoices.id)).limit(8) : Promise.resolve([]),
+  ]);
+  return {
+    products: productRows.map(row => ({ id: row.id, label: row.nameAr || row.name || row.nameFr || row.nameEn || row.sku, detail: row.sku })),
+    customers: customerRows.filter(row => Array.isArray(row.types) && row.types.includes("customer")).slice(0, 8).map(row => ({ id: row.id, label: row.name, detail: row.code || "—" })),
+    invoices: invoiceRows.map(row => ({ id: row.id, label: row.invoiceNumber, detail: `${row.grandTotal} ${row.currencyCode}` })),
+  };
 }
 
 export async function getSalesInvoicePrintDataForOrganization(organizationId: number, invoiceId: number) {
