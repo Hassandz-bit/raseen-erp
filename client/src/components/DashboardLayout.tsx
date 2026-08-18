@@ -129,6 +129,7 @@ function DashboardLayoutContent({
   const [isResizing, setIsResizing] = useState(false);
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
+  const previousPortalId = useRef<string | undefined>(undefined);
   const pathWithoutQuery = location.split("?")[0];
   const activePortal = getPortalForPath(pathWithoutQuery);
   const chrome = portalChrome[language];
@@ -166,6 +167,12 @@ function DashboardLayoutContent({
   useEffect(() => {
     if (activePortal) localStorage.setItem("nawa:last-portal", activePortal.id);
   }, [activePortal]);
+
+  useEffect(() => {
+    const portalChanged = Boolean(activePortal?.id && activePortal.id !== previousPortalId.current);
+    if (portalChanged && !isMobile && isCollapsed) toggleSidebar();
+    previousPortalId.current = activePortal?.id;
+  }, [activePortal?.id, isCollapsed, isMobile, toggleSidebar]);
 
   useEffect(() => {
     if (selectedBranch) localStorage.setItem(ACTIVE_BRANCH_KEY, String(selectedBranch.id));
@@ -230,7 +237,7 @@ function DashboardLayoutContent({
         <Sidebar
           side={direction === "rtl" ? "right" : "left"}
           collapsible="icon"
-          className={`border-r-0 ${preferences.sidebarMode === "compact" ? "[--sidebar-width:220px]" : ""}`}
+          className={`nawa-portal-sidebar border-r-0 ${preferences.sidebarMode === "compact" ? "[--sidebar-width:220px]" : ""}`}
           disableTransition={isResizing}
         >
           <SidebarHeader className="h-[78px] justify-center border-b border-white/[.06] md:h-[88px]">
@@ -273,7 +280,7 @@ function DashboardLayoutContent({
                       isActive={isActive}
                       onClick={() => navigateTo(item.href, item.label[language])}
                       tooltip={item.label[language]}
-                      className={`group/portal h-14 text-[18px] font-semibold transition-all ${activePortal?.id === "ai" ? `group/ai hover:-translate-y-px hover:bg-primary/12 hover:shadow-[0_10px_22px_rgba(212,161,49,.14)] ${isActive ? "shadow-[inset_3px_0_0_hsl(var(--primary))]" : ""}` : ""}`}
+                      className={`group/portal h-14 text-[18px] font-semibold transition-all ${isActive ? "bg-primary/12 text-primary ring-1 ring-primary/30 shadow-[inset_4px_0_0_hsl(var(--primary)),0_8px_20px_rgba(212,161,49,.12)]" : ""} ${activePortal?.id === "ai" ? `group/ai hover:-translate-y-px hover:bg-primary/12 hover:shadow-[0_10px_22px_rgba(212,161,49,.14)] ${isActive ? "shadow-[inset_3px_0_0_hsl(var(--primary))]" : ""}` : ""}`}
                     >
                       {navigatingTo === item.href ? <Loader2 className="h-5 w-5 animate-spin motion-reduce:animate-none" /> : activePortal ? <activePortal.icon className={`h-5 w-5 ${isActive ? "text-primary" : ""} ${activePortal.id === "ai" ? "group-hover/ai:scale-110 group-hover/ai:-rotate-3" : ""}`} /> : <Grid2X2 className="h-5 w-5" />}
                       <span>{item.label[language]}</span>

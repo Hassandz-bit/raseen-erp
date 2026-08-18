@@ -103,6 +103,17 @@ body {
 :root[data-accent="emerald"] { --primary: oklch(0.74 0.14 165); --primary-foreground: oklch(0.17 0.02 165); --ring: oklch(0.74 0.14 165); }
 :root[data-accent="violet"] { --primary: oklch(0.72 0.15 300); --primary-foreground: oklch(0.96 0.02 300); --ring: oklch(0.72 0.15 300); }
 
+:root[data-sidebar-font-scale="small"] .nawa-portal-sidebar [data-slot="sidebar-menu-button"] { font-size: 1rem !important; }
+:root[data-sidebar-font-scale="normal"] .nawa-portal-sidebar [data-slot="sidebar-menu-button"] { font-size: 1.125rem !important; }
+:root[data-sidebar-font-scale="large"] .nawa-portal-sidebar [data-slot="sidebar-menu-button"] { font-size: 1.25rem !important; }
+:root[data-sidebar-font-scale="extra_large"] .nawa-portal-sidebar [data-slot="sidebar-menu-button"] { font-size: 1.4rem !important; }
+:root[data-sidebar-font-scale="large"] .nawa-portal-sidebar [data-slot="sidebar-menu-button"], :root[data-sidebar-font-scale="extra_large"] .nawa-portal-sidebar [data-slot="sidebar-menu-button"] { min-height: 3.75rem; }
+:root[data-high-contrast="true"] .nawa-portal-sidebar { background: #07090d !important; color: #fff !important; border-color: #f3c94d !important; }
+:root[data-high-contrast="true"] .nawa-portal-sidebar [data-slot="sidebar-menu-button"] { color: #fff !important; border: 1px solid transparent; }
+:root[data-high-contrast="true"] .nawa-portal-sidebar [data-slot="sidebar-menu-button"]:hover, :root[data-high-contrast="true"] .nawa-portal-sidebar [data-active="true"] { background: #222a37 !important; border-color: #f3c94d !important; color: #fff !important; }
+:root[data-high-contrast="true"] .nawa-portal-sidebar .text-muted-foreground { color: #dfe7f2 !important; }
+:root[data-high-contrast="true"] .nawa-portal-sidebar .text-primary { color: #ffdc67 !important; }
+
 button, input, textarea, select { font: inherit; }
 
 input:not([type="checkbox"]):not([type="radio"]), textarea, select {

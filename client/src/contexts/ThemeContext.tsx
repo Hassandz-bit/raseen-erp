@@ -7,6 +7,8 @@ export type AppearancePreferences = {
   density: "comfortable" | "compact";
   fontFamily: "ibm-plex" | "tajawal" | "noto-arabic" | "inter" | "system";
   fontScale: "small" | "normal" | "large" | "extra_large";
+  sidebarFontScale: "small" | "normal" | "large" | "extra_large";
+  highContrast: boolean;
   numeralStyle: "western" | "arabic_indic";
   accentColor: "gold" | "blue" | "emerald" | "violet";
   radiusPreset: "soft" | "rounded" | "sharp";
@@ -22,7 +24,7 @@ type ThemeContextType = {
   switchable: boolean;
 };
 
-const defaultPreferences: AppearancePreferences = { themeMode: "dark", sidebarMode: "expanded", density: "comfortable", fontFamily: "ibm-plex", fontScale: "normal", numeralStyle: "western", accentColor: "gold", radiusPreset: "rounded", moduleViewMode: "classic" };
+const defaultPreferences: AppearancePreferences = { themeMode: "dark", sidebarMode: "expanded", density: "comfortable", fontFamily: "ibm-plex", fontScale: "normal", sidebarFontScale: "normal", highContrast: false, numeralStyle: "western", accentColor: "gold", radiusPreset: "rounded", moduleViewMode: "classic" };
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children, defaultTheme = "dark" }: { children: React.ReactNode; defaultTheme?: "light" | "dark" }) {
@@ -47,6 +49,8 @@ export function ThemeProvider({ children, defaultTheme = "dark" }: { children: R
     root.dataset.radius = preferences.radiusPreset;
     root.dataset.sidebar = preferences.sidebarMode;
     root.dataset.fontScale = preferences.fontScale;
+    root.dataset.sidebarFontScale = preferences.sidebarFontScale;
+    root.dataset.highContrast = String(preferences.highContrast);
     root.dataset.numeralStyle = preferences.numeralStyle;
     localStorage.setItem("nawa-appearance", JSON.stringify(preferences));
     window.dispatchEvent(new Event("nawa-appearance"));
