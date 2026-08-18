@@ -240,8 +240,8 @@ function DashboardLayoutContent({
           className={`nawa-portal-sidebar border-r-0 ${preferences.sidebarMode === "compact" ? "[--sidebar-width:220px]" : ""}`}
           disableTransition={isResizing}
         >
-          <SidebarHeader className="h-[78px] justify-center border-b border-white/[.06] md:h-[88px]">
-            <div className="flex items-center gap-3 px-2 transition-all w-full">
+          <SidebarHeader className="h-[72px] shrink-0 justify-center border-b border-white/[.06] md:h-[88px]">
+            <div className="flex min-w-0 items-center gap-3 px-2 transition-all w-full">
               <button
                 onClick={toggleSidebar}
                 className="h-8 w-8 flex items-center justify-center hover:bg-accent rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring shrink-0"
@@ -249,11 +249,11 @@ function DashboardLayoutContent({
               >
                 <PanelLeft className="h-4 w-4 text-muted-foreground" />
               </button>
-              {!isCollapsed ? <div className="flex min-w-0 items-center gap-2"><span className="truncate text-[19px] font-bold tracking-tight md:text-[22px]">{activePortal?.name[language] ?? chrome.portals}</span></div> : null}
+              {!isCollapsed ? <div className="flex min-w-0 items-center gap-2"><span className="truncate text-[17px] font-bold tracking-tight min-[600px]:text-[20px] md:text-[22px]">{activePortal?.name[language] ?? chrome.portals}</span></div> : null}
             </div>
           </SidebarHeader>
 
-          <div className="border-b border-white/[.06] px-3 py-3 lg:hidden group-data-[collapsible=icon]:hidden">
+          <div className="shrink-0 border-b border-white/[.06] px-3 py-3 lg:hidden group-data-[collapsible=icon]:hidden">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button type="button" className="flex w-full items-center justify-between rounded-xl border border-border/70 bg-background/70 px-3 py-2.5 text-start transition-colors hover:border-primary/35 hover:bg-primary/[.05] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50">
@@ -266,9 +266,9 @@ function DashboardLayoutContent({
             </DropdownMenu>
           </div>
 
-          <SidebarContent className="gap-0 overflow-y-auto">
+          <SidebarContent className="min-h-0 gap-0 overscroll-contain overflow-y-auto">
             <SidebarMenu className="px-2 py-3">
-              {activePortal ? <><SidebarMenuItem><SidebarMenuButton onClick={() => navigateTo("/", chrome.portals)} tooltip={chrome.portals} className="h-11 text-[16px] font-semibold text-muted-foreground hover:text-foreground"><Grid2X2 className="h-[18px] w-[18px]" /><span>{chrome.portals}</span></SidebarMenuButton></SidebarMenuItem><div className="mx-2 mt-3 rounded-xl border border-primary/15 bg-primary/[.06] px-3 py-3 group-data-[collapsible=icon]:hidden"><p className="text-[11px] font-bold uppercase tracking-[.12em] text-primary">{chrome.navigation}</p><p className="mt-1 text-[18px] font-bold text-foreground">{activePortal.name[language]}</p></div></> : <><SidebarMenuItem><SidebarMenuButton onClick={() => navigateTo("/", chrome.portals)} tooltip={chrome.portals} className="h-12 text-[16px] font-semibold"><Grid2X2 className="h-[19px] w-[19px] text-primary" /><span>{chrome.portals}</span></SidebarMenuButton></SidebarMenuItem><SidebarMenuItem><SidebarMenuButton onClick={() => navigateTo("/executive", chrome.executive)} tooltip={chrome.executive} className="h-12 text-[16px] font-medium"><Home className="h-[19px] w-[19px]" /><span>{chrome.executive}</span></SidebarMenuButton></SidebarMenuItem><SidebarMenuItem><SidebarMenuButton onClick={() => navigateTo("/workspace", chrome.ai)} tooltip={chrome.ai} className="h-12 text-[16px] font-bold text-primary"><Bot className="h-[19px] w-[19px] text-primary" /><span>{chrome.ai}</span><span className="sr-only">{chrome.workspace}</span></SidebarMenuButton></SidebarMenuItem></>}
+              {activePortal ? <><SidebarMenuItem><SidebarMenuButton onClick={() => navigateTo("/", chrome.portals)} tooltip={chrome.portals} className="h-11 text-[15px] font-semibold text-muted-foreground hover:text-foreground min-[600px]:text-[16px]"><Grid2X2 className="h-[18px] w-[18px]" /><span>{chrome.portals}</span></SidebarMenuButton></SidebarMenuItem><div className="mx-2 mt-3 min-w-0 rounded-xl border border-primary/15 bg-primary/[.06] px-3 py-3 group-data-[collapsible=icon]:hidden"><p className="text-[11px] font-bold uppercase tracking-[.12em] text-primary">{chrome.navigation}</p><p className="mt-1 break-words text-[16px] font-bold text-foreground min-[600px]:text-[18px]">{activePortal.name[language]}</p></div></> : <><SidebarMenuItem><SidebarMenuButton onClick={() => navigateTo("/", chrome.portals)} tooltip={chrome.portals} className="h-12 text-[15px] font-semibold min-[600px]:text-[16px]"><Grid2X2 className="h-[19px] w-[19px] text-primary" /><span>{chrome.portals}</span></SidebarMenuButton></SidebarMenuItem><SidebarMenuItem><SidebarMenuButton onClick={() => navigateTo("/executive", chrome.executive)} tooltip={chrome.executive} className="h-12 text-[15px] font-medium min-[600px]:text-[16px]"><Home className="h-[19px] w-[19px]" /><span>{chrome.executive}</span></SidebarMenuButton></SidebarMenuItem><SidebarMenuItem><SidebarMenuButton onClick={() => navigateTo("/workspace", chrome.ai)} tooltip={chrome.ai} className="h-12 text-[15px] font-bold text-primary min-[600px]:text-[16px]"><Bot className="h-[19px] w-[19px] text-primary" /><span>{chrome.ai}</span><span className="sr-only">{chrome.workspace}</span></SidebarMenuButton></SidebarMenuItem></>}
               {activePortal ? <p className="px-2 pb-2 pt-5 text-[12px] font-semibold uppercase tracking-[.14em] text-muted-foreground group-data-[collapsible=icon]:hidden">{chrome.navigation}</p> : null}
               {localItems.map((item, index) => {
                 const isActive = item.href.includes("?") ? `${pathWithoutQuery}${search}` === item.href : pathWithoutQuery === item.href;
@@ -280,10 +280,10 @@ function DashboardLayoutContent({
                       isActive={isActive}
                       onClick={() => navigateTo(item.href, item.label[language])}
                       tooltip={item.label[language]}
-                      className={`group/portal h-14 text-[18px] font-semibold transition-all ${isActive ? "bg-primary/12 text-primary ring-1 ring-primary/30 shadow-[inset_4px_0_0_hsl(var(--primary)),0_8px_20px_rgba(212,161,49,.12)]" : ""} ${activePortal?.id === "ai" ? `group/ai hover:-translate-y-px hover:bg-primary/12 hover:shadow-[0_10px_22px_rgba(212,161,49,.14)] ${isActive ? "shadow-[inset_3px_0_0_hsl(var(--primary))]" : ""}` : ""}`}
+                      className={`group/portal h-12 min-w-0 text-[16px] font-semibold transition-all min-[600px]:h-14 min-[600px]:text-[18px] ${isActive ? "bg-primary/12 text-primary ring-1 ring-primary/30 shadow-[inset_4px_0_0_hsl(var(--primary)),0_8px_20px_rgba(212,161,49,.12)]" : ""} ${activePortal?.id === "ai" ? `group/ai hover:-translate-y-px hover:bg-primary/12 hover:shadow-[0_10px_22px_rgba(212,161,49,.14)] ${isActive ? "shadow-[inset_3px_0_0_hsl(var(--primary))]" : ""}` : ""}`}
                     >
                       {navigatingTo === item.href ? <Loader2 className="h-5 w-5 animate-spin motion-reduce:animate-none" /> : activePortal ? <activePortal.icon className={`h-5 w-5 ${isActive ? "text-primary" : ""} ${activePortal.id === "ai" ? "group-hover/ai:scale-110 group-hover/ai:-rotate-3" : ""}`} /> : <Grid2X2 className="h-5 w-5" />}
-                      <span>{item.label[language]}</span>
+                      <span className="min-w-0 truncate">{item.label[language]}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 );
@@ -291,7 +291,7 @@ function DashboardLayoutContent({
             </SidebarMenu>
             </SidebarContent>
 
-          <SidebarFooter className="p-3">
+          <SidebarFooter className="shrink-0 p-3">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="flex items-center gap-3 rounded-lg px-1 py-1 hover:bg-accent/50 transition-colors w-full text-left group-data-[collapsible=icon]:justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
