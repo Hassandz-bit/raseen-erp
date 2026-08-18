@@ -71,4 +71,8 @@ describe("تنقل بوابات Nawa", () => {
     expect(source).toContain('toggleGroup(groupKey)');
     expect(source).toContain('chrome.favorites');
   });
+
+  it("يثبت الرأس العلوي فوق المحتوى أثناء التمرير", () => {
+    expect(source).toContain('nawa-top-header sticky top-0 z-[60]');
+  });
 });

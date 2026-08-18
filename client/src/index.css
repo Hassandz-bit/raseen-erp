@@ -221,6 +221,7 @@ html:not(.dark) .text-slate-300 { color: oklch(.36 .018 255) !important; }
 .grid-line { background-image: linear-gradient(oklch(0.8 0.03 90 / .035) 1px, transparent 1px), linear-gradient(90deg, oklch(0.8 0.03 90 / .035) 1px, transparent 1px); background-size: 28px 28px; }
 .thin-scrollbar::-webkit-scrollbar { width: 7px; height: 7px; }
 .thin-scrollbar::-webkit-scrollbar-thumb { background: oklch(0.38 0.022 250); border-radius: 10px; }
+.nawa-top-header { position: sticky !important; top: 0; z-index: 60; isolation: isolate; }
 .nawa-main-inset > .sticky > .flex.shrink-0 { display: none; }
 
 @media (prefers-reduced-motion: reduce) {
