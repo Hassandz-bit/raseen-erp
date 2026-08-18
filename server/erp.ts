@@ -10,6 +10,8 @@ import { canUseRetailPermission, type RetailPermission } from "./retailPermissio
 import { hasValidExchangeRateDateRange, normalizeExchangeRateFilters } from "./exchangeRateFilters";
 import { isValidTextBarcode } from "./barcodePolicy";
 import { classifyBranchPersistenceError } from "./branchPolicy";
+import { parseOrganizationLogoDataUrl, isTrustedOrganizationLogoUrl } from "./organizationLogo";
+import { storagePut } from "./storage";
 import { canUseDistributionPermission, isScopedIdAllowed, type DistributionPermission } from "./distributionPolicy";
 import { addDistributionRouteExpense, completeDriverStop, createDistributionRoute, createDistributionTerritory, createDriverVanSale, createFleetVehicle, createMaintenanceRecord, createVehicleDocument, createVehicleLoadOrder, getDistributionControlCenter, getDistributionOwnerAlertReasons, getDistributionSettings, getDriverRouteFeed, getDriverRouteInventory, getLatestFleetLocations, listDistributionRoutes, listDistributionTerritories, listFleetVehicleDocumentAlerts, listFleetVehicles, listVehicleInventory, logFuel, recordDistributionCollection, recordDistributionDelivery, recordDistributionReturn, recordFleetGpsPoint, recordGeofenceEvent, returnVehicleStockToWarehouse, saveDistributionSettings, submitDistributionDeliveryProof, submitRouteClosing, transitionDistributionRoute, transitionRouteClosing, transitionVehicleLoadOrder } from "./distribution";
 import { cancelRetailerOrder, createB2bPromotion, createRetailerOrder, createRetailerOutlet, createRetailerReturnRequest, createSavedRetailerOrderList, getRetailerCatalog, getRetailerFrequentProducts, getRetailerMonthlyReport, getRetailerSummary, grantRetailerAccess, inviteRetailerAccess, listManagedRetailerAccesses, listOrganizationB2bOrders, listOrganizationRetailerPromotions, listOrganizationRetailerReturnRequests, listRetailerAccesses, listRetailerDocuments, listRetailerFavorites, listRetailerNotifications, listRetailerOrders, listRetailerOutlets, listRetailerOutletsForAccess, listRetailerPromotions, listRetailerReturnRequests, listSavedRetailerOrderLists, lookupRetailerUserByEmail, markRetailerNotificationRead, reorderRetailerOrder, resendRetailerAccessInvite, reviewAndConvertRetailerOrder, reviewRetailerReturnRequest, submitSavedRetailerOrderList, toggleRetailerFavorite, updateRetailerAccessStatus, updateRetailerVisibilityPolicy } from "./b2b";
@@ -258,7 +260,7 @@ export const erpRouter = router({
       thousandsSeparator: z.enum(["comma", "dot", "space"]).optional(),
       documentSettings: z.object({
         paperSize: z.enum(["A4", "A5", "thermal"]),
-        logoUrl: z.string().url().optional(),
+        logoUrl: z.string().max(1024).refine(isTrustedOrganizationLogoUrl, "يجب أن يكون رابط الشعار آمناً.").optional(),
         address: z.string().max(300).optional(),
         phone: z.string().max(64).optional(),
         legalInfo: z.string().max(500).optional(),
@@ -272,6 +274,14 @@ export const erpRouter = router({
     })).mutation(async ({ ctx, input }) => {
       const context = await requireOrganizationOwner(ctx.user.id);
       return updateOrganizationSettings(context.organization.id, input);
+    }),
+    uploadOrganizationLogo: protectedProcedure.input(z.object({ dataUrl: z.string().min(24).max(1_500_000) })).mutation(async ({ ctx, input }) => {
+      const context = await requireOrganizationOwner(ctx.user.id);
+      const logo = parseOrganizationLogoDataUrl(input.dataUrl);
+      const stored = await storagePut(`organizations/${context.organization.id}/branding/document-logo.${logo.extension}`, logo.bytes, logo.mimeType);
+      const settings = await getOrCreateOrganizationSettings(context.organization.id);
+      await updateOrganizationSettings(context.organization.id, { documentSettings: { ...settings.documentSettings, logoUrl: stored.url } });
+      return { url: stored.url };
     }),
     currencyCatalog: protectedProcedure.query(() => currencyCatalog),
     currencies: protectedProcedure.query(async ({ ctx }) => {
