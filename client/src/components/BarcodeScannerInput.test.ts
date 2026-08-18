@@ -16,4 +16,12 @@ describe("مكوّن ماسح الباركود وQR", () => {
     expect(source).toContain("controlsRef.current?.stop()");
     expect(source).toContain("onOpenChange={nextOpen => { if (!nextOpen) stopCamera(); setOpen(nextOpen); }}");
   });
+
+  it("يعرض نتيجة المسح بصرياً ويتيح صوتاً اختيارياً يمكن كتمه", () => {
+    expect(source).toContain("aria-live=\"polite\"");
+    expect(source).toContain("AUDIO_PREFERENCE_KEY");
+    expect(source).toContain("new AudioContext()");
+    expect(source).toContain("signalFeedback(\"success\")");
+    expect(source).toContain("signalFeedback(\"error\")");
+  });
 });

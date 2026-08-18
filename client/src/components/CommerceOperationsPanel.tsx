@@ -40,6 +40,7 @@ export function CommerceOperationsPanel() {
   const [salesTaxRate, setSalesTaxRate] = useState("0");
   const [salesBarcodeInput, setSalesBarcodeInput] = useState("");
   const [salesBarcodeLookupCode, setSalesBarcodeLookupCode] = useState("");
+  const [salesScanFeedback, setSalesScanFeedback] = useState<"error" | null>(null);
   const [purchaseProductId, setPurchaseProductId] = useState("");
   const [purchaseWarehouseId, setPurchaseWarehouseId] = useState("");
   const [purchaseQuantity, setPurchaseQuantity] = useState("1");
@@ -83,6 +84,7 @@ export function CommerceOperationsPanel() {
       setSalesProductId(String(salesBarcodeLookup.data.id));
       toast.success(language === "ar" ? `تم اختيار المنتج: ${salesBarcodeLookup.data.nameAr || salesBarcodeLookup.data.name}` : language === "fr" ? `Produit sélectionné : ${salesBarcodeLookup.data.nameFr || salesBarcodeLookup.data.name}` : `Product selected: ${salesBarcodeLookup.data.nameEn || salesBarcodeLookup.data.name}`);
     } else {
+      setSalesScanFeedback("error");
       toast.error(language === "ar" ? "الرمز غير مسجل في كتالوج المؤسسة." : language === "fr" ? "Ce code n'est pas enregistré dans le catalogue de l'organisation." : "This code is not registered in the organization catalog.");
     }
     setSalesBarcodeInput("");
@@ -91,6 +93,7 @@ export function CommerceOperationsPanel() {
 
   useEffect(() => {
     if (!salesBarcodeLookup.isError) return;
+    setSalesScanFeedback("error");
     toast.error(salesBarcodeLookup.error.message || t("error"));
     setSalesBarcodeLookupCode("");
   }, [salesBarcodeLookup.error?.message, salesBarcodeLookup.isError, t]);
@@ -205,7 +208,7 @@ export function CommerceOperationsPanel() {
         <article id="sales" className="surface scroll-mt-24 rounded-3xl border p-5">
           <div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-2xl bg-sky-400/10 text-sky-300"><ReceiptText className="h-5 w-5" /></span><div><h2 className="font-semibold text-foreground">{t("salesInvoices")}</h2><p className="mt-1 text-xs text-muted-foreground">{t("fefo")}</p></div></div>
           <form className="mt-5 space-y-3" onSubmit={event => { event.preventDefault(); if (!selectedSalesProduct || !salesWarehouseId) return; createInvoice.mutate({ currencyCode: formatSettings.currencyCode, baseCurrencyCode: formatSettings.currencyCode, taxMode: salesTaxMode, taxRate: salesTaxRateValue, lines: [{ productId: selectedSalesProduct.id, warehouseId: Number(salesWarehouseId), quantity: Number(salesQuantity), unit: selectedSalesProduct.salesUnit }] }); }}>
-            <BarcodeScannerInput value={salesBarcodeInput} onValueChange={setSalesBarcodeInput} onDetected={setSalesBarcodeLookupCode} placeholder={language === "ar" ? "امسح رمز المنتج لاختياره" : language === "fr" ? "Scannez le code pour sélectionner un produit" : "Scan product code to select"} />
+            <BarcodeScannerInput value={salesBarcodeInput} onValueChange={setSalesBarcodeInput} feedback={salesScanFeedback} onDetected={code => { setSalesScanFeedback(null); setSalesBarcodeLookupCode(code); }} placeholder={language === "ar" ? "امسح رمز المنتج لاختياره" : language === "fr" ? "Scannez le code pour sélectionner un produit" : "Scan product code to select"} />
             <div className="grid gap-2 md:grid-cols-4">
               <select aria-label={t("product")} value={salesProductId} onChange={event => setSalesProductId(event.target.value)} className="h-10 rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/40">{products.data?.map(product => <option key={product.id} value={product.id}>{product.name}</option>)}</select>
               <select aria-label={t("warehouse")} value={salesWarehouseId} onChange={event => setSalesWarehouseId(event.target.value)} className="h-10 rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/40">{warehouses.data?.map(warehouse => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}</select>
