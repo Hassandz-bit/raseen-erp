@@ -23,9 +23,10 @@ import Finance from "./pages/Finance";
 import HRPayroll from "./pages/HRPayroll";
 import EmployeeSelfService from "./pages/EmployeeSelfService";
 import PortalsHome from "./pages/PortalsHome";
+import DemoGuide from "./pages/DemoGuide";
 
 function Router() {
-  return <Switch><Route path="/" component={PortalsHome} /><Route path="/executive" component={Home} /><Route path="/workspace" component={Workspace} /><Route path="/commerce" component={CommerceInventory} /><Route path="/manufacturing" component={Manufacturing} /><Route path="/distribution" component={Distribution} /><Route path="/finance" component={Finance} /><Route path="/hr" component={HRPayroll} /><Route path="/self-service" component={EmployeeSelfService} /><Route path="/logistics-check" component={LogisticsCheck} /><Route path="/driver" component={Driver} /><Route path="/retailer" component={Retailer} /><Route path="/b2b-orders" component={B2BOrders} /><Route path="/modules" component={ModulesPage} /><Route path="/settings" component={SettingsPage} /><Route path="/404" component={NotFound} /><Route component={NotFound} /></Switch>;
+  return <Switch><Route path="/" component={PortalsHome} /><Route path="/demo-guide" component={DemoGuide} /><Route path="/executive" component={Home} /><Route path="/workspace" component={Workspace} /><Route path="/commerce" component={CommerceInventory} /><Route path="/manufacturing" component={Manufacturing} /><Route path="/distribution" component={Distribution} /><Route path="/finance" component={Finance} /><Route path="/hr" component={HRPayroll} /><Route path="/self-service" component={EmployeeSelfService} /><Route path="/logistics-check" component={LogisticsCheck} /><Route path="/driver" component={Driver} /><Route path="/retailer" component={Retailer} /><Route path="/b2b-orders" component={B2BOrders} /><Route path="/modules" component={ModulesPage} /><Route path="/settings" component={SettingsPage} /><Route path="/404" component={NotFound} /><Route component={NotFound} /></Switch>;
 }
 
 function PreferencesHydrator({ children }: { children: React.ReactNode }) {

@@ -93,6 +93,19 @@ export async function getOrCreateUserPreferences(userId: number) {
   return result[0];
 }
 
+export async function setActiveOrganizationForUser(userId: number, organizationId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const [membership] = await db
+    .select({ id: organizationMemberships.id })
+    .from(organizationMemberships)
+    .where(and(eq(organizationMemberships.userId, userId), eq(organizationMemberships.organizationId, organizationId), eq(organizationMemberships.status, "active")))
+    .limit(1);
+  if (!membership) throw new Error("لا تملك عضوية نشطة في المؤسسة المطلوبة.");
+  await updateUserPreferences(userId, { activeOrganizationId: organizationId });
+  return getOrCreateUserPreferences(userId);
+}
+
 export async function updateUserPreferences(userId: number, values: Partial<typeof userPreferences.$inferInsert>) {
   const db = await getDb();
   if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
@@ -204,13 +217,21 @@ export async function createOrganizationForUser({ userId, name }: { userId: numb
 export async function getDefaultTenantContext(userId: number) {
   const db = await getDb();
   if (!db) return undefined;
-  const row = await db
+  const [preferences] = await db.select({ activeOrganizationId: userPreferences.activeOrganizationId }).from(userPreferences).where(eq(userPreferences.userId, userId)).limit(1);
+  const findContext = (organizationId?: number | null) => db
     .select({ organization: organizations, membership: organizationMemberships })
     .from(organizationMemberships)
     .innerJoin(organizations, eq(organizations.id, organizationMemberships.organizationId))
-    .where(and(eq(organizationMemberships.userId, userId), eq(organizationMemberships.status, "active"), eq(organizations.status, "active")))
+    .where(and(
+      eq(organizationMemberships.userId, userId),
+      eq(organizationMemberships.status, "active"),
+      eq(organizations.status, "active"),
+      ...(organizationId ? [eq(organizations.id, organizationId)] : []),
+    ))
     .orderBy(desc(organizationMemberships.updatedAt))
     .limit(1);
+  const preferred = preferences?.activeOrganizationId ? await findContext(preferences.activeOrganizationId) : [];
+  const row = preferred[0] ? preferred : await findContext();
   if (!row[0]) return undefined;
   const modules = await db.select().from(organizationModules).where(eq(organizationModules.organizationId, row[0].organization.id));
   return { ...row[0], modules };

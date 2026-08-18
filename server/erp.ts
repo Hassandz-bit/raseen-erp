@@ -22,7 +22,7 @@ import { postCollection, postDistributionCollection, postDistributionRouteExpens
 import { createBankAccount, createCashbox, getPayableAging, getReceivableAging, listTreasury, recordPayablePayment, transferTreasuryFunds } from "./treasury";
 import { addBankReconciliationLine, changeBankReconciliationStatus, createBankReconciliation, createCashReconciliation, listReconciliations } from "./reconciliations";
 import { approveBudget, createBudget, createCostCenter, getBudgetVsActual, listBudgets, listCostCenters, upsertBudgetLine } from "./financePlanning";
-import { approveOvertimeEntry, createDepartment, createEmployeeContract, createEmployeeProfile, createLeaveType, createOvertimeEntry, createPosition, createWorkSchedule, decideLeaveRequest, getHrDashboard, listHrDirectory, listHrOperations, recordAttendance, submitLeaveRequest } from "./hr";
+import { approveOvertimeEntry, createDepartment, createEmployee, createEmployeeContract, createEmployeeProfile, createLeaveType, createOvertimeEntry, createPosition, createWorkSchedule, decideLeaveRequest, getHrDashboard, listHrDirectory, listHrOperations, recordAttendance, submitLeaveRequest } from "./hr";
 import { approvePayroll, assignAllowance, calculatePayroll, createAllowanceType, createCollectionCommissionFromDistributionReceipt, createCommissionEntry, createCommissionRule, createDeliveryCommissionFromCompletedDelivery, createEmployeeAdvance, createPayrollAdjustment, createPayrollPeriod, createSalesCommissionFromIssuedInvoice, getPayrollDashboard, reopenPayroll, reverseDeliveryCommissionFromReturn } from "./payroll";
 import { payPayrollPeriod, postEmployeeAdvance, postPayrollPeriod } from "./payrollPostingRules";
 import { exportPaidPayrollBankFile } from "./payrollBankExport";
@@ -30,6 +30,7 @@ import { getHrOperationalReports } from "./hrReports";
 import { canUseHrPermission, type HrPermission } from "./hrPermissionPolicy";
 import { assertHrEmployeeInScope, hasRestrictedHrScope, resolveHrEmployeeScope } from "./hrDataScope";
 import { decideTeamAdvanceRequest, decideTeamLeaveRequest, getEmployeeSelfService, submitSelfAdvanceRequest, submitSelfLeaveRequest } from "./hrSelfService";
+import { activateDemoOrganizationForUser, deleteDemoOrganization, ensureDemoOrganization, getDemoOrganizationForUser, getDemoShowcaseMetricsForUser, resetDemoOrganization, seedDemoCatalog, seedDemoCommerceScenarios, seedDemoCommercialMaster, seedDemoFoundation, seedDemoOperationsScenarios, seedDemoPromotions, seedDemoRetailHrPayrollScenarios } from "./demo";
 
 type ModuleKey = "inventory" | "sales" | "purchases" | "finance" | "hr" | "reports" | "ai_assistant" | "distribution" | "manufacturing" | "nawa_retail";
 const operationalModuleKeys = ["inventory", "sales", "purchases", "finance", "hr"] as const;
@@ -139,6 +140,51 @@ function assertDistributionScope(context: Awaited<ReturnType<typeof getTenantCon
 
 
 export const erpRouter = router({
+  demo: router({
+    status: protectedProcedure.query(async ({ ctx }) => getDemoOrganizationForUser(ctx.user.id)),
+    metrics: protectedProcedure.query(async ({ ctx }) => getDemoShowcaseMetricsForUser(ctx.user.id)),
+    ensure: protectedProcedure.mutation(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "يلزم مدير المنصة لإنشاء شركة العرض." });
+      return ensureDemoOrganization(ctx.user.id);
+    }),
+    seedFoundation: protectedProcedure.mutation(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "يلزم مدير المنصة لتهيئة شركة العرض." });
+      return seedDemoFoundation(ctx.user.id);
+    }),
+    seedCatalog: protectedProcedure.mutation(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "يلزم مدير المنصة لتهيئة كتالوج شركة العرض." });
+      return seedDemoCatalog(ctx.user.id);
+    }),
+    seedCommercialMaster: protectedProcedure.mutation(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "يلزم مدير المنصة لتهيئة تجارة شركة العرض." });
+      return seedDemoCommercialMaster(ctx.user.id);
+    }),
+    seedPromotions: protectedProcedure.mutation(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "يلزم مدير المنصة لتهيئة عروض شركة العرض." });
+      return seedDemoPromotions(ctx.user.id);
+    }),
+    seedCommerceScenarios: protectedProcedure.mutation(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "يلزم مدير المنصة لتهيئة سيناريوهات تجارة شركة العرض." });
+      return seedDemoCommerceScenarios(ctx.user.id);
+    }),
+    seedOperationsScenarios: protectedProcedure.mutation(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "يلزم مدير المنصة لتهيئة التصنيع والتوزيع لشركة العرض." });
+      return seedDemoOperationsScenarios(ctx.user.id);
+    }),
+    seedRetailHrPayrollScenarios: protectedProcedure.mutation(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "يلزم مدير المنصة لتهيئة Retail والموارد البشرية والرواتب لشركة العرض." });
+      return seedDemoRetailHrPayrollScenarios(ctx.user.id);
+    }),
+    reset: protectedProcedure.mutation(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "يلزم مدير المنصة لإعادة تهيئة شركة العرض." });
+      return resetDemoOrganization(ctx.user.id);
+    }),
+    delete: protectedProcedure.input(z.object({ confirmation: z.literal("DELETE NAWA DEMO") })).mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "يلزم مدير المنصة لحذف شركة العرض." });
+      return deleteDemoOrganization(ctx.user.id, input.confirmation);
+    }),
+    activate: protectedProcedure.mutation(async ({ ctx }) => activateDemoOrganizationForUser(ctx.user.id)),
+  }),
   onboarding: router({
     createOrganization: protectedProcedure
       .input(z.object({ name: z.string().trim().min(2, "اكتب اسم المؤسسة.").max(180) }))
@@ -482,6 +528,7 @@ export const erpRouter = router({
     payrollDashboard: protectedProcedure.query(async ({ ctx }) => { const context = await requireHrOwner(ctx.user.id); return getPayrollDashboard(context.organization.id); }),
     reports: protectedProcedure.input(z.object({ branchId: z.number().int().positive().optional(), departmentId: z.number().int().positive().optional() }).optional()).query(async ({ ctx, input }) => { const { context, scope } = await requireHrScopedPermission(ctx.user.id, "hr.payroll.view"); if (scope.roleKey !== "owner") { if (scope.branchIds.length && (!input?.branchId || !scope.branchIds.includes(input.branchId))) throw new TRPCError({ code: "FORBIDDEN", message: "يلزم اختيار فرع داخل نطاق بياناتك المصرح به." }); if (scope.departmentIds.length && (!input?.departmentId || !scope.departmentIds.includes(input.departmentId))) throw new TRPCError({ code: "FORBIDDEN", message: "يلزم اختيار قسم داخل نطاق بياناتك المصرح به." }); } return getHrOperationalReports(context.organization.id, input); }),
     exportBankFile: protectedProcedure.input(z.object({ payrollPeriodId: z.number().int().positive(), delimiter: z.enum([",", ";"]).optional() })).query(async ({ ctx, input }) => { const context = await requireHrPermission(ctx.user.id, "hr.payroll.export_bank"); return exportPaidPayrollBankFile(context.organization.id, input.payrollPeriodId, input.delimiter); }),
+    createEmployee: protectedProcedure.input(z.object({ employeeNumber: z.string().trim().min(2).max(64), fullName: z.string().trim().min(2).max(180), department: z.string().trim().max(120).optional(), jobTitle: z.string().trim().max(120).optional(), joinedAt: z.coerce.date().optional() })).mutation(async ({ ctx, input }) => { const context = await requireOrganizationOwner(ctx.user.id); return createEmployee(context.organization.id, ctx.user.id, input); }),
     createDepartment: protectedProcedure.input(z.object({ code: z.string().trim().min(2).max(48), name: z.string().trim().min(2).max(160), branchId: z.number().int().positive().optional() })).mutation(async ({ ctx, input }) => { const context = await requireOrganizationOwner(ctx.user.id); return createDepartment(context.organization.id, ctx.user.id, input); }),
     createPosition: protectedProcedure.input(z.object({ code: z.string().trim().min(2).max(48), name: z.string().trim().min(2).max(160), departmentId: z.number().int().positive().optional() })).mutation(async ({ ctx, input }) => { const context = await requireOrganizationOwner(ctx.user.id); return createPosition(context.organization.id, ctx.user.id, input); }),
     createEmployeeProfile: protectedProcedure.input(z.object({ employeeId: z.number().int().positive(), userId: z.number().int().positive().optional(), branchId: z.number().int().positive().optional(), departmentId: z.number().int().positive().optional(), positionId: z.number().int().positive().optional(), managerEmployeeId: z.number().int().positive().optional(), fullNameAr: z.string().trim().max(180).optional(), fullNameLatin: z.string().trim().max(180).optional(), payrollCurrency: z.string().trim().length(3), bankAccountReference: z.string().trim().max(128).optional(), phone: z.string().trim().max(48).optional(), email: z.string().trim().email().max(320).optional(), workLocation: z.string().trim().max(180).optional(), notes: z.string().trim().max(2000).optional() })).mutation(async ({ ctx, input }) => { const context = await requireOrganizationOwner(ctx.user.id); return createEmployeeProfile(context.organization.id, ctx.user.id, input); }),
