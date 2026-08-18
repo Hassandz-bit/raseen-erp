@@ -55,4 +55,15 @@ describe("شركة Nawa Demo", () => {
     expect(source).toContain("receivePurchaseOrder");
     expect(source).toContain("INV-DEMO-OVERDUE-001");
   });
+
+  it("يستكمل التصنيع والجودة والتوزيع بأمان عند إعادة تشغيل بيانات العرض", async () => {
+    const source = await import("node:fs/promises").then(fs => fs.readFile(new URL("./demo.ts", import.meta.url), "utf8"));
+    expect(source).toContain("seedDemoOperationsScenarios");
+    expect(source).toContain("ensureProductionOrder");
+    expect(source).toContain("advanceToProduction");
+    expect(source).toContain("recordProductionQualityCheck");
+    expect(source).toContain("recordDistributionDelivery");
+    expect(source).toContain("RTE-DEMO-001");
+    expect(source).toContain("DEMO-TRK-01");
+  });
 });

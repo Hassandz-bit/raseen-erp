@@ -1,6 +1,9 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
-import { auditLogs, b2bPromotions, branches, businessParties, demoSeedRuns, organizationMemberships, organizationModules, organizationRoles, organizationSettings, organizations, priceListItems, priceLists, productBatches, productBrands, productCategories, productPackagingLevels, productUnitConversions, products, purchaseOrderItems, purchaseOrders, salesInvoices, uomCatalog, userPreferences, warehouses } from "../drizzle/schema";
+import { auditLogs, b2bPromotions, branches, businessParties, demoSeedRuns, distributionRoutes, fleetVehicles, manufacturingBoms, organizationMemberships, organizationModules, organizationRoles, organizationSettings, organizations, priceListItems, priceLists, productBatches, productBrands, productCategories, productPackagingLevels, productUnitConversions, products, productionOrders, purchaseOrderItems, purchaseOrders, salesInvoices, uomCatalog, userPreferences, vehicleLoadItems, warehouses } from "../drizzle/schema";
 import { createBusinessParty, createProductBatch, createPurchaseOrder, createSalesInvoice, defaultDocumentSettings, getDb, issueSalesInvoiceWithFefo, receivePurchaseOrder, recordSalesInvoicePayment, sendPurchaseOrder, setActiveOrganizationForUser } from "./db";
+import { createDistributionRoute, createDistributionTerritory, createFleetVehicle, createVehicleLoadOrder, logFuel, recordDistributionCollection, recordDistributionDelivery, transitionDistributionRoute, transitionVehicleLoadOrder } from "./distribution";
+import { createManufacturingBom, createProductionOrder, issueMaterialsForProduction, recordProductionExpense, recordProductionOutput, recordProductionQualityCheck, recordProductionWaste, reserveProductionMaterials, saveManufacturingProductProfile, transitionProductionOrderStatus } from "./manufacturing";
+import { productionExpenses, productionOutputs } from "../drizzle/manufacturingSchema";
 
 export const DEMO_ORGANIZATION = {
   slug: "nawa-demo",
@@ -280,6 +283,146 @@ export async function seedDemoCommerceScenarios(actorUserId: number) {
   }
   await db.insert(auditLogs).values({ organizationId, actorUserId, action: "demo.commerce.scenarios.seeded", entityType: "demo_seed", entityId: String(organizationId), metadata: { salesInvoices: 3, purchaseOrders: 1 } });
   return { ...master, salesInvoices: 3, purchaseOrders: 1 };
+}
+
+export async function seedDemoOperationsScenarios(actorUserId: number) {
+  const commerce = await seedDemoCommerceScenarios(actorUserId);
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const organizationId = commerce.organizationId;
+  const [rawWarehouse, finishedWarehouse, centralWarehouse] = await Promise.all([
+    db.select().from(warehouses).where(and(eq(warehouses.organizationId, organizationId), eq(warehouses.code, "DEMO-RM"))).limit(1).then(rows => rows[0]),
+    db.select().from(warehouses).where(and(eq(warehouses.organizationId, organizationId), eq(warehouses.code, "DEMO-FG"))).limit(1).then(rows => rows[0]),
+    db.select().from(warehouses).where(and(eq(warehouses.organizationId, organizationId), eq(warehouses.code, "DEMO-CENTRAL"))).limit(1).then(rows => rows[0]),
+  ]);
+  if (!rawWarehouse || !finishedWarehouse || !centralWarehouse) throw new Error("مخازن التصنيع أو التوزيع لشركة العرض غير مكتملة.");
+
+  const [hqBranch] = await db.select().from(branches).where(and(eq(branches.organizationId, organizationId), eq(branches.code, "DEMO-HQ"))).limit(1);
+  const demoProducts = await db.select().from(products).where(eq(products.organizationId, organizationId));
+  const demoParties = await db.select().from(businessParties).where(eq(businessParties.organizationId, organizationId));
+  const productBySku = new Map(demoProducts.map(product => [product.sku, product]));
+  const partyByCode = new Map(demoParties.map(party => [party.code, party]));
+  const need = <T>(value: T | undefined, label: string): T => { if (!value) throw new Error(`بيانات Demo ناقصة: ${label}`); return value; };
+  const needId = (value: number | null | undefined, label: string) => { if (!value) throw new Error(`بيانات Demo ناقصة: ${label}`); return value; };
+
+  const rawInputs = ["DEMO-025", "DEMO-027", "DEMO-028", "DEMO-029"].map(sku => need(productBySku.get(sku), sku));
+  const [existingSupplier] = await db.select().from(businessParties).where(and(eq(businessParties.organizationId, organizationId), eq(businessParties.code, "SUP-002"))).limit(1);
+  for (const input of rawInputs) {
+    const lotNumber = `DEMO-RM-${input.sku}`;
+    const [existing] = await db.select({ id: productBatches.id }).from(productBatches).where(and(eq(productBatches.organizationId, organizationId), eq(productBatches.warehouseId, rawWarehouse.id), eq(productBatches.lotNumber, lotNumber))).limit(1);
+    if (!existing) await createProductBatch(organizationId, { productId: input.id, warehouseId: rawWarehouse.id, lotNumber, receivedQuantity: 1000, cost: Number(input.purchasePrice), sourcePartyId: existingSupplier?.id, manufacturingDate: new Date(Date.now() - 10 * 86_400_000), expiryDate: new Date(Date.now() + 360 * 86_400_000), status: "active", movementType: "opening_balance", sourceDocumentType: "demo_seed" });
+  }
+
+  const milk = need(productBySku.get("DEMO-001"), "DEMO-001");
+  const juice = need(productBySku.get("DEMO-005"), "DEMO-005");
+  const flour = need(productBySku.get("DEMO-025"), "DEMO-025");
+  const bottle = need(productBySku.get("DEMO-027"), "DEMO-027");
+  const cap = need(productBySku.get("DEMO-028"), "DEMO-028");
+  const label = need(productBySku.get("DEMO-029"), "DEMO-029");
+  for (const output of [milk, juice]) await saveManufacturingProductProfile(organizationId, actorUserId, { productId: output.id, manufacturingType: "finished_good", requiresQualityCheck: "yes", defaultShelfLifeDays: output.id === milk.id ? 20 : 45 });
+
+  const [milkBom, juiceBom] = await Promise.all([
+    db.select().from(manufacturingBoms).where(and(eq(manufacturingBoms.organizationId, organizationId), eq(manufacturingBoms.code, "BOM-DEMO-MILK"))).limit(1).then(rows => rows[0]),
+    db.select().from(manufacturingBoms).where(and(eq(manufacturingBoms.organizationId, organizationId), eq(manufacturingBoms.code, "BOM-DEMO-JUICE"))).limit(1).then(rows => rows[0]),
+  ]);
+  const milkBomId = milkBom?.id ?? (await createManufacturingBom(organizationId, actorUserId, { code: "BOM-DEMO-MILK", version: "1.0", productId: milk.id, outputQuantity: 100, outputUnit: "وحدة", notes: "BOM Demo للحليب", items: [{ componentProductId: flour.id, quantity: 1, baseQuantity: 1, unit: "وحدة", wasteAllowance: 2, stageCode: "MIX" }, { componentProductId: bottle.id, quantity: 1, baseQuantity: 1, unit: "وحدة", stageCode: "FILL" }, { componentProductId: cap.id, quantity: 1, baseQuantity: 1, unit: "وحدة", stageCode: "PACK" }, { componentProductId: label.id, quantity: 1, baseQuantity: 1, unit: "وحدة", stageCode: "PACK" }] })).id;
+  const juiceBomId = juiceBom?.id ?? (await createManufacturingBom(organizationId, actorUserId, { code: "BOM-DEMO-JUICE", version: "1.0", productId: juice.id, outputQuantity: 100, outputUnit: "وحدة", notes: "BOM Demo للعصير", items: [{ componentProductId: flour.id, quantity: 1, baseQuantity: 1, unit: "وحدة", wasteAllowance: 1, stageCode: "MIX" }, { componentProductId: bottle.id, quantity: 1, baseQuantity: 1, unit: "وحدة", stageCode: "FILL" }, { componentProductId: cap.id, quantity: 1, baseQuantity: 1, unit: "وحدة", stageCode: "PACK" }, { componentProductId: label.id, quantity: 1, baseQuantity: 1, unit: "وحدة", stageCode: "PACK" }] })).id;
+  await db.update(manufacturingBoms).set({ status: "active" }).where(and(eq(manufacturingBoms.organizationId, organizationId), inArray(manufacturingBoms.id, [milkBomId, juiceBomId])));
+
+  const productionOrdersForDemo = await db.select().from(productionOrders).where(eq(productionOrders.organizationId, organizationId));
+  const findOrder = (bomId: number, plannedQuantity: number) => productionOrdersForDemo.find(order => order.bomId === bomId && Number(order.plannedQuantity) === plannedQuantity);
+  const ensureProductionOrder = async (bomId: number, plannedQuantity: number) => {
+    const found = findOrder(bomId, plannedQuantity);
+    if (found) return found;
+    const created = await createProductionOrder(organizationId, actorUserId, { bomId, plannedQuantity, plannedUnit: "وحدة", baseQuantity: plannedQuantity, rawMaterialWarehouseId: rawWarehouse.id, finishedGoodsWarehouseId: finishedWarehouse.id, branchId: hqBranch?.id });
+    const [order] = await db.select().from(productionOrders).where(and(eq(productionOrders.organizationId, organizationId), eq(productionOrders.id, created.id))).limit(1);
+    return need(order, `أمر إنتاج ${plannedQuantity}`);
+  };
+  const advanceToProduction = async (order: { id: number; status: string }) => {
+    let status = order.status;
+    if (status === "draft") { await transitionProductionOrderStatus(organizationId, actorUserId, order.id, "planned"); status = "planned"; }
+    if (status === "planned") { await transitionProductionOrderStatus(organizationId, actorUserId, order.id, "approved"); status = "approved"; }
+    if (status === "approved") { await reserveProductionMaterials(organizationId, actorUserId, order.id); status = "materials_reserved"; }
+    if (status === "materials_reserved") { await issueMaterialsForProduction(organizationId, actorUserId, order.id); status = "in_production"; }
+    return status;
+  };
+
+  const completed = await ensureProductionOrder(milkBomId, 100);
+  const completedStatus = await advanceToProduction(completed);
+  const [completedOutputRow] = await db.select().from(productionOutputs).where(and(eq(productionOutputs.organizationId, organizationId), eq(productionOutputs.productionOrderId, completed.id))).limit(1);
+  if (!completedOutputRow && completedStatus === "in_production") {
+    const [expense] = await db.select({ id: productionExpenses.id }).from(productionExpenses).where(and(eq(productionExpenses.organizationId, organizationId), eq(productionExpenses.productionOrderId, completed.id))).limit(1);
+    if (!expense) await recordProductionExpense(organizationId, actorUserId, { productionOrderId: completed.id, category: "energy", amount: 1250, currencyCode: "DZD", notes: "طاقة تشغيل Demo" });
+    await recordProductionOutput(organizationId, actorUserId, completed.id, { lotNumber: "MFG-DEMO-MILK-001", goodQuantity: 96, defectiveQuantity: 2, scrapQuantity: 2, manufacturingDate: new Date(Date.now() - 3 * 86_400_000), expiryDate: new Date(Date.now() + 17 * 86_400_000) });
+  }
+  const [completedOutput] = await db.select().from(productionOutputs).where(and(eq(productionOutputs.organizationId, organizationId), eq(productionOutputs.productionOrderId, completed.id))).limit(1);
+  if (completedOutput && completedOutput.qualityStatus !== "passed") await recordProductionQualityCheck(organizationId, actorUserId, { productionOrderId: completed.id, productionOutputId: completedOutput.id, checkType: "microbiology", result: "pass", numericValue: 98, notes: "نتيجة Demo مطابقة" });
+  const [completedWaste] = await db.select({ id: auditLogs.id }).from(auditLogs).where(and(eq(auditLogs.organizationId, organizationId), eq(auditLogs.action, "manufacturing.waste_recorded"), eq(auditLogs.entityId, String(completedOutput?.id ?? 0)))).limit(1);
+  if (completedOutput && !completedWaste) await recordProductionWaste(organizationId, actorUserId, { productionOrderId: completed.id, productionOutputId: completedOutput.id, defectiveQuantity: 2, scrapQuantity: 2, reason: "هدر تجريبي للعرض" });
+
+  const qualityHold = await ensureProductionOrder(juiceBomId, 80);
+  const qualityHoldStatus = await advanceToProduction(qualityHold);
+  const [heldOutputRow] = await db.select().from(productionOutputs).where(and(eq(productionOutputs.organizationId, organizationId), eq(productionOutputs.productionOrderId, qualityHold.id))).limit(1);
+  if (!heldOutputRow && qualityHoldStatus === "in_production") await recordProductionOutput(organizationId, actorUserId, qualityHold.id, { lotNumber: "MFG-DEMO-JUICE-HOLD", goodQuantity: 78, defectiveQuantity: 2, manufacturingDate: new Date(Date.now() - 1 * 86_400_000), expiryDate: new Date(Date.now() + 44 * 86_400_000) });
+  const [heldOutput] = await db.select().from(productionOutputs).where(and(eq(productionOutputs.organizationId, organizationId), eq(productionOutputs.productionOrderId, qualityHold.id))).limit(1);
+  if (heldOutput && heldOutput.qualityStatus !== "quarantined") await recordProductionQualityCheck(organizationId, actorUserId, { productionOrderId: qualityHold.id, productionOutputId: heldOutput.id, checkType: "packaging", result: "fail", notes: "عينة Demo معلقة للمراجعة" });
+
+  const planned = await ensureProductionOrder(milkBomId, 120);
+  if (planned.status === "draft") await transitionProductionOrderStatus(organizationId, actorUserId, planned.id, "planned");
+
+  const vehicleSpecs = [
+    ["DEMO-TRK-01", "DEMO-101-16", "شاحنة تبريد", 3500, 24], ["DEMO-TRK-02", "DEMO-102-16", "شاحنة توزيع", 3000, 20], ["DEMO-VAN-01", "DEMO-103-16", "فان توزيع", 1600, 12], ["DEMO-VAN-02", "DEMO-104-16", "فان توزيع", 1600, 12],
+  ] as const;
+  for (const [code, registrationNumber, type, maximumPayloadWeight, maximumVolume] of vehicleSpecs) {
+    const [existing] = await db.select({ id: fleetVehicles.id }).from(fleetVehicles).where(and(eq(fleetVehicles.organizationId, organizationId), eq(fleetVehicles.code, code))).limit(1);
+    if (!existing) await createFleetVehicle(organizationId, actorUserId, { code, registrationNumber, type, branchId: hqBranch?.id, ownershipType: "owned", maximumPayloadWeight, maximumVolume, palletCapacity: 12, insuranceStartAt: new Date(Date.now() - 300 * 86_400_000), insuranceEndAt: new Date(Date.now() + (code === "DEMO-TRK-01" ? 5 : 180) * 86_400_000), technicalInspectionStartAt: new Date(Date.now() - 300 * 86_400_000), technicalInspectionEndAt: new Date(Date.now() + 120 * 86_400_000) });
+  }
+  const vehicles = await db.select().from(fleetVehicles).where(eq(fleetVehicles.organizationId, organizationId));
+  const truck = need(vehicles.find(vehicle => vehicle.code === "DEMO-TRK-01"), "DEMO-TRK-01");
+  const territoryDefinitions = [["DEMO-CENTER", "وسط الجزائر", 36.7538, 3.0588], ["DEMO-EAST", "محور الشرق", 36.365, 6.6147], ["DEMO-SOUTH", "محور الجنوب", 28.0339, 1.6596]] as const;
+  for (const [code, name, latitude, longitude] of territoryDefinitions) {
+    const result = await db.execute(sql`SELECT id FROM distribution_territories WHERE organizationId = ${organizationId} AND code = ${code} LIMIT 1`);
+    const rows = (result as unknown as [Array<{ id: number }>])[0] ?? [];
+    if (!rows[0]) await createDistributionTerritory(organizationId, actorUserId, { code, name, latitude, longitude, branchId: hqBranch?.id, defaultVehicleId: truck.id });
+  }
+
+  const distributionInvoiceNumber = "INV-DEMO-DIST-001";
+  let [distributionInvoice] = await db.select().from(salesInvoices).where(and(eq(salesInvoices.organizationId, organizationId), eq(salesInvoices.invoiceNumber, distributionInvoiceNumber))).limit(1);
+  if (!distributionInvoice) {
+    const created = await createSalesInvoice(organizationId, actorUserId, { invoiceNumber: distributionInvoiceNumber, customerId: need(partyByCode.get("CUS-007"), "CUS-007").id, currencyCode: "DZD", baseCurrencyCode: "DZD", dueDate: new Date(Date.now() + 10 * 86_400_000), lines: [{ productId: milk.id, warehouseId: centralWarehouse.id, quantity: 20 }, { productId: juice.id, warehouseId: centralWarehouse.id, quantity: 18 }] });
+    await issueSalesInvoiceWithFefo(organizationId, actorUserId, created.id);
+    [distributionInvoice] = await db.select().from(salesInvoices).where(and(eq(salesInvoices.id, created.id), eq(salesInvoices.organizationId, organizationId))).limit(1);
+  }
+  const [existingRoute] = await db.select().from(distributionRoutes).where(and(eq(distributionRoutes.organizationId, organizationId), eq(distributionRoutes.routeNumber, "RTE-DEMO-001"))).limit(1);
+  if (!existingRoute && distributionInvoice) {
+    const territoryResult = await db.execute(sql`SELECT id FROM distribution_territories WHERE organizationId = ${organizationId} AND code = 'DEMO-CENTER' LIMIT 1`);
+    const territories = (territoryResult as unknown as [Array<{ id: number }>])[0] ?? [];
+    const customer = need(partyByCode.get("CUS-007"), "CUS-007");
+    const route = await createDistributionRoute(organizationId, actorUserId, { routeNumber: "RTE-DEMO-001", routeDate: new Date(), branchId: hqBranch?.id, territoryId: territories[0]?.id, vehicleId: truck.id, stops: [{ customerId: customer.id, salesInvoiceId: distributionInvoice.id, notes: "تسليم جزئي Demo" }] });
+    await transitionDistributionRoute(organizationId, actorUserId, route.id, "prepared");
+    const [milkBatch, juiceBatch] = await Promise.all([
+      db.select().from(productBatches).where(and(eq(productBatches.organizationId, organizationId), eq(productBatches.warehouseId, centralWarehouse.id), eq(productBatches.productId, milk.id), eq(productBatches.status, "active"))).limit(1).then(rows => rows[0]),
+      db.select().from(productBatches).where(and(eq(productBatches.organizationId, organizationId), eq(productBatches.warehouseId, centralWarehouse.id), eq(productBatches.productId, juice.id), eq(productBatches.status, "active"))).limit(1).then(rows => rows[0]),
+    ]);
+    const load = await createVehicleLoadOrder(organizationId, actorUserId, { loadNumber: "LOAD-DEMO-001", sourceWarehouseId: centralWarehouse.id, vehicleId: truck.id, routeId: route.id, lines: [{ productId: milk.id, batchId: need(milkBatch, "دفعة حليب").id, quantity: 20, unit: "وحدة" }, { productId: juice.id, batchId: need(juiceBatch, "دفعة عصير").id, quantity: 18, unit: "وحدة" }] });
+    for (const status of ["prepared", "approved", "loading", "loaded", "dispatched"] as const) await transitionVehicleLoadOrder(organizationId, actorUserId, load.id, status);
+    await transitionDistributionRoute(organizationId, actorUserId, route.id, "started");
+    const items = await db.select().from(vehicleLoadItems).where(and(eq(vehicleLoadItems.organizationId, organizationId), eq(vehicleLoadItems.loadOrderId, load.id)));
+    const milkItem = need(items.find(item => item.productId === milk.id), "تحميل الحليب");
+    const juiceItem = need(items.find(item => item.productId === juice.id), "تحميل العصير");
+    const stopResult = await db.execute(sql`SELECT id FROM distribution_route_stops WHERE organizationId = ${organizationId} AND routeId = ${route.id} LIMIT 1`);
+    const stops = (stopResult as unknown as [Array<{ id: number }>])[0] ?? [];
+    const delivery = await recordDistributionDelivery(organizationId, actorUserId, { routeId: route.id, stopId: stops[0]?.id, customerId: customer.id, salesInvoiceId: distributionInvoice.id, idempotencyKey: "demo-delivery-001", notes: "تسليم جزئي Demo", items: [{ productId: milk.id, vehicleBatchId: needId(milkItem.vehicleBatchId, "دفعة مركبة حليب"), expectedQuantity: 20, deliveredQuantity: 12, unit: "وحدة" }, { productId: juice.id, vehicleBatchId: needId(juiceItem.vehicleBatchId, "دفعة مركبة عصير"), expectedQuantity: 18, deliveredQuantity: 0, rejectedQuantity: 18, unit: "وحدة" }] });
+    await recordDistributionCollection(organizationId, actorUserId, { routeId: route.id, customerId: customer.id, salesInvoiceId: distributionInvoice.id, collectionType: "current_invoice", amount: 1000, currencyCode: "DZD", paymentMethod: "cash", idempotencyKey: "demo-collection-001" });
+    await logFuel(organizationId, actorUserId, { vehicleId: truck.id, routeId: route.id, odometer: 24850, fuelQuantity: 75, fuelType: "diesel", unitPrice: 48, currencyCode: "DZD", vendor: "محطة Demo", occurredAt: new Date() });
+    await transitionDistributionRoute(organizationId, actorUserId, route.id, "in_progress");
+    await transitionDistributionRoute(organizationId, actorUserId, route.id, "returning");
+    await transitionDistributionRoute(organizationId, actorUserId, route.id, "closing");
+    await transitionDistributionRoute(organizationId, actorUserId, route.id, "closed");
+    await db.insert(auditLogs).values({ organizationId, actorUserId, action: "demo.operations.distribution_seeded", entityType: "distribution_delivery", entityId: String(delivery.id), metadata: { routeId: route.id, deliveryStatus: delivery.status } });
+  }
+  await db.insert(auditLogs).values({ organizationId, actorUserId, action: "demo.operations.seeded", entityType: "demo_seed", entityId: String(organizationId), metadata: { production: true, vehicles: vehicleSpecs.length, route: "RTE-DEMO-001" } });
+  return { ...commerce, productionSeeded: true, vehicles: vehicleSpecs.length, distributionRoute: "RTE-DEMO-001" };
 }
 
 async function listDemoOrganizationTables() {

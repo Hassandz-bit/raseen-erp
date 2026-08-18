@@ -30,7 +30,7 @@ import { getHrOperationalReports } from "./hrReports";
 import { canUseHrPermission, type HrPermission } from "./hrPermissionPolicy";
 import { assertHrEmployeeInScope, hasRestrictedHrScope, resolveHrEmployeeScope } from "./hrDataScope";
 import { decideTeamAdvanceRequest, decideTeamLeaveRequest, getEmployeeSelfService, submitSelfAdvanceRequest, submitSelfLeaveRequest } from "./hrSelfService";
-import { activateDemoOrganizationForUser, deleteDemoOrganization, ensureDemoOrganization, getDemoOrganizationForUser, resetDemoOrganization, seedDemoCatalog, seedDemoCommerceScenarios, seedDemoCommercialMaster, seedDemoFoundation, seedDemoPromotions } from "./demo";
+import { activateDemoOrganizationForUser, deleteDemoOrganization, ensureDemoOrganization, getDemoOrganizationForUser, resetDemoOrganization, seedDemoCatalog, seedDemoCommerceScenarios, seedDemoCommercialMaster, seedDemoFoundation, seedDemoOperationsScenarios, seedDemoPromotions } from "./demo";
 
 type ModuleKey = "inventory" | "sales" | "purchases" | "finance" | "hr" | "reports" | "ai_assistant" | "distribution" | "manufacturing" | "nawa_retail";
 const operationalModuleKeys = ["inventory", "sales", "purchases", "finance", "hr"] as const;
@@ -165,6 +165,10 @@ export const erpRouter = router({
     seedCommerceScenarios: protectedProcedure.mutation(async ({ ctx }) => {
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "يلزم مدير المنصة لتهيئة سيناريوهات تجارة شركة العرض." });
       return seedDemoCommerceScenarios(ctx.user.id);
+    }),
+    seedOperationsScenarios: protectedProcedure.mutation(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "يلزم مدير المنصة لتهيئة التصنيع والتوزيع لشركة العرض." });
+      return seedDemoOperationsScenarios(ctx.user.id);
     }),
     reset: protectedProcedure.mutation(async ({ ctx }) => {
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "يلزم مدير المنصة لإعادة تهيئة شركة العرض." });
