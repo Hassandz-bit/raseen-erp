@@ -27,7 +27,7 @@ import * as React from "react";
 const SIDEBAR_COOKIE_NAME = "sidebar_state";
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
 const SIDEBAR_WIDTH = "16rem";
-const SIDEBAR_WIDTH_MOBILE = "min(88vw, 26rem)";
+const SIDEBAR_WIDTH_MOBILE = "var(--nawa-tablet-sidebar-width, min(88vw, 26rem))";
 const SIDEBAR_WIDTH_ICON = "3rem";
 const SIDEBAR_KEYBOARD_SHORTCUT = "b";
 
@@ -375,9 +375,10 @@ function SidebarSeparator({
   );
 }
 
-function SidebarContent({ className, ...props }: React.ComponentProps<"div">) {
+const SidebarContent = React.forwardRef<HTMLDivElement, React.ComponentProps<"div">>(function SidebarContent({ className, ...props }, ref) {
   return (
     <div
+      ref={ref}
       data-slot="sidebar-content"
       data-sidebar="content"
       className={cn(
@@ -387,7 +388,7 @@ function SidebarContent({ className, ...props }: React.ComponentProps<"div">) {
       {...props}
     />
   );
-}
+});
 
 function SidebarGroup({ className, ...props }: React.ComponentProps<"div">) {
   return (

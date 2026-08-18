@@ -39,6 +39,7 @@ const DEFAULT_WIDTH = 304;
 const MIN_WIDTH = 240;
 const MAX_WIDTH = 480;
 const ACTIVE_BRANCH_KEY = "nawa:active-branch";
+const PORTAL_SCROLL_PREFIX = "nawa:portal-sidebar-scroll:";
 const portalChrome = {
   ar: { portals: "الرئيسية", executive: "الملخص التنفيذي", workspace: "مساحة العمل", navigation: "تنقل البوابة", breadcrumbRoot: "نواة", defaultBranch: "الفرع الافتراضي", notifications: "التنبيهات", markAllRead: "تحديد الكل كمقروء", emptyNotifications: "لا توجد تنبيهات حديثة", settings: "الإعدادات", ai: "Nawa AI", demo: "بيانات Demo" },
   fr: { portals: "Accueil", executive: "Vue exécutive", workspace: "Espace de travail", navigation: "Navigation du portail", breadcrumbRoot: "Nawa", defaultBranch: "Branche par défaut", notifications: "Notifications", markAllRead: "Tout marquer comme lu", emptyNotifications: "Aucune notification récente", settings: "Paramètres", ai: "Nawa AI", demo: "Données Demo" },
@@ -124,11 +125,12 @@ function DashboardLayoutContent({
   const { preferences } = useTheme();
   const [location, setLocation] = useLocation();
   const search = useSearch();
-  const { state, toggleSidebar } = useSidebar();
+  const { state, toggleSidebar, setOpenMobile } = useSidebar();
   const isCollapsed = state === "collapsed";
   const [isResizing, setIsResizing] = useState(false);
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
+  const portalScrollRef = useRef<HTMLDivElement>(null);
   const previousPortalId = useRef<string | undefined>(undefined);
   const pathWithoutQuery = location.split("?")[0];
   const activePortal = getPortalForPath(pathWithoutQuery);
@@ -167,6 +169,24 @@ function DashboardLayoutContent({
   useEffect(() => {
     if (activePortal) localStorage.setItem("nawa:last-portal", activePortal.id);
   }, [activePortal]);
+
+  useEffect(() => {
+    const content = portalScrollRef.current;
+    if (!content) return;
+    const portalKey = activePortal?.id ?? "home";
+    const storageKey = `${PORTAL_SCROLL_PREFIX}${portalKey}`;
+    const restore = window.requestAnimationFrame(() => {
+      const savedTop = Number(localStorage.getItem(storageKey));
+      content.scrollTop = Number.isFinite(savedTop) && savedTop > 0 ? savedTop : 0;
+    });
+    const persist = () => localStorage.setItem(storageKey, String(content.scrollTop));
+    content.addEventListener("scroll", persist, { passive: true });
+    return () => {
+      window.cancelAnimationFrame(restore);
+      persist();
+      content.removeEventListener("scroll", persist);
+    };
+  }, [activePortal?.id]);
 
   useEffect(() => {
     const portalChanged = Boolean(activePortal?.id && activePortal.id !== previousPortalId.current);
@@ -250,6 +270,7 @@ function DashboardLayoutContent({
                 <PanelLeft className="h-4 w-4 text-muted-foreground" />
               </button>
               {!isCollapsed ? <div className="flex min-w-0 items-center gap-2"><span className="truncate text-[17px] font-bold tracking-tight min-[600px]:text-[20px] md:text-[22px]">{activePortal?.name[language] ?? chrome.portals}</span></div> : null}
+              {isMobile && !isCollapsed ? <Button type="button" variant="ghost" size="sm" onClick={() => setOpenMobile(false)} className="ms-auto h-9 shrink-0 gap-1.5 px-2.5 text-[13px] font-bold text-primary hover:bg-primary/10 hover:text-primary"><span>{language === "ar" ? "إغلاق" : language === "fr" ? "Fermer" : "Close"}</span></Button> : null}
             </div>
           </SidebarHeader>
 
@@ -266,7 +287,7 @@ function DashboardLayoutContent({
             </DropdownMenu>
           </div>
 
-          <SidebarContent className="min-h-0 gap-0 overscroll-contain overflow-y-auto">
+          <SidebarContent ref={portalScrollRef} className="min-h-0 gap-0 overscroll-contain overflow-y-auto">
             <SidebarMenu className="px-2 py-3">
               {activePortal ? <><SidebarMenuItem><SidebarMenuButton onClick={() => navigateTo("/", chrome.portals)} tooltip={chrome.portals} className="h-11 text-[15px] font-semibold text-muted-foreground hover:text-foreground min-[600px]:text-[16px]"><Grid2X2 className="h-[18px] w-[18px]" /><span>{chrome.portals}</span></SidebarMenuButton></SidebarMenuItem><div className="mx-2 mt-3 min-w-0 rounded-xl border border-primary/15 bg-primary/[.06] px-3 py-3 group-data-[collapsible=icon]:hidden"><p className="text-[11px] font-bold uppercase tracking-[.12em] text-primary">{chrome.navigation}</p><p className="mt-1 break-words text-[16px] font-bold text-foreground min-[600px]:text-[18px]">{activePortal.name[language]}</p></div></> : <><SidebarMenuItem><SidebarMenuButton onClick={() => navigateTo("/", chrome.portals)} tooltip={chrome.portals} className="h-12 text-[15px] font-semibold min-[600px]:text-[16px]"><Grid2X2 className="h-[19px] w-[19px] text-primary" /><span>{chrome.portals}</span></SidebarMenuButton></SidebarMenuItem><SidebarMenuItem><SidebarMenuButton onClick={() => navigateTo("/executive", chrome.executive)} tooltip={chrome.executive} className="h-12 text-[15px] font-medium min-[600px]:text-[16px]"><Home className="h-[19px] w-[19px]" /><span>{chrome.executive}</span></SidebarMenuButton></SidebarMenuItem><SidebarMenuItem><SidebarMenuButton onClick={() => navigateTo("/workspace", chrome.ai)} tooltip={chrome.ai} className="h-12 text-[15px] font-bold text-primary min-[600px]:text-[16px]"><Bot className="h-[19px] w-[19px] text-primary" /><span>{chrome.ai}</span><span className="sr-only">{chrome.workspace}</span></SidebarMenuButton></SidebarMenuItem></>}
               {activePortal ? <p className="px-2 pb-2 pt-5 text-[12px] font-semibold uppercase tracking-[.14em] text-muted-foreground group-data-[collapsible=icon]:hidden">{chrome.navigation}</p> : null}

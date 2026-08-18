@@ -108,6 +108,9 @@ body {
 :root[data-sidebar-font-scale="large"] .nawa-portal-sidebar [data-slot="sidebar-menu-button"] { font-size: 1.25rem !important; }
 :root[data-sidebar-font-scale="extra_large"] .nawa-portal-sidebar [data-slot="sidebar-menu-button"] { font-size: 1.4rem !important; }
 :root[data-sidebar-font-scale="large"] .nawa-portal-sidebar [data-slot="sidebar-menu-button"], :root[data-sidebar-font-scale="extra_large"] .nawa-portal-sidebar [data-slot="sidebar-menu-button"] { min-height: 3.75rem; }
+:root[data-tablet-sidebar-width="narrow"] { --nawa-tablet-sidebar-width: min(76vw, 21rem); }
+:root[data-tablet-sidebar-width="normal"] { --nawa-tablet-sidebar-width: min(88vw, 26rem); }
+:root[data-tablet-sidebar-width="wide"] { --nawa-tablet-sidebar-width: min(94vw, 30rem); }
 :root[data-high-contrast="true"] .nawa-portal-sidebar { background: #07090d !important; color: #fff !important; border-color: #f3c94d !important; }
 :root[data-high-contrast="true"] .nawa-portal-sidebar [data-slot="sidebar-menu-button"] { color: #fff !important; border: 1px solid transparent; }
 :root[data-high-contrast="true"] .nawa-portal-sidebar [data-slot="sidebar-menu-button"]:hover, :root[data-high-contrast="true"] .nawa-portal-sidebar [data-active="true"] { background: #222a37 !important; border-color: #f3c94d !important; color: #fff !important; }

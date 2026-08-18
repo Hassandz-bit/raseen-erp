@@ -9,6 +9,7 @@ export type AppearancePreferences = {
   fontScale: "small" | "normal" | "large" | "extra_large";
   sidebarFontScale: "small" | "normal" | "large" | "extra_large";
   highContrast: boolean;
+  tabletSidebarWidth: "narrow" | "normal" | "wide";
   numeralStyle: "western" | "arabic_indic";
   accentColor: "gold" | "blue" | "emerald" | "violet";
   radiusPreset: "soft" | "rounded" | "sharp";
@@ -24,7 +25,7 @@ type ThemeContextType = {
   switchable: boolean;
 };
 
-const defaultPreferences: AppearancePreferences = { themeMode: "dark", sidebarMode: "expanded", density: "comfortable", fontFamily: "ibm-plex", fontScale: "normal", sidebarFontScale: "normal", highContrast: false, numeralStyle: "western", accentColor: "gold", radiusPreset: "rounded", moduleViewMode: "classic" };
+const defaultPreferences: AppearancePreferences = { themeMode: "dark", sidebarMode: "expanded", density: "comfortable", fontFamily: "ibm-plex", fontScale: "normal", sidebarFontScale: "normal", highContrast: false, tabletSidebarWidth: "normal", numeralStyle: "western", accentColor: "gold", radiusPreset: "rounded", moduleViewMode: "classic" };
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children, defaultTheme = "dark" }: { children: React.ReactNode; defaultTheme?: "light" | "dark" }) {
@@ -51,6 +52,7 @@ export function ThemeProvider({ children, defaultTheme = "dark" }: { children: R
     root.dataset.fontScale = preferences.fontScale;
     root.dataset.sidebarFontScale = preferences.sidebarFontScale;
     root.dataset.highContrast = String(preferences.highContrast);
+    root.dataset.tabletSidebarWidth = preferences.tabletSidebarWidth;
     root.dataset.numeralStyle = preferences.numeralStyle;
     localStorage.setItem("nawa-appearance", JSON.stringify(preferences));
     window.dispatchEvent(new Event("nawa-appearance"));
