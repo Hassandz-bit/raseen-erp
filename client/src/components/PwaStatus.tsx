@@ -5,6 +5,7 @@ import { Download, Laptop, RefreshCw, Smartphone, WifiOff } from "lucide-react";
 import { useEffect, useState } from "react";
 
 type InstallPromptEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: "accepted" | "dismissed" }> };
+export const PWA_OPEN_INSTALL_EVENT = "nawa-pwa-open-install";
 
 export function PwaStatus() {
   const { language } = useLanguage();
@@ -21,7 +22,7 @@ export function PwaStatus() {
     window.addEventListener("online", syncConnectivity);
     window.addEventListener("offline", syncConnectivity);
     window.addEventListener("beforeinstallprompt", onInstallPrompt);
-    window.addEventListener("nawa-pwa-open-install", onOpenInstall);
+    window.addEventListener(PWA_OPEN_INSTALL_EVENT, onOpenInstall);
     if ("serviceWorker" in navigator && import.meta.env.PROD) {
       navigator.serviceWorker.register("/nawa-erp-sw.js").then(registration => {
         if (registration.waiting) setUpdateReady(registration);
@@ -31,7 +32,7 @@ export function PwaStatus() {
         });
       }).catch(() => { /* PWA enhancement must never block application usage. */ });
     }
-    return () => { window.removeEventListener("online", syncConnectivity); window.removeEventListener("offline", syncConnectivity); window.removeEventListener("beforeinstallprompt", onInstallPrompt); window.removeEventListener("nawa-pwa-open-install", onOpenInstall); };
+    return () => { window.removeEventListener("online", syncConnectivity); window.removeEventListener("offline", syncConnectivity); window.removeEventListener("beforeinstallprompt", onInstallPrompt); window.removeEventListener(PWA_OPEN_INSTALL_EVENT, onOpenInstall); };
   }, []);
 
   const applyUpdate = () => {

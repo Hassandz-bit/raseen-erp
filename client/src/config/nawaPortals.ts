@@ -31,7 +31,7 @@ const navigationIcons: Record<string, LucideIcon> = {
   supplier: Store, accesses: UsersRound, outlets: MapPin, "retail-users": UserCog, promotions: BadgePercent, "retail-orders": ClipboardList, returns: RotateCcw, retailer: ShoppingBag,
   accounts: BookOpen, entries: NotebookPen, aging: Scale, treasury: WalletCards, reports: ChartNoAxesCombined,
   employees: Contact, attendance: CalendarCheck2, overtime: Clock3, leave: CalendarDays, payroll: Banknote, "self-service": UserRoundCheck,
-  workspace: Bot, flow: Workflow, settings: Settings2, modules: Boxes, security: ShieldAlert, details: FileText, "decision-alerts": AlertTriangle, vat: BadgePercent,
+  workspace: Bot, flow: Workflow, settings: Settings2, modules: Boxes, security: ShieldAlert, details: FileText, "decision-alerts": AlertTriangle, vat: BadgePercent, appearance: Settings2, about: FileText,
 };
 
 export function getPortalNavigationIcon(itemId: string, fallback: LucideIcon) {
@@ -179,7 +179,7 @@ export const nawaPortals: NawaPortal[] = [
       { id: "currencies", label: text("العملات", "Devises", "Currencies"), href: "/settings?section=currencies", group: text("التفضيلات", "Préférences", "Preferences") },
       { id: "exchange-rates", label: text("أسعار الصرف", "Taux de change", "Exchange rates"), href: "/settings?section=exchangeRates", group: text("التفضيلات", "Préférences", "Preferences") },
       { id: "date-numbers", label: text("التاريخ والأرقام", "Dates et nombres", "Dates & numbers"), href: "/settings?section=dateAndNumbers", group: text("التفضيلات", "Préférences", "Preferences") },
-      { id: "appearance", label: text("المظهر", "Apparence", "Appearance"), href: "/settings?section=appearance", group: text("التفضيلات", "Préférences", "Preferences") },
+      { id: "appearance", label: text("ألوان رصين", "Couleurs RASEEN", "RASEEN colors"), href: "/appearance", group: text("التفضيلات", "Préférences", "Preferences") },
       { id: "typography", label: text("الخطوط والوصول", "Typographie et accessibilité", "Typography & accessibility"), href: "/settings?section=typography", group: text("التفضيلات", "Préférences", "Preferences") },
       { id: "module-view", label: text("عرض الوحدات", "Vue des modules", "Module view"), href: "/settings?section=moduleView", group: text("التفضيلات", "Préférences", "Preferences") },
       { id: "printing", label: text("الطباعة والمستندات", "Impression et documents", "Printing & documents"), href: "/settings?section=printing", group: text("الإدارة", "Administration", "Administration") },
@@ -190,6 +190,7 @@ export const nawaPortals: NawaPortal[] = [
       { id: "security", label: text("الأمان", "Sécurité", "Security"), href: "/settings?section=security", group: text("الإدارة", "Administration", "Administration") },
       { id: "settings", label: text("ملخص الإعدادات", "Résumé des paramètres", "Settings overview"), href: "/settings", group: text("الإدارة", "Administration", "Administration") },
       { id: "modules", label: text("الوحدات والاشتراكات", "Modules et abonnements", "Modules & subscriptions"), href: "/modules", group: text("الاشتراك", "Abonnement", "Subscription") },
+      { id: "about", label: text("حول رصين", "À propos de RASEEN", "About RASEEN"), href: "/about", group: text("الإدارة", "Administration", "Administration") },
     ],
   },
 ];
@@ -206,6 +207,6 @@ export function getPortalForPath(path: string) {
   if (path.startsWith("/manufacturing")) return getPortal("manufacturing");
   if (path.startsWith("/finance")) return getPortal("finance");
   if (path.startsWith("/workspace")) return getPortal("ai");
-  if (path.startsWith("/settings") || path.startsWith("/modules") || path.startsWith("/alerts")) return getPortal("administration");
+  if (path.startsWith("/settings") || path.startsWith("/appearance") || path.startsWith("/about") || path.startsWith("/modules") || path.startsWith("/alerts")) return getPortal("administration");
   return undefined;
 }

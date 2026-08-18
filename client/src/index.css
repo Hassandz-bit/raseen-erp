@@ -102,6 +102,7 @@ body {
 :root[data-accent="blue"] { --primary: oklch(0.72 0.12 245); --primary-foreground: oklch(0.18 0.02 245); --ring: oklch(0.72 0.12 245); }
 :root[data-accent="emerald"] { --primary: oklch(0.74 0.14 165); --primary-foreground: oklch(0.17 0.02 165); --ring: oklch(0.74 0.14 165); }
 :root[data-accent="violet"] { --primary: oklch(0.72 0.15 300); --primary-foreground: oklch(0.96 0.02 300); --ring: oklch(0.72 0.15 300); }
+:root[data-accent="gold"] { --primary: oklch(0.78 0.12 82); --primary-foreground: oklch(0.17 0.02 75); --ring: oklch(0.78 0.12 82); }
 
 :root[data-sidebar-font-scale="small"] .nawa-portal-sidebar [data-slot="sidebar-menu-button"] { font-size: 1rem !important; }
 :root[data-sidebar-font-scale="normal"] .nawa-portal-sidebar [data-slot="sidebar-menu-button"] { font-size: 1.125rem !important; }
