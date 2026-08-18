@@ -6,6 +6,7 @@ import NotFound from "@/pages/NotFound";
 import { useEffect } from "react";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
+import { PwaStatus } from "./components/PwaStatus";
 import { LanguageProvider, useLanguage } from "./contexts/LanguageContext";
 import { ThemeProvider, useTheme } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
@@ -60,5 +61,5 @@ function PreferencesHydrator({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
-  return <ErrorBoundary><ThemeProvider defaultTheme="dark"><LanguageProvider><TooltipProvider><Toaster richColors position="top-center" /><PreferencesHydrator><Router /></PreferencesHydrator></TooltipProvider></LanguageProvider></ThemeProvider></ErrorBoundary>;
+  return <ErrorBoundary><ThemeProvider defaultTheme="dark"><LanguageProvider><TooltipProvider><Toaster richColors position="top-center" /><PwaStatus /><PreferencesHydrator><Router /></PreferencesHydrator></TooltipProvider></LanguageProvider></ThemeProvider></ErrorBoundary>;
 }

@@ -1,9 +1,28 @@
 {
-  "name": "Nawa Driver",
-  "short_name": "Nawa Driver",
-  "start_url": "/driver",
+  "name": "Nawa ERP — منصة الأعمال الذكية",
+  "short_name": "Nawa ERP",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "any",
   "background_color": "#0b0e14",
   "theme_color": "#0b0e14",
-  "description": "واجهة Nawa ERP الميدانية للسائقين. تتطلب مشاركة الموقع موافقة صريحة ولا توفر تتبعاً خلفياً بعد إغلاق التطبيق."
+  "description": "منصة Nawa ERP لإدارة التجارة والمخزون والتوزيع والتصنيع والمالية والموارد البشرية ضمن مؤسسات معزولة.",
+  "categories": ["business", "productivity"],
+  "lang": "ar",
+  "dir": "rtl",
+  "icons": [
+    {
+      "src": "https://files.manuscdn.com/user_upload_by_module/web_dev_logo/310519663063374930/nDTjnNRICZOtwSCv.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    { "name": "التجارة والمخزون", "url": "/commerce", "description": "فتح عمليات التجارة والمخزون" },
+    { "name": "فواتير المبيعات", "url": "/commerce/sales", "description": "فتح فواتير المبيعات" },
+    { "name": "Nawa AI", "url": "/workspace", "description": "فتح مساحة Nawa AI" }
+  ]
 }
