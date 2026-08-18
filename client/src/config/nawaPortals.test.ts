@@ -22,10 +22,12 @@ describe("Nawa portals definition", () => {
 
   it("يعرّف أدوات سياقية واسعة للبوابات التشغيلية الرئيسة", () => {
     const byId = (id: string) => nawaPortals.find(portal => portal.id === id)!;
-    expect(byId("manufacturing").localNavigation.map(item => item.id)).toEqual(expect.arrayContaining(["orders", "materials", "stages", "quality", "traceability"]));
-    expect(byId("distribution").localNavigation.map(item => item.id)).toEqual(expect.arrayContaining(["control", "routes", "fleet", "territories", "driver"]));
+    expect(byId("manufacturing").localNavigation.map(item => item.id)).toEqual(expect.arrayContaining(["orders", "materials", "consumption", "stages", "output", "quality", "traceability", "costs"]));
+    expect(byId("distribution").localNavigation.map(item => item.id)).toEqual(expect.arrayContaining(["control", "routes", "fleet", "territories", "logistics-check", "driver"]));
     expect(byId("finance").localNavigation.map(item => item.id)).toEqual(expect.arrayContaining(["accounts", "entries", "aging", "treasury", "reports"]));
-    expect(byId("hr").localNavigation.map(item => item.id)).toEqual(expect.arrayContaining(["employees", "attendance", "leave", "payroll"]));
+    expect(byId("hr").localNavigation.map(item => item.id)).toEqual(expect.arrayContaining(["employees", "attendance", "overtime", "leave", "payroll", "self-service"]));
     expect(byId("commerce").localNavigation.map(item => item.id)).toEqual(expect.arrayContaining(["products", "warehouses", "batches", "sales", "purchases"]));
+    expect(byId("retail").localNavigation.map(item => item.id)).toEqual(expect.arrayContaining(["accesses", "outlets", "retail-users", "promotions", "retail-orders", "returns", "retailer"]));
+    expect(byId("administration").localNavigation.map(item => item.id)).toEqual(expect.arrayContaining(["organization", "language", "currencies", "exchange-rates", "date-numbers", "appearance", "typography", "module-view", "printing", "branches", "users", "notifications", "security", "modules"]));
   });
 });

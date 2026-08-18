@@ -13,6 +13,7 @@ import { trpc } from "@/lib/trpc";
 import { Bell, Building2, CalendarDays, ChevronLeft, Languages, Loader2, Palette, Printer, RefreshCw, Route, Search, Settings2, ShieldCheck, Type, Users, WalletCards } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { useSearch } from "wouter";
 
 const sections = [
   ["organization", Building2], ["language", Languages], ["currencies", WalletCards], ["exchangeRates", RefreshCw], ["dateAndNumbers", CalendarDays], ["appearance", Palette], ["typography", Type], ["moduleView", Route], ["printing", Printer], ["branches", Settings2], ["users", Users], ["notifications", Bell], ["security", ShieldCheck], ["subscriptions", WalletCards],
@@ -28,6 +29,8 @@ export default function SettingsPage() {
   const { language, setLanguage, t } = useLanguage();
   const { preferences, updatePreferences, resetPreferences } = useTheme();
   const auth = useAuth();
+  const search = useSearch();
+  const requestedSection = new URLSearchParams(search).get("section");
   const [active, setActive] = useState<SectionKey>("organization");
   const [settingsSearch, setSettingsSearch] = useState("");
   const [documentDraft, setDocumentDraft] = useState<DocumentDraft>({ paperSize: "A4", headerText: "", footerText: "", legalInfo: "", showSignature: true, fontFamily: "noto-arabic", fontSize: "normal" });
@@ -46,6 +49,10 @@ export default function SettingsPage() {
   const markNotificationRead = trpc.erp.notifications.markRead.useMutation({ onSuccess: () => organizationNotifications.refetch(), onError: () => toast.error(settingsCopy.markReadError) });
   const subscription = trpc.erp.bootstrap.useQuery();
   const settings = organizationPrefs.data;
+
+  useEffect(() => {
+    if (requestedSection && sections.some(([key]) => key === requestedSection)) setActive(requestedSection as SectionKey);
+  }, [requestedSection]);
 
   useEffect(() => {
     if (!userPrefs.data) return;
