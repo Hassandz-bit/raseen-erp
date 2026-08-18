@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vitest";
 import { auditLogs, products, salesInvoiceItems, salesInvoices, warehouses, organizations } from "../drizzle/schema";
-import { createSalesInvoice, getDb } from "./db";
+import { createSalesInvoice, getDb, getSalesInvoicePrintDataForOrganization } from "./db";
 
 type Fixture = { organizationId: number; productId: number; warehouseId: number };
 let fixture: Fixture | null = null;
@@ -74,4 +74,15 @@ describe("حساب ضريبة القيمة المضافة في فواتير ال
     expect(Number(item?.unitPrice)).toBe(119);
     expect(Number(item?.lineTotal)).toBe(119);
   });
-});
+
+  it("يعيد بيانات طباعة الفاتورة وأسطرها ضمن المؤسسة المالكة فقط", async () => {
+    const { organizationId, productId, warehouseId } = await createFixture("100");
+    const created = await createSalesInvoice(organizationId, 1, { invoiceNumber: "VAT-PRINT-001", currencyCode: "SAR", baseCurrencyCode: "SAR", taxMode: "exclusive", taxRate: 19, lines: [{ productId, warehouseId, quantity: 2, unit: "قطعة" }] });
+
+    const printData = await getSalesInvoicePrintDataForOrganization(organizationId, created.id);
+
+    expect(printData.invoice).toMatchObject({ invoiceNumber: "VAT-PRINT-001", taxMode: "exclusive", netAmount: "200.00", taxAmount: "38.00", grandTotal: "238.00" });
+    expect(printData.items).toEqual([expect.objectContaining({ productName: "منتج اختبار ضريبة", quantity: "2.000", unit: "قطعة", taxRate: "19.0000", lineTotal: "238.00" })]);
+    await expect(getSalesInvoicePrintDataForOrganization(organizationId + 999_999, created.id)).rejects.toThrow("لم يتم العثور على الفاتورة ضمن المؤسسة الحالية");
+  });
+}, 20_000);

@@ -335,6 +335,39 @@ export async function listSalesInvoicesForOrganization(organizationId: number) {
   return db.select().from(salesInvoices).where(eq(salesInvoices.organizationId, organizationId)).orderBy(desc(salesInvoices.updatedAt), desc(salesInvoices.id)).limit(100);
 }
 
+export async function getSalesInvoicePrintDataForOrganization(organizationId: number, invoiceId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const [header] = await db.select({
+    invoice: salesInvoices,
+    organizationName: organizations.name,
+    customerName: businessParties.name,
+    documentSettings: organizationSettings.documentSettings,
+  }).from(salesInvoices)
+    .innerJoin(organizations, eq(organizations.id, salesInvoices.organizationId))
+    .leftJoin(businessParties, and(eq(businessParties.id, salesInvoices.customerId), eq(businessParties.organizationId, salesInvoices.organizationId)))
+    .leftJoin(organizationSettings, eq(organizationSettings.organizationId, salesInvoices.organizationId))
+    .where(and(eq(salesInvoices.organizationId, organizationId), eq(salesInvoices.id, invoiceId)))
+    .limit(1);
+  if (!header) throw new Error("لم يتم العثور على الفاتورة ضمن المؤسسة الحالية.");
+
+  const items = await db.select({
+    id: salesInvoiceItems.id,
+    productName: products.name,
+    sku: products.sku,
+    quantity: salesInvoiceItems.quantity,
+    unit: salesInvoiceItems.unit,
+    unitPrice: salesInvoiceItems.unitPrice,
+    taxRate: salesInvoiceItems.taxRate,
+    lineTotal: salesInvoiceItems.lineTotal,
+  }).from(salesInvoiceItems)
+    .innerJoin(products, and(eq(products.id, salesInvoiceItems.productId), eq(products.organizationId, salesInvoiceItems.organizationId)))
+    .where(and(eq(salesInvoiceItems.organizationId, organizationId), eq(salesInvoiceItems.invoiceId, invoiceId)))
+    .orderBy(asc(salesInvoiceItems.id));
+
+  return { ...header, items };
+}
+
 export async function listPurchaseOrdersForOrganization(organizationId: number) {
   const db = await getDb();
   if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
