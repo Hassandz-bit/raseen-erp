@@ -51,6 +51,11 @@ export const nawaPortals: NawaPortal[] = [
     requiredModules: ["manufacturing"],
     localNavigation: [
       { id: "overview", label: text("لوحة التصنيع", "Tableau de production", "Manufacturing dashboard"), href: "/manufacturing", group: text("الإنتاج", "Production", "Production") },
+      { id: "orders", label: text("أوامر الإنتاج", "Ordres de production", "Production orders"), href: "/manufacturing?tab=overview", group: text("الإنتاج", "Production", "Production") },
+      { id: "materials", label: text("المواد", "Matières", "Materials"), href: "/manufacturing?tab=materials", group: text("التشغيل", "Exécution", "Execution") },
+      { id: "stages", label: text("المراحل", "Étapes", "Stages"), href: "/manufacturing?tab=stages", group: text("التشغيل", "Exécution", "Execution") },
+      { id: "quality", label: text("الجودة", "Qualité", "Quality"), href: "/manufacturing?tab=quality", group: text("الرقابة", "Contrôle", "Control") },
+      { id: "traceability", label: text("التتبع", "Traçabilité", "Traceability"), href: "/manufacturing?tab=traceability", group: text("الرقابة", "Contrôle", "Control") },
     ],
   },
   {
@@ -63,6 +68,9 @@ export const nawaPortals: NawaPortal[] = [
     requiredModules: ["distribution"],
     localNavigation: [
       { id: "control", label: text("مركز العمليات", "Centre de contrôle", "Control center"), href: "/distribution", group: text("التوزيع", "Distribution", "Distribution") },
+      { id: "routes", label: text("الجولات والتسليم", "Tournées et livraisons", "Routes & delivery"), href: "/distribution?section=routes", group: text("التوزيع", "Distribution", "Distribution") },
+      { id: "fleet", label: text("المركبات والأسطول", "Véhicules et flotte", "Vehicles & fleet"), href: "/distribution?section=fleet", group: text("الأسطول", "Flotte", "Fleet") },
+      { id: "territories", label: text("نطاقات التوزيع", "Zones de distribution", "Distribution territories"), href: "/distribution?section=territories", group: text("الأسطول", "Flotte", "Fleet") },
       { id: "driver", label: text("مساحة السائق", "Espace conducteur", "Driver workspace"), href: "/driver", group: text("العمليات الميدانية", "Opérations terrain", "Field operations"), externalExperience: true },
     ],
   },
@@ -89,6 +97,11 @@ export const nawaPortals: NawaPortal[] = [
     requiredModules: ["finance"],
     localNavigation: [
       { id: "overview", label: text("مركز المالية", "Centre finance", "Finance center"), href: "/finance", group: text("المالية", "Finance", "Finance") },
+      { id: "accounts", label: text("دليل الحسابات", "Plan comptable", "Chart of accounts"), href: "/finance?tab=accounts", group: text("المحاسبة", "Comptabilité", "Accounting") },
+      { id: "entries", label: text("قيود اليومية", "Écritures", "Journal entries"), href: "/finance?tab=entries", group: text("المحاسبة", "Comptabilité", "Accounting") },
+      { id: "aging", label: text("الذمم", "Balances âgées", "Aging"), href: "/finance?tab=aging", group: text("الرقابة", "Contrôle", "Control") },
+      { id: "treasury", label: text("الخزينة", "Trésorerie", "Treasury"), href: "/finance?tab=treasury", group: text("الرقابة", "Contrôle", "Control") },
+      { id: "reports", label: text("التقارير المالية", "Rapports financiers", "Financial reports"), href: "/finance?tab=reports", group: text("التقارير", "Rapports", "Reports") },
     ],
   },
   {
@@ -101,6 +114,10 @@ export const nawaPortals: NawaPortal[] = [
     requiredModules: ["hr"],
     localNavigation: [
       { id: "overview", label: text("مركز الموارد البشرية", "Centre RH", "HR center"), href: "/hr", group: text("الإدارة", "Administration", "Administration") },
+      { id: "employees", label: text("الموظفون", "Employés", "Employees"), href: "/hr?tab=employees", group: text("الإدارة", "Administration", "Administration") },
+      { id: "attendance", label: text("الحضور", "Présences", "Attendance"), href: "/hr?tab=attendance", group: text("الوقت والإجازات", "Temps et congés", "Time & leave") },
+      { id: "leave", label: text("الإجازات", "Congés", "Leave"), href: "/hr?tab=leave", group: text("الوقت والإجازات", "Temps et congés", "Time & leave") },
+      { id: "payroll", label: text("الرواتب", "Paie", "Payroll"), href: "/hr?tab=payroll", group: text("الرواتب", "Paie", "Payroll") },
       { id: "self-service", label: text("الخدمة الذاتية", "Libre-service", "Self-service"), href: "/self-service", group: text("تجارب مستقلة", "Expériences indépendantes", "Independent experiences"), externalExperience: true },
     ],
   },

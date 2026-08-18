@@ -29,7 +29,7 @@ import { trpc } from "@/lib/trpc";
 import { Bell, Bot, CheckCheck, ChevronDown, Grid2X2, Home, Inbox, Loader2, LogOut, PanelLeft, Settings2 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
@@ -123,6 +123,7 @@ function DashboardLayoutContent({
   const { direction, language, t } = useLanguage();
   const { preferences } = useTheme();
   const [location, setLocation] = useLocation();
+  const search = useSearch();
   const { state, toggleSidebar } = useSidebar();
   const isCollapsed = state === "collapsed";
   const [isResizing, setIsResizing] = useState(false);
@@ -260,25 +261,10 @@ function DashboardLayoutContent({
 
           <SidebarContent className="gap-0 overflow-y-auto">
             <SidebarMenu className="px-2 py-3">
-              <SidebarMenuItem>
-                <SidebarMenuButton onClick={() => navigateTo("/", chrome.portals)} tooltip={chrome.portals} className="h-11 text-[15px] font-semibold">
-                  <Grid2X2 className="h-[18px] w-[18px] text-primary" /><span>{chrome.portals}</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton onClick={() => navigateTo("/executive", chrome.executive)} tooltip={chrome.executive} className="h-11 text-[15px] font-medium">
-                  <Home className="h-[18px] w-[18px]" /><span>{chrome.executive}</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <p className="px-3 pb-1 pt-5 text-[11px] font-bold uppercase tracking-[.12em] text-muted-foreground group-data-[collapsible=icon]:hidden">{chrome.workspace}</p>
-              <SidebarMenuItem>
-                <SidebarMenuButton isActive={activePortal?.id === "ai"} onClick={() => navigateTo("/workspace", chrome.ai)} tooltip={chrome.ai} className={`group/ai relative h-13 overflow-hidden text-[17px] font-bold text-primary transition-all duration-200 hover:-translate-y-px hover:bg-primary/12 hover:shadow-[0_10px_22px_rgba(212,161,49,.14)] active:scale-[.985] motion-reduce:hover:translate-y-0 ${activePortal?.id === "ai" ? "bg-primary/14 shadow-[inset_3px_0_0_hsl(var(--primary)),0_8px_20px_rgba(212,161,49,.12)]" : ""}`}>
-                  <Bot className="h-5 w-5 text-primary transition-transform duration-200 group-hover/ai:scale-110 group-hover/ai:-rotate-3" /><span>{chrome.ai}</span>{activePortal?.id === "ai" ? <span className="absolute end-2 h-2 w-2 rounded-full bg-primary shadow-[0_0_12px_hsl(var(--primary))]" aria-hidden="true" /> : null}
-                </SidebarMenuButton>
-              </SidebarMenuItem>
+              {activePortal ? <><SidebarMenuItem><SidebarMenuButton onClick={() => navigateTo("/", chrome.portals)} tooltip={chrome.portals} className="h-10 text-[14px] font-semibold text-muted-foreground hover:text-foreground"><Grid2X2 className="h-[17px] w-[17px]" /><span>{chrome.portals}</span></SidebarMenuButton></SidebarMenuItem><div className="mx-2 mt-3 rounded-xl border border-primary/15 bg-primary/[.06] px-3 py-2.5 group-data-[collapsible=icon]:hidden"><p className="text-[10px] font-bold uppercase tracking-[.12em] text-primary">{chrome.navigation}</p><p className="mt-1 text-[15px] font-bold text-foreground">{activePortal.name[language]}</p></div></> : <><SidebarMenuItem><SidebarMenuButton onClick={() => navigateTo("/", chrome.portals)} tooltip={chrome.portals} className="h-11 text-[15px] font-semibold"><Grid2X2 className="h-[18px] w-[18px] text-primary" /><span>{chrome.portals}</span></SidebarMenuButton></SidebarMenuItem><SidebarMenuItem><SidebarMenuButton onClick={() => navigateTo("/executive", chrome.executive)} tooltip={chrome.executive} className="h-11 text-[15px] font-medium"><Home className="h-[18px] w-[18px]" /><span>{chrome.executive}</span></SidebarMenuButton></SidebarMenuItem><SidebarMenuItem><SidebarMenuButton onClick={() => navigateTo("/workspace", chrome.ai)} tooltip={chrome.ai} className="h-11 text-[15px] font-bold text-primary"><Bot className="h-[18px] w-[18px] text-primary" /><span>{chrome.ai}</span><span className="sr-only">{chrome.workspace}</span></SidebarMenuButton></SidebarMenuItem></>}
               {activePortal ? <p className="px-2 pb-2 pt-4 text-[10px] font-semibold uppercase tracking-[.14em] text-muted-foreground group-data-[collapsible=icon]:hidden">{chrome.navigation}</p> : null}
               {localItems.map((item, index) => {
-                const isActive = location === item.href || pathWithoutQuery === item.href.split("?")[0];
+                const isActive = item.href.includes("?") ? `${pathWithoutQuery}${search}` === item.href : pathWithoutQuery === item.href;
                 const showGroup = index === 0 || item.group[language] !== localItems[index - 1]?.group[language];
                 return (
                   <SidebarMenuItem key={item.id}>
@@ -287,9 +273,9 @@ function DashboardLayoutContent({
                       isActive={isActive}
                       onClick={() => navigateTo(item.href, item.label[language])}
                       tooltip={item.label[language]}
-                      className="h-12 text-[16px] font-medium transition-all"
+                      className={`group/portal h-12 text-[16px] font-medium transition-all ${activePortal?.id === "ai" ? `group/ai hover:-translate-y-px hover:bg-primary/12 hover:shadow-[0_10px_22px_rgba(212,161,49,.14)] ${isActive ? "shadow-[inset_3px_0_0_hsl(var(--primary))]" : ""}` : ""}`}
                     >
-                      {navigatingTo === item.href ? <Loader2 className="h-[18px] w-[18px] animate-spin motion-reduce:animate-none" /> : activePortal ? <activePortal.icon className={`h-[18px] w-[18px] ${isActive ? "text-primary" : ""}`} /> : <Grid2X2 className="h-[18px] w-[18px]" />}
+                      {navigatingTo === item.href ? <Loader2 className="h-[18px] w-[18px] animate-spin motion-reduce:animate-none" /> : activePortal ? <activePortal.icon className={`h-[18px] w-[18px] ${isActive ? "text-primary" : ""} ${activePortal.id === "ai" ? "group-hover/ai:scale-110 group-hover/ai:-rotate-3" : ""}`} /> : <Grid2X2 className="h-[18px] w-[18px]" />}
                       <span>{item.label[language]}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

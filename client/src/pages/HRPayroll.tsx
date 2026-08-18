@@ -2,19 +2,27 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs as RadixTabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { createDocumentPreviewPdf } from "@/lib/documentPreviewExport";
 import { trpc } from "@/lib/trpc";
 import { CalendarCheck, Clock3, Download, FileText, RefreshCcw, ShieldCheck, UsersRound } from "lucide-react";
 import React from "react";
 import { toast } from "sonner";
+import { useSearch } from "wouter";
 
 const copy = {
   ar: { title: "مركز الموارد البشرية والرواتب", subtitle: "إدارة الموظفين والحضور والإجازات ضمن نطاق المؤسسة، مع حماية بيانات الأجور في إجراءات مستقلة.", overview: "نظرة عامة", employees: "الموظفون", attendance: "الحضور", leave: "الإجازات", overtime: "الساعات الإضافية", payroll: "الرواتب", payrollRegister: "سجل الرواتب", total: "إجمالي الموظفين", active: "نشطون", present: "حاضرون اليوم", absent: "غائبون اليوم", onLeave: "في إجازة", employee: "الموظف", number: "الرقم", department: "القسم", position: "المنصب", status: "الحالة", date: "التاريخ", type: "النوع", hours: "الساعات", currency: "العملة", gross: "إجمالي الرواتب", net: "صافي الرواتب", advances: "السلف القائمة", payrollAccess: "لا تملك صلاحية صريحة لعرض بيانات الرواتب.", exportExcel: "Excel", exportPdf: "PDF", bankCsv: "كشف البنك CSV", bankExcel: "كشف البنك Excel", empty: "لا توجد بيانات قابلة للعرض حالياً.", confidential: "بيانات الرواتب والرواتب الصافية لا تظهر هنا إلا عبر صلاحيات HR/Payroll الخادمية الصريحة.", loadError: "تعذر تحميل بعض بيانات الموارد البشرية. لا تعتمد القيم الظاهرة قبل إعادة المحاولة.", retry: "إعادة تحميل البيانات", bankExportError: "تعذر إنشاء الملف المطلوب." },
   fr: { title: "Centre RH et paie", subtitle: "Gérez les collaborateurs, présences et congés dans le périmètre de l’organisation; les salaires restent protégés dans des actions séparées.", overview: "Vue d’ensemble", employees: "Employés", attendance: "Présences", leave: "Congés", overtime: "Heures supplémentaires", payroll: "Paie", payrollRegister: "Registre de paie", total: "Employés au total", active: "Actifs", present: "Présents aujourd’hui", absent: "Absents aujourd’hui", onLeave: "En congé", employee: "Employé", number: "Numéro", department: "Département", position: "Poste", status: "Statut", date: "Date", type: "Type", hours: "Heures", currency: "Devise", gross: "Paie brute", net: "Paie nette", advances: "Avances en cours", payrollAccess: "Vous n’avez pas l’autorisation explicite de consulter les données de paie.", exportExcel: "Excel", exportPdf: "PDF", bankCsv: "Banque CSV", bankExcel: "Banque Excel", empty: "Aucune donnée à afficher.", confidential: "Les montants de paie et salaires nets ne sont accessibles que par des autorisations HR/Payroll explicites côté serveur.", loadError: "Certaines données RH n’ont pas pu être chargées. Ne vous fiez pas aux valeurs affichées avant un nouvel essai.", retry: "Recharger les données", bankExportError: "Impossible de créer le fichier demandé." },
   en: { title: "HR & payroll center", subtitle: "Manage employees, attendance, and leave within the organization scope; salary data remains protected in separate actions.", overview: "Overview", employees: "Employees", attendance: "Attendance", leave: "Leave", overtime: "Overtime", payroll: "Payroll", payrollRegister: "Payroll register", total: "Total employees", active: "Active", present: "Present today", absent: "Absent today", onLeave: "On leave", employee: "Employee", number: "Number", department: "Department", position: "Position", status: "Status", date: "Date", type: "Type", hours: "Hours", currency: "Currency", gross: "Gross payroll", net: "Net payroll", advances: "Outstanding advances", payrollAccess: "You do not have explicit permission to view payroll data.", exportExcel: "Excel", exportPdf: "PDF", bankCsv: "Bank CSV", bankExcel: "Bank Excel", empty: "No data available yet.", confidential: "Payroll amounts and net salaries are available only through explicit server-side HR/Payroll permissions.", loadError: "Some HR data could not be loaded. Do not rely on displayed values until you retry.", retry: "Reload data", bankExportError: "The requested file could not be generated." },
 } as const;
+
+function Tabs({ defaultValue, onValueChange, ...props }: React.ComponentProps<typeof RadixTabs>) {
+  const requestedTab = new URLSearchParams(useSearch()).get("tab") ?? defaultValue ?? "overview";
+  const [value, setValue] = React.useState(requestedTab);
+  React.useEffect(() => setValue(requestedTab), [requestedTab]);
+  return <RadixTabs {...props} value={value} onValueChange={next => { setValue(next); onValueChange?.(next); }} />;
+}
 
 function download(name: string, content: BlobPart, type: string) {
   const url = URL.createObjectURL(new Blob([content], { type }));

@@ -19,4 +19,12 @@ describe("Nawa portals definition", () => {
       expect(portal.localNavigation.length).toBeGreaterThan(0);
     }
   });
+
+  it("يعرّف أدوات سياقية واسعة للبوابات التشغيلية الرئيسة", () => {
+    const byId = (id: string) => nawaPortals.find(portal => portal.id === id)!;
+    expect(byId("manufacturing").localNavigation.map(item => item.id)).toEqual(expect.arrayContaining(["orders", "materials", "stages", "quality", "traceability"]));
+    expect(byId("distribution").localNavigation.map(item => item.id)).toEqual(expect.arrayContaining(["control", "routes", "fleet", "territories", "driver"]));
+    expect(byId("finance").localNavigation.map(item => item.id)).toEqual(expect.arrayContaining(["accounts", "entries", "aging", "treasury", "reports"]));
+    expect(byId("hr").localNavigation.map(item => item.id)).toEqual(expect.arrayContaining(["employees", "attendance", "leave", "payroll"]));
+  });
 });

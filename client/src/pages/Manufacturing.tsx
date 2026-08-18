@@ -12,7 +12,8 @@ import { manufacturingCenterCopy } from "@/i18n/translations";
 import { downloadManufacturingExcel, downloadManufacturingPdf, type ManufacturingReportRow } from "@/lib/manufacturingReportExport";
 import { trpc } from "@/lib/trpc";
 import { Boxes, Download, Factory, FileText, FlaskConical, Plus, RefreshCw, ShieldCheck, TriangleAlert } from "lucide-react";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { useSearch } from "wouter";
 
 const statusKey = (status: string) => ({ draft: "draft", planned: "planned", approved: "approved", materials_reserved: "materialsReserved", in_production: "activeProduction", quality_hold: "qualityHoldStatus", completed: "completedStatus", closed: "closed", cancelled: "cancelled" }[status] ?? "draft") as keyof typeof manufacturingCenterCopy.ar;
 
@@ -23,6 +24,10 @@ export default function Manufacturing() {
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const openOrderWorkspace = language === "ar" ? "فتح التشغيل" : language === "fr" ? "Ouvrir l’exécution" : "Open execution";
+  const querySection = new URLSearchParams(useSearch()).get("tab");
+  useEffect(() => {
+    if (["overview", "materials", "stages", "quality", "traceability"].includes(querySection ?? "")) setSection(querySection!);
+  }, [querySection]);
   const overview = trpc.erp.manufacturing.overview.useQuery();
   const orders = trpc.erp.manufacturing.orders.useQuery();
   const capabilities = trpc.erp.manufacturing.capabilities.useQuery();
