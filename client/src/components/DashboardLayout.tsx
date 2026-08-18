@@ -26,7 +26,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { useIsMobile } from "@/hooks/useMobile";
 import { navigationFeedbackCopy } from "@/i18n/translations";
 import { trpc } from "@/lib/trpc";
-import { Bell, Bot, CheckCheck, ChevronDown, Grid2X2, Home, Inbox, Loader2, LogOut, PanelLeft, Settings2 } from "lucide-react";
+import { Bell, Bot, CheckCheck, ChevronDown, ChevronUp, Grid2X2, Home, Inbox, Loader2, LogOut, PanelLeft, Search, Settings2, Star, X } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useLocation, useSearch } from "wouter";
@@ -40,10 +40,12 @@ const MIN_WIDTH = 240;
 const MAX_WIDTH = 480;
 const ACTIVE_BRANCH_KEY = "nawa:active-branch";
 const PORTAL_SCROLL_PREFIX = "nawa:portal-sidebar-scroll:";
+const PORTAL_FAVORITES_KEY = "nawa:portal-sidebar-favorites";
+const PORTAL_GROUPS_PREFIX = "nawa:portal-sidebar-groups:";
 const portalChrome = {
-  ar: { portals: "الرئيسية", executive: "الملخص التنفيذي", workspace: "مساحة العمل", navigation: "تنقل البوابة", breadcrumbRoot: "نواة", defaultBranch: "الفرع الافتراضي", notifications: "التنبيهات", markAllRead: "تحديد الكل كمقروء", emptyNotifications: "لا توجد تنبيهات حديثة", settings: "الإعدادات", ai: "Nawa AI", demo: "بيانات Demo" },
-  fr: { portals: "Accueil", executive: "Vue exécutive", workspace: "Espace de travail", navigation: "Navigation du portail", breadcrumbRoot: "Nawa", defaultBranch: "Branche par défaut", notifications: "Notifications", markAllRead: "Tout marquer comme lu", emptyNotifications: "Aucune notification récente", settings: "Paramètres", ai: "Nawa AI", demo: "Données Demo" },
-  en: { portals: "Home", executive: "Executive overview", workspace: "Workspace", navigation: "Portal navigation", breadcrumbRoot: "Nawa", defaultBranch: "Default branch", notifications: "Notifications", markAllRead: "Mark all as read", emptyNotifications: "No recent notifications", settings: "Settings", ai: "Nawa AI", demo: "Demo data" },
+  ar: { portals: "الرئيسية", executive: "الملخص التنفيذي", workspace: "مساحة العمل", navigation: "تنقل البوابة", breadcrumbRoot: "نواة", defaultBranch: "الفرع الافتراضي", notifications: "التنبيهات", markAllRead: "تحديد الكل كمقروء", emptyNotifications: "لا توجد تنبيهات حديثة", settings: "الإعدادات", ai: "Nawa AI", demo: "بيانات Demo", searchTools: "ابحث في الأدوات والصفحات", favorites: "المفضلة", noTools: "لا توجد أداة مطابقة" },
+  fr: { portals: "Accueil", executive: "Vue exécutive", workspace: "Espace de travail", navigation: "Navigation du portail", breadcrumbRoot: "Nawa", defaultBranch: "Branche par défaut", notifications: "Notifications", markAllRead: "Tout marquer comme lu", emptyNotifications: "Aucune notification récente", settings: "Paramètres", ai: "Nawa AI", demo: "Données Demo", searchTools: "Rechercher un outil ou une page", favorites: "Favoris", noTools: "Aucun outil correspondant" },
+  en: { portals: "Home", executive: "Executive overview", workspace: "Workspace", navigation: "Portal navigation", breadcrumbRoot: "Nawa", defaultBranch: "Default branch", notifications: "Notifications", markAllRead: "Mark all as read", emptyNotifications: "No recent notifications", settings: "Settings", ai: "Nawa AI", demo: "Demo data", searchTools: "Search tools and pages", favorites: "Favorites", noTools: "No matching tools" },
 } as const;
 
 function formatNotificationTime(value: Date | string | number, language: "ar" | "fr" | "en") {
@@ -137,6 +139,28 @@ function DashboardLayoutContent({
   const activePortal = getPortalForPath(pathWithoutQuery);
   const chrome = portalChrome[language];
   const localItems = activePortal?.localNavigation ?? [];
+  const [toolQuery, setToolQuery] = useState("");
+  const [favoriteToolIds, setFavoriteToolIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem(PORTAL_FAVORITES_KEY);
+      const parsed = saved ? JSON.parse(saved) : [];
+      return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [];
+    } catch {
+      return [];
+    }
+  });
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem(`${PORTAL_GROUPS_PREFIX}${activePortal?.id ?? "home"}`);
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+  const normalizedToolQuery = toolQuery.trim().toLocaleLowerCase(language === "ar" ? "ar" : language);
+  const navigationItems = localItems.filter(item => !(activePortal?.id === "administration" && item.id === "settings"));
+  const visibleLocalItems = normalizedToolQuery ? navigationItems.filter(item => `${item.label[language]} ${item.group[language]}`.toLocaleLowerCase(language === "ar" ? "ar" : language).includes(normalizedToolQuery)) : navigationItems;
+  const favoriteLocalItems = localItems.filter(item => favoriteToolIds.includes(`${activePortal?.id}:${item.id}`));
   const activeMenuItem = localItems.find(item => item.href.includes("#") ? `${pathWithoutQuery}${currentHash}` === item.href : item.href.includes("?") ? `${pathWithoutQuery}${search}` === item.href : !currentHash && (location === item.href || pathWithoutQuery === item.href));
   const isMobile = useIsMobile();
   const bootstrap = trpc.erp.bootstrap.useQuery(undefined, { retry: false, refetchOnWindowFocus: false });
@@ -170,6 +194,24 @@ function DashboardLayoutContent({
   useEffect(() => {
     if (activePortal) localStorage.setItem("nawa:last-portal", activePortal.id);
   }, [activePortal]);
+
+  useEffect(() => {
+    setToolQuery("");
+    try {
+      const saved = localStorage.getItem(`${PORTAL_GROUPS_PREFIX}${activePortal?.id ?? "home"}`);
+      setCollapsedGroups(saved ? JSON.parse(saved) : {});
+    } catch {
+      setCollapsedGroups({});
+    }
+  }, [activePortal?.id]);
+
+  useEffect(() => {
+    localStorage.setItem(PORTAL_FAVORITES_KEY, JSON.stringify(favoriteToolIds));
+  }, [favoriteToolIds]);
+
+  useEffect(() => {
+    localStorage.setItem(`${PORTAL_GROUPS_PREFIX}${activePortal?.id ?? "home"}`, JSON.stringify(collapsedGroups));
+  }, [activePortal?.id, collapsedGroups]);
 
   useEffect(() => {
     const content = portalScrollRef.current;
@@ -252,6 +294,15 @@ function DashboardLayoutContent({
     }, path === "/workspace" ? 220 : 180);
   };
 
+  const toggleFavoriteTool = (itemId: string) => {
+    const key = `${activePortal?.id}:${itemId}`;
+    setFavoriteToolIds(current => current.includes(key) ? current.filter(item => item !== key) : [...current, key]);
+  };
+
+  const toggleGroup = (groupKey: string) => {
+    setCollapsedGroups(current => ({ ...current, [groupKey]: !current[groupKey] }));
+  };
+
   return (
     <div dir={direction} className="flex min-h-svh w-full min-w-0 overflow-x-hidden">
       <div className="relative shrink-0" ref={sidebarRef}>
@@ -290,7 +341,7 @@ function DashboardLayoutContent({
 
           <SidebarContent ref={portalScrollRef} className="min-h-0 gap-0 overscroll-contain overflow-y-auto">
             <SidebarMenu className="px-2 py-3">
-              {activePortal ? <><SidebarMenuItem><SidebarMenuButton onClick={() => navigateTo("/", chrome.portals)} tooltip={chrome.portals} className="h-13 text-[18px] font-bold text-muted-foreground transition-all hover:bg-primary/[.07] hover:text-primary"><Grid2X2 className="h-5 w-5" /><span>{chrome.portals}</span></SidebarMenuButton></SidebarMenuItem><div className="mx-2 mt-3 min-w-0 rounded-2xl border border-primary/25 bg-primary/[.10] px-3 py-3 shadow-sm group-data-[collapsible=icon]:hidden"><p className="text-[11px] font-bold uppercase tracking-[.12em] text-primary">{chrome.navigation}</p><p className="mt-1 break-words text-[18px] font-extrabold text-primary">{activePortal.name[language]}</p></div></> : <><SidebarMenuItem><SidebarMenuButton onClick={() => navigateTo("/", chrome.portals)} tooltip={chrome.portals} className="h-13 text-[18px] font-bold transition-all hover:bg-primary/[.07] hover:text-primary"><Grid2X2 className="h-5 w-5 text-primary" /><span>{chrome.portals}</span></SidebarMenuButton></SidebarMenuItem><SidebarMenuItem><SidebarMenuButton onClick={() => navigateTo("/executive", chrome.executive)} tooltip={chrome.executive} className="h-13 text-[18px] font-bold transition-all hover:bg-primary/[.07] hover:text-primary"><Home className="h-5 w-5" /><span>{chrome.executive}</span></SidebarMenuButton></SidebarMenuItem><SidebarMenuItem><SidebarMenuButton onClick={() => navigateTo("/workspace", chrome.ai)} tooltip={chrome.ai} className="h-13 text-[18px] font-extrabold text-primary transition-all hover:bg-primary/[.12] hover:shadow-[0_8px_18px_rgba(212,161,49,.12)]"><Bot className="h-5 w-5 text-primary" /><span>{chrome.ai}</span><span className="sr-only">{chrome.workspace}</span></SidebarMenuButton></SidebarMenuItem></>}
+              {activePortal ? <SidebarMenuItem><SidebarMenuButton onClick={() => navigateTo("/", chrome.portals)} tooltip={chrome.portals} className="h-13 text-[18px] font-bold text-muted-foreground transition-all hover:bg-primary/[.07] hover:text-primary"><Grid2X2 className="h-5 w-5" /><span>{chrome.portals}</span></SidebarMenuButton></SidebarMenuItem> : <><SidebarMenuItem><SidebarMenuButton onClick={() => navigateTo("/", chrome.portals)} tooltip={chrome.portals} className="h-13 text-[18px] font-bold transition-all hover:bg-primary/[.07] hover:text-primary"><Grid2X2 className="h-5 w-5 text-primary" /><span>{chrome.portals}</span></SidebarMenuButton></SidebarMenuItem><SidebarMenuItem><SidebarMenuButton onClick={() => navigateTo("/executive", chrome.executive)} tooltip={chrome.executive} className="h-13 text-[18px] font-bold transition-all hover:bg-primary/[.07] hover:text-primary"><Home className="h-5 w-5" /><span>{chrome.executive}</span></SidebarMenuButton></SidebarMenuItem><SidebarMenuItem><SidebarMenuButton onClick={() => navigateTo("/workspace", chrome.ai)} tooltip={chrome.ai} className="h-13 text-[18px] font-extrabold text-primary transition-all hover:bg-primary/[.12] hover:shadow-[0_8px_18px_rgba(212,161,49,.12)]"><Bot className="h-5 w-5 text-primary" /><span>{chrome.ai}</span><span className="sr-only">{chrome.workspace}</span></SidebarMenuButton></SidebarMenuItem></>}
               <SidebarMenuItem>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -302,24 +353,36 @@ function DashboardLayoutContent({
                   </DropdownMenuContent>
                 </DropdownMenu>
               </SidebarMenuItem>
-              <SidebarMenuItem><SidebarMenuButton onClick={() => navigateTo("/settings", chrome.settings)} tooltip={chrome.settings} className="h-13 text-[18px] font-bold transition-all hover:bg-primary/[.07] hover:text-primary hover:shadow-[0_8px_18px_rgba(212,161,49,.10)]"><Settings2 className="h-5 w-5" /><span>{chrome.settings}</span></SidebarMenuButton></SidebarMenuItem>
-              {activePortal ? <p className="px-2 pb-2 pt-5 text-[12px] font-semibold uppercase tracking-[.14em] text-muted-foreground group-data-[collapsible=icon]:hidden">{chrome.navigation}</p> : null}
-              {localItems.map((item, index) => {
+              {activePortal?.id !== "administration" ? <SidebarMenuItem><SidebarMenuButton onClick={() => navigateTo("/settings", chrome.settings)} tooltip={chrome.settings} className="h-13 text-[18px] font-bold transition-all hover:bg-primary/[.07] hover:text-primary hover:shadow-[0_8px_18px_rgba(212,161,49,.10)]"><Settings2 className="h-5 w-5" /><span>{chrome.settings}</span></SidebarMenuButton></SidebarMenuItem> : null}
+              {activePortal && !isCollapsed ? <>
+                <div className="px-2 pb-2 pt-4">
+                  <label className="relative block">
+                    <Search className="pointer-events-none absolute end-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <input value={toolQuery} onChange={event => setToolQuery(event.target.value)} placeholder={chrome.searchTools} className="h-11 w-full rounded-xl border border-border/70 bg-background/70 ps-3 pe-10 text-[14px] font-semibold outline-none transition-all placeholder:text-muted-foreground/80 focus:border-primary/45 focus:bg-primary/[.04] focus:ring-2 focus:ring-primary/20" />
+                    {toolQuery ? <button type="button" onClick={() => setToolQuery("")} aria-label="Clear" className="absolute start-2 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"><X className="h-4 w-4" /></button> : null}
+                  </label>
+                </div>
+                {favoriteLocalItems.length ? <><p className="px-2 pb-1.5 pt-2 text-[12px] font-bold uppercase tracking-[.12em] text-primary">{chrome.favorites}</p>{favoriteLocalItems.map(item => { const ItemIcon = getPortalNavigationIcon(item.id, activePortal.icon); const isActive = item.href.includes("?") ? `${pathWithoutQuery}${search}` === item.href : item.href.includes("#") ? `${pathWithoutQuery}${currentHash}` === item.href : !currentHash && pathWithoutQuery === item.href; return <SidebarMenuItem key={`favorite-${item.id}`} className="group/favorite relative"><SidebarMenuButton isActive={isActive} onClick={() => navigateTo(item.href, item.label[language])} tooltip={item.label[language]} className={`h-12 pe-10 text-[17px] font-bold transition-all hover:bg-primary/[.08] hover:text-primary ${isActive ? "bg-primary/15 text-primary ring-1 ring-primary/30" : ""}`}><ItemIcon className="h-5 w-5" /><span className="min-w-0 truncate">{item.label[language]}</span></SidebarMenuButton><button type="button" onClick={() => toggleFavoriteTool(item.id)} aria-label={`Unpin ${item.label[language]}`} className="absolute end-1 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg text-primary opacity-70 transition-all hover:bg-primary/10 hover:opacity-100"><Star className="h-4 w-4 fill-current" /></button></SidebarMenuItem>; })}</> : null}
+              </> : null}
+              {activePortal && normalizedToolQuery && !visibleLocalItems.length ? <p className="px-3 py-6 text-center text-sm font-semibold text-muted-foreground">{chrome.noTools}</p> : null}
+              {visibleLocalItems.map((item, index) => {
                 const isActive = item.href.includes("?") ? `${pathWithoutQuery}${search}` === item.href : item.href.includes("#") ? `${pathWithoutQuery}${currentHash}` === item.href : !currentHash && pathWithoutQuery === item.href;
-                const showGroup = index === 0 || item.group[language] !== localItems[index - 1]?.group[language];
+                const groupKey = item.group.ar;
+                const showGroup = index === 0 || groupKey !== visibleLocalItems[index - 1]?.group.ar;
+                const groupIsCollapsed = !normalizedToolQuery && Boolean(collapsedGroups[groupKey]);
                 const ItemIcon = getPortalNavigationIcon(item.id, activePortal?.icon ?? Grid2X2);
                 return (
                   <SidebarMenuItem key={item.id}>
-                    {showGroup ? <p className="px-2 pb-1.5 pt-5 text-[13px] font-bold uppercase tracking-[.1em] text-muted-foreground group-data-[collapsible=icon]:hidden">{item.group[language]}</p> : null}
-                    <SidebarMenuButton
+                    {showGroup ? <button type="button" onClick={() => toggleGroup(groupKey)} aria-expanded={!groupIsCollapsed} className="flex w-full items-center justify-between px-2 pb-1.5 pt-5 text-[13px] font-bold uppercase tracking-[.1em] text-muted-foreground transition-colors hover:text-primary group-data-[collapsible=icon]:hidden"><span>{item.group[language]}</span>{groupIsCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}</button> : null}
+                    {!groupIsCollapsed ? <div className="group/tool relative"><SidebarMenuButton
                       isActive={isActive}
                       onClick={() => navigateTo(item.href, item.label[language])}
                       tooltip={item.label[language]}
-                      className={`group/portal h-13 min-w-0 text-[18px] font-bold transition-all duration-200 hover:-translate-y-px hover:bg-primary/[.08] hover:text-primary hover:shadow-[0_10px_22px_rgba(212,161,49,.12)] active:scale-[.98] ${isActive ? "bg-primary/15 text-primary ring-1 ring-primary/35 shadow-[inset_4px_0_0_hsl(var(--primary)),0_10px_22px_rgba(212,161,49,.16)]" : ""} ${activePortal?.id === "ai" ? `group/ai hover:bg-primary/12 ${isActive ? "shadow-[inset_3px_0_0_hsl(var(--primary))]" : ""}` : ""}`}
+                      className={`group/portal h-13 min-w-0 pe-10 text-[18px] font-bold transition-all duration-200 hover:-translate-y-px hover:bg-primary/[.08] hover:text-primary hover:shadow-[0_10px_22px_rgba(212,161,49,.12)] active:scale-[.98] ${isActive ? "bg-primary/15 text-primary ring-1 ring-primary/35 shadow-[inset_4px_0_0_hsl(var(--primary)),0_10px_22px_rgba(212,161,49,.16)]" : ""} ${activePortal?.id === "ai" ? `group/ai hover:bg-primary/12 ${isActive ? "shadow-[inset_3px_0_0_hsl(var(--primary))]" : ""}` : ""}`}
                     >
                       {navigatingTo === item.href ? <Loader2 className="h-5 w-5 animate-spin motion-reduce:animate-none" /> : <ItemIcon className={`h-5 w-5 ${isActive ? "text-primary" : ""} ${activePortal?.id === "ai" ? "group-hover/ai:scale-110 group-hover/ai:-rotate-3" : ""}`} />}
                       <span className="min-w-0 truncate">{item.label[language]}</span>
-                    </SidebarMenuButton>
+                    </SidebarMenuButton><button type="button" onClick={() => toggleFavoriteTool(item.id)} aria-label={favoriteToolIds.includes(`${activePortal?.id}:${item.id}`) ? `Unpin ${item.label[language]}` : `Pin ${item.label[language]}`} className={`absolute end-1 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg transition-all hover:bg-primary/10 ${favoriteToolIds.includes(`${activePortal?.id}:${item.id}`) ? "text-primary opacity-100" : "text-muted-foreground opacity-0 group-hover/tool:opacity-100 focus:opacity-100"}`}><Star className={`h-4 w-4 ${favoriteToolIds.includes(`${activePortal?.id}:${item.id}`) ? "fill-current" : ""}`} /></button></div> : null}
                   </SidebarMenuItem>
                 );
               })}
