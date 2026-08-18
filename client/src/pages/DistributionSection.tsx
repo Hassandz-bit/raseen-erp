@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { formatOperationalStatus } from "@/lib/operationalStatus";
 import { trpc } from "@/lib/trpc";
 import { AlertTriangle, ChevronLeft, Loader2, MapPinned, RefreshCw, Route, Truck } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -37,7 +38,7 @@ export default function DistributionSectionPage() {
     return needle ? all.filter((row: any) => Object.values(row).some(value => String(value ?? "").toLocaleLowerCase().includes(needle))) : all;
   }, [query.data, search]);
   const copy = language === "ar" ? { search: "ابحث في الجدول", refresh: "تحديث البيانات", back: "فتح مركز العمليات", count: "سجل", empty: "لا توجد بيانات مطابقة.", code: "الرمز", date: "التاريخ", status: "الحالة", registration: "التسجيل", type: "النوع", payload: "الحمولة", name: "الاسم", location: "الموقع", document: "الوثيقة", expiry: "الانتهاء" } : language === "fr" ? { search: "Rechercher dans le tableau", refresh: "Actualiser", back: "Ouvrir le centre opérationnel", count: "lignes", empty: "Aucune donnée correspondante.", code: "Code", date: "Date", status: "Statut", registration: "Immatriculation", type: "Type", payload: "Charge", name: "Nom", location: "Position", document: "Document", expiry: "Échéance" } : { search: "Search this table", refresh: "Refresh data", back: "Open operations center", count: "rows", empty: "No matching data.", code: "Code", date: "Date", status: "Status", registration: "Registration", type: "Type", payload: "Payload", name: "Name", location: "Location", document: "Document", expiry: "Expiry" };
-  const badge = (status: string) => <Badge variant="outline" className={tone[status] ?? ""}>{t(status as never)}</Badge>;
+  const badge = (status: string) => <Badge variant="outline" className={tone[status] ?? ""}>{formatOperationalStatus(language, status)}</Badge>;
   const table = () => {
     if (query.isLoading) return <div className="grid min-h-72 place-items-center"><Loader2 className="h-7 w-7 animate-spin text-primary" /></div>;
     if (query.isError) return <div className="grid min-h-72 place-items-center gap-3"><p className="text-sm text-destructive">{t("error")}</p><Button variant="outline" onClick={() => void query.refetch()}>{copy.refresh}</Button></div>;

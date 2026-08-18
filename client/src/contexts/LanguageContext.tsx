@@ -19,6 +19,7 @@ const LanguageContext = createContext<LanguageContextValue | undefined>(undefine
 const languageLocale: Record<AppLanguage, string> = { ar: "ar-DZ", fr: "fr-FR", en: "en-US" };
 const isSupportedLanguage = (value: string | null): value is AppLanguage => value === "ar" || value === "fr" || value === "en";
 const defaultOrganizationFormat: OrganizationFormatSettings = { currencyCode: "DZD", currencySymbolPosition: "after", decimalPlaces: 2, dateFormat: "DD/MM/YYYY", timeFormat: "24h", timeZone: "Africa/Algiers", decimalSeparator: "dot", thousandsSeparator: "comma", numeralStyle: "western" };
+const humanizeMissingTranslation = (key: string) => key.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/[_-]+/g, " ").trim() || "—";
 function getOrganizationFormat() { try { const organization = JSON.parse(localStorage.getItem("nawa-organization-format") || "{}") as Partial<OrganizationFormatSettings>; const appearance = JSON.parse(localStorage.getItem("nawa-appearance") || "{}") as { numeralStyle?: OrganizationFormatSettings["numeralStyle"] }; return { ...defaultOrganizationFormat, ...organization, numeralStyle: appearance.numeralStyle ?? organization.numeralStyle ?? "western" }; } catch { return defaultOrganizationFormat; } }
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
@@ -46,7 +47,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     language,
     direction,
     setLanguage,
-    t: key => translations[language][key] ?? translations.en[key],
+    t: key => translations[language][key] ?? translations.en[key] ?? humanizeMissingTranslation(String(key)),
     formatDate: (value, options) => options ? new Intl.DateTimeFormat(languageLocale[language], options).format(new Date(value)) : formatOrganizationDate(value, organizationFormat),
     formatNumber: (value, options) => options ? new Intl.NumberFormat(languageLocale[language], options).format(value) : formatOrganizationNumber(value, organizationFormat),
     formatPercentage: value => formatOrganizationPercentage(value, organizationFormat),
