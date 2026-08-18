@@ -246,6 +246,7 @@ export const erpRouter = router({
         showSignature: z.boolean().optional(),
         fontFamily: z.enum(["ibm-plex", "tajawal", "noto-arabic", "inter", "system"]).optional(),
         fontSize: z.enum(["small", "normal", "large"]).optional(),
+        vat: z.object({ defaultRate: z.number().min(0).max(100), priceMode: z.enum(["exclusive", "inclusive"]) }).optional(),
       }).optional(),
     })).mutation(async ({ ctx, input }) => {
       const context = await requireOrganizationOwner(ctx.user.id);
@@ -448,6 +449,8 @@ export const erpRouter = router({
       exchangeRateUsed: z.number().positive().max(1_000_000_000).optional(),
       dueDate: z.coerce.date().optional(),
       discountAmount: z.number().nonnegative().max(999_999_999).optional(),
+      taxMode: z.enum(["exclusive", "inclusive"]).optional(),
+      taxRate: z.number().min(0).max(100).optional(),
       lines: z.array(z.object({ productId: z.number().int().positive(), warehouseId: z.number().int().positive(), quantity: z.number().positive(), unit: z.string().trim().min(1).max(32).optional(), unitPrice: z.number().nonnegative().max(999_999_999).optional(), taxRate: z.number().min(0).max(100).optional() })).min(1),
     })).mutation(async ({ ctx, input }) => {
       const context = await requireModule(ctx.user.id, "sales");

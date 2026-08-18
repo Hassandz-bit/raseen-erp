@@ -21,19 +21,22 @@ const statusTone: Record<string, string> = {
 };
 
 export function CommerceOperationsPanel() {
-  const { t, formatCurrency, formatDate, formatNumber, formatSettings } = useLanguage();
+  const { language, t, formatCurrency, formatDate, formatNumber, formatSettings } = useLanguage();
   const utils = trpc.useUtils();
   const products = trpc.erp.inventory.listProducts.useQuery(undefined, { retry: false });
   const warehouses = trpc.erp.inventory.listWarehouses.useQuery(undefined, { retry: false });
   const batches = trpc.erp.inventory.listBatches.useQuery(undefined, { retry: false });
   const invoices = trpc.erp.sales.listInvoices.useQuery(undefined, { retry: false });
   const orders = trpc.erp.purchases.listOrders.useQuery(undefined, { retry: false });
+  const organizationSettings = trpc.erp.preferences.organization.useQuery(undefined, { retry: false });
 
   const [warehouseName, setWarehouseName] = useState("");
   const [warehouseCode, setWarehouseCode] = useState("");
   const [salesProductId, setSalesProductId] = useState("");
   const [salesWarehouseId, setSalesWarehouseId] = useState("");
   const [salesQuantity, setSalesQuantity] = useState("1");
+  const [salesTaxMode, setSalesTaxMode] = useState<"exclusive" | "inclusive">("exclusive");
+  const [salesTaxRate, setSalesTaxRate] = useState("0");
   const [purchaseProductId, setPurchaseProductId] = useState("");
   const [purchaseWarehouseId, setPurchaseWarehouseId] = useState("");
   const [purchaseQuantity, setPurchaseQuantity] = useState("1");
@@ -61,6 +64,28 @@ export function CommerceOperationsPanel() {
   useEffect(() => {
     if (selectedPurchaseProduct) setPurchaseUnitCost(String(selectedPurchaseProduct.purchasePrice));
   }, [selectedPurchaseProduct]);
+
+  useEffect(() => {
+    const vat = organizationSettings.data?.documentSettings?.vat;
+    if (!vat) return;
+    setSalesTaxMode(vat.priceMode ?? "exclusive");
+    setSalesTaxRate(String(vat.defaultRate ?? 0));
+  }, [organizationSettings.data]);
+
+  const taxCopy = useMemo(() => language === "ar" ? {
+    mode: "طريقة عرض السعر", exclusive: "غير شامل الضريبة", inclusive: "شامل الضريبة", rate: "نسبة الضريبة (%)", net: "الصافي", tax: "الضريبة", total: "الإجمالي", preview: "معاينة تقديرية — الحساب النهائي محفوظ خادمياً", included: "شامل", excluded: "غير شامل",
+  } : language === "fr" ? {
+    mode: "Mode de prix", exclusive: "Hors taxe", inclusive: "TTC", rate: "Taux de TVA (%)", net: "Net", tax: "Taxe", total: "Total", preview: "Aperçu indicatif — le calcul final est appliqué côté serveur", included: "TTC", excluded: "HT",
+  } : {
+    mode: "Price mode", exclusive: "Tax exclusive", inclusive: "Tax inclusive", rate: "VAT rate (%)", net: "Net", tax: "Tax", total: "Total", preview: "Indicative preview — the final calculation is enforced server-side", included: "Tax inclusive", excluded: "Tax exclusive",
+  }, [language]);
+  const salesTaxRateValue = Math.min(100, Math.max(0, Number(salesTaxRate) || 0));
+  const invoicePreview = useMemo(() => {
+    const enteredAmount = Math.max(0, (Number(selectedSalesProduct?.salePrice) || 0) * (Number(salesQuantity) || 0));
+    const netAmount = salesTaxMode === "inclusive" && salesTaxRateValue > 0 ? enteredAmount / (1 + salesTaxRateValue / 100) : enteredAmount;
+    const taxAmount = salesTaxMode === "inclusive" ? enteredAmount - netAmount : netAmount * (salesTaxRateValue / 100);
+    return { netAmount, taxAmount, grandTotal: salesTaxMode === "inclusive" ? enteredAmount : netAmount + taxAmount };
+  }, [salesQuantity, salesTaxMode, salesTaxRateValue, selectedSalesProduct?.salePrice]);
 
   const refreshCommerce = async () => {
     await Promise.all([
@@ -156,13 +181,21 @@ export function CommerceOperationsPanel() {
       <div className="grid gap-6 xl:grid-cols-2">
         <article id="sales" className="surface scroll-mt-24 rounded-3xl border p-5">
           <div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-2xl bg-sky-400/10 text-sky-300"><ReceiptText className="h-5 w-5" /></span><div><h2 className="font-semibold text-foreground">{t("salesInvoices")}</h2><p className="mt-1 text-xs text-muted-foreground">{t("fefo")}</p></div></div>
-          <form className="mt-5 grid gap-2 md:grid-cols-4" onSubmit={event => { event.preventDefault(); if (!selectedSalesProduct || !salesWarehouseId) return; createInvoice.mutate({ currencyCode: formatSettings.currencyCode, baseCurrencyCode: formatSettings.currencyCode, lines: [{ productId: selectedSalesProduct.id, warehouseId: Number(salesWarehouseId), quantity: Number(salesQuantity), unit: selectedSalesProduct.salesUnit }] }); }}>
-            <select aria-label={t("product")} value={salesProductId} onChange={event => setSalesProductId(event.target.value)} className="h-10 rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/40">{products.data?.map(product => <option key={product.id} value={product.id}>{product.name}</option>)}</select>
-            <select aria-label={t("warehouse")} value={salesWarehouseId} onChange={event => setSalesWarehouseId(event.target.value)} className="h-10 rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/40">{warehouses.data?.map(warehouse => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}</select>
-            <Input required min="0.001" step="0.001" type="number" value={salesQuantity} onChange={event => setSalesQuantity(event.target.value)} placeholder={t("quantity")} />
-            <Button type="submit" disabled={createInvoice.isPending || !canCreateDocument || Number(salesQuantity) <= 0} className="gap-2">{createInvoice.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ReceiptText className="h-4 w-4" />}{t("createInvoice")}</Button>
+          <form className="mt-5 space-y-3" onSubmit={event => { event.preventDefault(); if (!selectedSalesProduct || !salesWarehouseId) return; createInvoice.mutate({ currencyCode: formatSettings.currencyCode, baseCurrencyCode: formatSettings.currencyCode, taxMode: salesTaxMode, taxRate: salesTaxRateValue, lines: [{ productId: selectedSalesProduct.id, warehouseId: Number(salesWarehouseId), quantity: Number(salesQuantity), unit: selectedSalesProduct.salesUnit }] }); }}>
+            <div className="grid gap-2 md:grid-cols-4">
+              <select aria-label={t("product")} value={salesProductId} onChange={event => setSalesProductId(event.target.value)} className="h-10 rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/40">{products.data?.map(product => <option key={product.id} value={product.id}>{product.name}</option>)}</select>
+              <select aria-label={t("warehouse")} value={salesWarehouseId} onChange={event => setSalesWarehouseId(event.target.value)} className="h-10 rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/40">{warehouses.data?.map(warehouse => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}</select>
+              <Input required min="0.001" step="0.001" type="number" value={salesQuantity} onChange={event => setSalesQuantity(event.target.value)} placeholder={t("quantity")} />
+              <Button type="submit" disabled={createInvoice.isPending || !canCreateDocument || Number(salesQuantity) <= 0} className="gap-2">{createInvoice.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ReceiptText className="h-4 w-4" />}{t("createInvoice")}</Button>
+            </div>
+            <div className="grid gap-2 rounded-2xl border border-primary/20 bg-primary/[.04] p-3 sm:grid-cols-[1.1fr_1fr_.7fr]">
+              <label className="text-xs font-medium text-muted-foreground">{taxCopy.mode}<select aria-label={taxCopy.mode} value={salesTaxMode} onChange={event => setSalesTaxMode(event.target.value as "exclusive" | "inclusive")} className="mt-1.5 h-9 w-full rounded-lg border border-border bg-background px-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/40"><option value="exclusive">{taxCopy.exclusive}</option><option value="inclusive">{taxCopy.inclusive}</option></select></label>
+              <label className="text-xs font-medium text-muted-foreground">{taxCopy.rate}<Input aria-label={taxCopy.rate} min="0" max="100" step="0.01" type="number" value={salesTaxRate} onChange={event => setSalesTaxRate(event.target.value)} className="mt-1.5 h-9" /></label>
+              <div className="self-end text-xs text-muted-foreground"><p>{taxCopy.preview}</p><p className="mt-1 font-medium text-foreground">{selectedSalesProduct ? `${selectedSalesProduct.name} · ${formatCurrency(Number(selectedSalesProduct.salePrice))}` : "—"}</p></div>
+            </div>
+            <div className="grid grid-cols-3 gap-2 rounded-xl border border-border/70 bg-background/30 p-3 text-xs"><div><p className="text-muted-foreground">{taxCopy.net}</p><p className="mt-1 font-semibold text-foreground">{formatCurrency(invoicePreview.netAmount)}</p></div><div><p className="text-muted-foreground">{taxCopy.tax}</p><p className="mt-1 font-semibold text-foreground">{formatCurrency(invoicePreview.taxAmount)}</p></div><div><p className="text-muted-foreground">{taxCopy.total}</p><p className="mt-1 font-semibold text-primary">{formatCurrency(invoicePreview.grandTotal)}</p></div></div>
           </form>
-          <div className="mt-5 space-y-2">{invoices.data?.length ? invoices.data.slice(0, 4).map(invoice => <div key={invoice.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/70 bg-background/30 p-3"><div><p className="latin text-sm font-semibold text-foreground">{invoice.invoiceNumber}</p><p className="mt-1 text-xs text-muted-foreground">{formatCurrency(Number(invoice.grandTotal))}</p></div><div className="flex items-center gap-2"><Badge variant="outline" className={statusTone[invoice.status] ?? ""}>{t(invoice.status)}</Badge>{invoice.status === "draft" ? <Button size="sm" onClick={() => issueInvoice.mutate({ invoiceId: invoice.id })} disabled={issueInvoice.isPending} className="h-8 gap-1.5"><CheckCircle2 className="h-3.5 w-3.5" />{t("issue")}</Button> : null}{["issued", "partial", "overdue"].includes(invoice.status) ? <Button size="sm" variant="outline" onClick={() => recordPayment.mutate({ invoiceId: invoice.id })} disabled={recordPayment.isPending} className="h-8">{t("pay")}</Button> : null}</div></div>) : <p className="py-5 text-center text-sm text-muted-foreground">{t("empty")}</p>}</div>
+          <div className="mt-5 space-y-2">{invoices.data?.length ? invoices.data.slice(0, 4).map(invoice => <div key={invoice.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/70 bg-background/30 p-3"><div><p className="latin text-sm font-semibold text-foreground">{invoice.invoiceNumber}</p><div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground"><span>{taxCopy.net}: {formatCurrency(Number(invoice.netAmount))}</span><span>{taxCopy.tax}: {formatCurrency(Number(invoice.taxAmount))}</span><span className="font-semibold text-foreground">{taxCopy.total}: {formatCurrency(Number(invoice.grandTotal))}</span></div></div><div className="flex items-center gap-2"><Badge variant="outline" className="border-primary/20 bg-primary/[.04] text-primary">{invoice.taxMode === "inclusive" ? taxCopy.included : taxCopy.excluded}</Badge><Badge variant="outline" className={statusTone[invoice.status] ?? ""}>{t(invoice.status)}</Badge>{invoice.status === "draft" ? <Button size="sm" onClick={() => issueInvoice.mutate({ invoiceId: invoice.id })} disabled={issueInvoice.isPending} className="h-8 gap-1.5"><CheckCircle2 className="h-3.5 w-3.5" />{t("issue")}</Button> : null}{["issued", "partial", "overdue"].includes(invoice.status) ? <Button size="sm" variant="outline" onClick={() => recordPayment.mutate({ invoiceId: invoice.id })} disabled={recordPayment.isPending} className="h-8">{t("pay")}</Button> : null}</div></div>) : <p className="py-5 text-center text-sm text-muted-foreground">{t("empty")}</p>}</div>
         </article>
 
         <article id="purchases" className="surface scroll-mt-24 rounded-3xl border p-5">

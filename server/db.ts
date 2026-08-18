@@ -46,6 +46,7 @@ export const defaultDocumentSettings = {
   showSignature: true,
   fontFamily: "noto-arabic" as const,
   fontSize: "normal" as const,
+  vat: { defaultRate: 0, priceMode: "exclusive" as const },
 };
 
 export async function getDb() {
@@ -340,7 +341,7 @@ export async function listPurchaseOrdersForOrganization(organizationId: number) 
   return db.select().from(purchaseOrders).where(eq(purchaseOrders.organizationId, organizationId)).orderBy(desc(purchaseOrders.updatedAt), desc(purchaseOrders.id)).limit(100);
 }
 
-export async function createSalesInvoice(organizationId: number, actorUserId: number, input: { invoiceNumber?: string; customerId?: number; currencyCode: string; baseCurrencyCode: string; exchangeRateUsed?: number; dueDate?: Date; discountAmount?: number; lines: SalesInvoiceLineInput[] }) {
+export async function createSalesInvoice(organizationId: number, actorUserId: number, input: { invoiceNumber?: string; customerId?: number; currencyCode: string; baseCurrencyCode: string; exchangeRateUsed?: number; dueDate?: Date; discountAmount?: number; taxMode?: "exclusive" | "inclusive"; taxRate?: number; lines: SalesInvoiceLineInput[] }) {
   const db = await getDb();
   if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
 
@@ -350,29 +351,36 @@ export async function createSalesInvoice(organizationId: number, actorUserId: nu
       if (!customer[0] || customer[0].status !== "active" || !customer[0].types.includes("customer")) throw new Error("العميل المحدد غير متاح ضمن المؤسسة الحالية.");
     }
 
-    const normalizedLines: Array<{ productId: number; warehouseId: number; quantity: number; unit: string; unitPrice: number; taxRate: number; lineTotal: number; taxAmount: number }> = [];
+    const [settings] = await tx.select({ documentSettings: organizationSettings.documentSettings }).from(organizationSettings).where(eq(organizationSettings.organizationId, organizationId)).limit(1);
+    const vat = settings?.documentSettings?.vat;
+    const taxMode = input.taxMode ?? vat?.priceMode ?? "exclusive";
+    const configuredTaxRate = input.taxRate ?? vat?.defaultRate ?? 0;
+    if (!Number.isFinite(configuredTaxRate) || configuredTaxRate < 0 || configuredTaxRate > 100) throw new Error("نسبة ضريبة القيمة المضافة يجب أن تكون بين 0 و100.");
+    const normalizedLines: Array<{ productId: number; warehouseId: number; quantity: number; unit: string; unitPrice: number; taxRate: number; netAmount: number; lineTotal: number; taxAmount: number }> = [];
     for (const line of input.lines) {
       const product = await tx.select().from(products).where(and(eq(products.id, line.productId), eq(products.organizationId, organizationId))).limit(1);
       const warehouse = await tx.select().from(warehouses).where(and(eq(warehouses.id, line.warehouseId), eq(warehouses.organizationId, organizationId), eq(warehouses.status, "active"))).limit(1);
       if (!product[0] || product[0].status !== "active") throw new Error("أحد منتجات الفاتورة غير متاح ضمن المؤسسة الحالية.");
       if (!warehouse[0]) throw new Error("مخزن أحد أسطر الفاتورة غير متاح ضمن المؤسسة الحالية.");
       const unitPrice = line.unitPrice ?? Number(product[0].salePrice);
-      const taxRate = line.taxRate ?? Number(product[0].taxRate);
-      const beforeTax = roundMoney(line.quantity * unitPrice);
-      const taxAmount = roundMoney(beforeTax * (taxRate / 100));
-      normalizedLines.push({ productId: line.productId, warehouseId: line.warehouseId, quantity: line.quantity, unit: line.unit?.trim() || product[0].salesUnit, unitPrice, taxRate, lineTotal: roundMoney(beforeTax + taxAmount), taxAmount });
+      const productTaxRate = Number(product[0].taxRate);
+      const taxRate = line.taxRate ?? (productTaxRate > 0 ? productTaxRate : configuredTaxRate);
+      const enteredLineAmount = roundMoney(line.quantity * unitPrice);
+      const netAmount = taxMode === "inclusive" && taxRate > 0 ? roundMoney(enteredLineAmount / (1 + taxRate / 100)) : enteredLineAmount;
+      const taxAmount = taxMode === "inclusive" ? roundMoney(enteredLineAmount - netAmount) : roundMoney(netAmount * (taxRate / 100));
+      normalizedLines.push({ productId: line.productId, warehouseId: line.warehouseId, quantity: line.quantity, unit: line.unit?.trim() || product[0].salesUnit, unitPrice, taxRate, netAmount, lineTotal: taxMode === "inclusive" ? enteredLineAmount : roundMoney(netAmount + taxAmount), taxAmount });
     }
 
-    const subtotal = roundMoney(normalizedLines.reduce((total, line) => total + line.lineTotal - line.taxAmount, 0));
+    const subtotal = roundMoney(normalizedLines.reduce((total, line) => total + line.netAmount, 0));
     const taxAmount = roundMoney(normalizedLines.reduce((total, line) => total + line.taxAmount, 0));
     const discountAmount = roundMoney(input.discountAmount ?? 0);
     if (discountAmount > subtotal + taxAmount) throw new Error("لا يمكن أن يتجاوز الخصم إجمالي الفاتورة.");
     const grandTotal = roundMoney(subtotal + taxAmount - discountAmount);
-    const inserted = await tx.insert(salesInvoices).values({ organizationId, customerId: input.customerId, invoiceNumber: input.invoiceNumber?.trim() || newDocumentNumber("INV"), status: "draft", currencyCode: input.currencyCode, baseCurrencyCode: input.baseCurrencyCode, exchangeRateUsed: String(input.exchangeRateUsed ?? 1), discountAmount: String(discountAmount), taxAmount: String(taxAmount), grandTotal: String(grandTotal), amountPaid: "0", dueDate: input.dueDate });
+    const inserted = await tx.insert(salesInvoices).values({ organizationId, customerId: input.customerId, invoiceNumber: input.invoiceNumber?.trim() || newDocumentNumber("INV"), status: "draft", currencyCode: input.currencyCode, baseCurrencyCode: input.baseCurrencyCode, exchangeRateUsed: String(input.exchangeRateUsed ?? 1), taxMode, netAmount: String(subtotal), discountAmount: String(discountAmount), taxAmount: String(taxAmount), grandTotal: String(grandTotal), amountPaid: "0", dueDate: input.dueDate });
     const invoiceId = Number(inserted[0].insertId);
     await tx.insert(salesInvoiceItems).values(normalizedLines.map(line => ({ organizationId, invoiceId, productId: line.productId, warehouseId: line.warehouseId, quantity: String(line.quantity), unit: line.unit, unitPrice: String(line.unitPrice), taxRate: String(line.taxRate), lineTotal: String(line.lineTotal) })));
-    await tx.insert(auditLogs).values({ organizationId, actorUserId, action: "sales_invoice.created", entityType: "sales_invoice", entityId: String(invoiceId), metadata: { invoiceNumber: input.invoiceNumber?.trim() || null, lines: normalizedLines.length, grandTotal } });
-    return { id: invoiceId, status: "draft" as const, grandTotal };
+    await tx.insert(auditLogs).values({ organizationId, actorUserId, action: "sales_invoice.created", entityType: "sales_invoice", entityId: String(invoiceId), metadata: { invoiceNumber: input.invoiceNumber?.trim() || null, lines: normalizedLines.length, netAmount: subtotal, taxAmount, grandTotal, taxMode } });
+    return { id: invoiceId, status: "draft" as const, netAmount: subtotal, taxAmount, grandTotal, taxMode };
   });
 }
 
