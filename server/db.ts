@@ -20,6 +20,7 @@ import {
   organizationSettings,
   organizations,
   products,
+  productCategories,
   purchaseOrderItems,
   purchaseOrders,
   salesInvoiceItems,
@@ -241,7 +242,25 @@ export async function getDefaultTenantContext(userId: number) {
 export async function listProductsForOrganization(organizationId: number) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(products).where(eq(products.organizationId, organizationId)).orderBy(desc(products.updatedAt));
+  const rows = await db.select({ product: products, categoryName: productCategories.name, categoryColor: productCategories.color }).from(products).leftJoin(productCategories, and(eq(productCategories.id, products.categoryId), eq(productCategories.organizationId, products.organizationId))).where(eq(products.organizationId, organizationId)).orderBy(desc(products.updatedAt));
+  return rows.map(row => ({ ...row.product, categoryName: row.categoryName, categoryColor: row.categoryColor }));
+}
+
+export async function listProductCategoriesForOrganization(organizationId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(productCategories).where(eq(productCategories.organizationId, organizationId)).orderBy(asc(productCategories.name));
+}
+
+export async function createProductCategoryForOrganization(organizationId: number, input: { name: string; parentId?: number; color?: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  if (input.parentId) {
+    const [parent] = await db.select({ id: productCategories.id }).from(productCategories).where(and(eq(productCategories.organizationId, organizationId), eq(productCategories.id, input.parentId))).limit(1);
+    if (!parent) throw new Error("الفئة الرئيسية لا تنتمي إلى المؤسسة الحالية.");
+  }
+  const result = await db.insert(productCategories).values({ organizationId, name: input.name, parentId: input.parentId, color: input.color ?? "#D7B56D", status: "active" });
+  return { id: Number(result[0].insertId), name: input.name, parentId: input.parentId ?? null };
 }
 
 export async function findProductByBarcodeForOrganization(organizationId: number, rawBarcode: string) {
@@ -258,6 +277,11 @@ export async function createProductMaster(organizationId: number, values: { sku:
   if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
   const barcode = values.barcode ? normalizeTextBarcode(values.barcode) : undefined;
   if (barcode && !isValidTextBarcode(barcode)) throw new Error("صيغة الباركود النصي غير صالحة.");
+  if (values.categoryId) {
+    const [category] = await db.select({ id: productCategories.id, status: productCategories.status }).from(productCategories).where(and(eq(productCategories.organizationId, organizationId), eq(productCategories.id, values.categoryId))).limit(1);
+    if (!category) throw new Error("الفئة المختارة لا تنتمي إلى المؤسسة الحالية.");
+    if (category.status !== "active") throw new Error("الفئة المختارة غير مفعلة.");
+  }
   const result = await db.insert(products).values({ organizationId, sku: values.sku, name: values.name, nameAr: values.nameAr, nameFr: values.nameFr, nameEn: values.nameEn, barcode, categoryId: values.categoryId, brandId: values.brandId, productType: values.productType, baseUnit: values.baseUnit, unit: values.baseUnit, purchaseUnit: values.purchaseUnit, salesUnit: values.salesUnit, unitsPerCarton: String(values.unitsPerCarton), purchasePrice: String(values.purchasePrice), salePrice: String(values.salePrice), taxRate: String(values.taxRate), minimumStock: String(values.minimumStock), reorderPoint: String(values.reorderPoint), description: values.description, status: "active" });
   return { id: Number(result[0].insertId) };
 }
