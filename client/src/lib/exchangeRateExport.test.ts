@@ -5,8 +5,10 @@ import { buildExchangeRateExcel, buildExchangeRatePdf } from "./exchangeRateExpo
 describe("تصدير أسعار الصرف", () => {
   it("يبني محتوى Excel منظمًا مع التاريخ والمصدر", () => {
     const content = buildExchangeRateExcel([{ baseCurrencyCode: "DZD", quoteCurrencyCode: "EUR", rate: "0.0062", effectiveAt: new Date("2026-03-15T00:00:00Z"), source: "manual" }]);
-    expect(content).toContain("Base\tQuote\tRate\tEffective date\tSource");
-    expect(content).toContain("DZD\tEUR\t0.0062\t2026-03-15T00:00:00.000Z\tmanual");
+    expect(content).toContain("<th>Base</th>");
+    expect(content).toContain("<td>DZD</td>");
+    expect(content).toContain("<td>EUR</td>");
+    expect(content).toContain("<col style=\"width:");
   });
 
   it("يبني PDF متعدد الصفحات عند تجاوز 25 سجلاً", async () => {
@@ -21,6 +23,7 @@ describe("تصدير أسعار الصرف", () => {
       formatRate: value => `rate:${value.toFixed(4)}`,
       formatDate: () => "15/03/2026 01:00",
     });
-    expect(content).toContain("rate:0.0062\t15/03/2026 01:00");
+    expect(content).toContain("rate:0.0062");
+    expect(content).toContain("15/03/2026 01:00");
   });
 });

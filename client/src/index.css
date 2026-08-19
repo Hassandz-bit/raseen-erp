@@ -222,6 +222,24 @@ html:not(.dark) .text-slate-300 { color: oklch(.36 .018 255) !important; }
 .grid-line { background-image: linear-gradient(oklch(0.8 0.03 90 / .035) 1px, transparent 1px), linear-gradient(90deg, oklch(0.8 0.03 90 / .035) 1px, transparent 1px); background-size: 28px 28px; }
 .thin-scrollbar::-webkit-scrollbar { width: 7px; height: 7px; }
 .thin-scrollbar::-webkit-scrollbar-thumb { background: oklch(0.38 0.022 250); border-radius: 10px; }
+
+/* Operational tables: fit their columns to real content while retaining a readable lower bound. */
+.raseen-data-table { width: max-content; min-width: 0; table-layout: auto; border-collapse: collapse; }
+.raseen-data-table :is(th, td) { padding: .56rem .72rem; vertical-align: middle; line-height: 1.32; }
+.raseen-data-table th { white-space: nowrap; font-weight: 700; }
+.raseen-data-table td { max-width: 30rem; overflow-wrap: anywhere; }
+.raseen-data-table td:has(button), .raseen-data-table td:has(input), .raseen-data-table td:has([role="checkbox"]) { white-space: nowrap; }
+.overflow-x-auto > table { width: max-content; min-width: 0; table-layout: auto; border-collapse: collapse; }
+.overflow-x-auto > table :is(th, td) { padding: .56rem .72rem; vertical-align: middle; line-height: 1.32; }
+.overflow-x-auto > table th { white-space: nowrap; }
+.overflow-x-auto > table td { max-width: 30rem; overflow-wrap: anywhere; }
+@media print {
+  .raseen-data-table { width: 100%; min-width: 0; font-size: 9pt; }
+  .raseen-data-table :is(th, td) { padding: 4px 6px; line-height: 1.22; }
+  .raseen-data-table th { white-space: normal; }
+  .overflow-x-auto > table { width: 100%; min-width: 0; font-size: 9pt; }
+  .overflow-x-auto > table :is(th, td) { padding: 4px 6px; line-height: 1.22; }
+}
 .nawa-top-header { position: sticky !important; top: 0; z-index: 60; isolation: isolate; }
 .nawa-main-inset > .sticky > .flex.shrink-0 { display: none; }
 

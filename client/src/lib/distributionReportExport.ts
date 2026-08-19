@@ -1,10 +1,10 @@
 import { createDocumentPreviewPdf, type DocumentPreviewExportData } from "./documentPreviewExport";
+import { buildAdaptiveExcelHtml } from "./adaptiveTableExport";
 
 export type DistributionReportRow = { label: string; value: string };
 
 export function buildDistributionExcel(title: string, generatedAt: string, rows: DistributionReportRow[]) {
-  const clean = (value: string) => value.replace(/[\t\r\n]/g, " ");
-  return [clean(title), clean(generatedAt), "Metric\tValue", ...rows.map(row => `${clean(row.label)}\t${clean(row.value)}`)].join("\n");
+  return buildAdaptiveExcelHtml({ title, generatedAt, headers: ["Metric", "Value"], rows: rows.map(row => [row.label, row.value]) });
 }
 
 export function downloadDistributionExcel(title: string, generatedAt: string, rows: DistributionReportRow[], filename: string) {
