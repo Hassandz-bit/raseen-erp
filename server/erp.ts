@@ -1,10 +1,12 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { addOrganizationExchangeRate, adjustProductBatchQuantity, approveInventoryCount, approveStockTransfer, createBranchForOrganization, createBusinessParty, createInventoryCount, createOperationalNotifications, createOperationalRecord, createOrganizationForUser, createProductBatch, createProductMaster, createPurchaseOrder, createSalesInvoice, createStockTransfer, createWarehouseForOrganization, dispatchStockTransfer, findProductByBarcodeForOrganization, getCommerceReportSummary, getDashboardMetrics, getDefaultTenantContext, getFinancialReportSummary, getOrCreateOrganizationSettings, getOrCreateUserPreferences, getOrganizationRolePermissions, getSalesInvoicePrintDataForOrganization, issueSalesInvoiceWithFefo, issueStockByFefo, listActiveCustomersForOrganization, listBranchesForOrganization, listInventoryCountsForOrganization, listNotificationsForOrganization, listOperationalRecords, listOrganizationCurrencies, listOrganizationExchangeRates, listOrganizationMembersForOrganization, listProductBatchesForOrganization, listProductsForOrganization, listPurchaseOrdersForOrganization, listSalesInvoicesForOrganization, listStockMovementsForOrganization, listStockTransfersForOrganization, listWarehousesForOrganization, markAllNotificationsRead, markNotificationRead, previewFefoAllocation, receivePurchaseOrder, receiveStockTransfer, recordSalesInvoicePayment, recordStockMovement, saveOrganizationCurrency, searchCommandEntitiesForOrganization, sendPurchaseOrder, startInventoryCount, submitInventoryCount, updateOrganizationSettings, updateProductBatchStatus, updateUserPreferences, type OperationalModule } from "./db";
+import { addOrganizationExchangeRate, adjustProductBatchQuantity, approveInventoryCount, approveStockTransfer, createBranchForOrganization, createBusinessParty, createInventoryCount, createOperationalNotifications, createOperationalRecord, createOrganizationForUser, createProductBatch, createProductMaster, createPurchaseOrder, createSalesInvoice, createStockTransfer, createWarehouseForOrganization, dispatchStockTransfer, findProductByBarcodeForOrganization, getCommerceReportSummary, getDashboardMetrics, getDefaultTenantContext, getFinancialReportSummary, getOrCreateOrganizationSettings, getOrCreateUserPreferences, getOrganizationRolePermissions, getPublicSalesInvoiceVerification, getSalesInvoicePrintDataForOrganization, issueSalesInvoiceWithFefo, issueStockByFefo, listActiveCustomersForOrganization, listBranchesForOrganization, listInventoryCountsForOrganization, listNotificationsForOrganization, listOperationalRecords, listOrganizationCurrencies, listOrganizationExchangeRates, listOrganizationMembersForOrganization, listProductBatchesForOrganization, listProductsForOrganization, listPurchaseOrdersForOrganization, listSalesInvoicesForOrganization, listStockMovementsForOrganization, listStockTransfersForOrganization, listWarehousesForOrganization, markAllNotificationsRead, markNotificationRead, previewFefoAllocation, receivePurchaseOrder, receiveStockTransfer, recordSalesInvoicePayment, recordStockMovement, saveOrganizationCurrency, searchCommandEntitiesForOrganization, sendPurchaseOrder, startInventoryCount, submitInventoryCount, updateOrganizationSettings, updateProductBatchStatus, updateUserPreferences, type OperationalModule } from "./db";
 import { currencyCatalog } from "../shared/currencyCatalog";
 import { askNawaAI } from "./nawaAI";
 import { notifyOwner } from "./_core/notification";
-import { protectedProcedure, router } from "./_core/trpc";
+import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
+import { ENV } from "./_core/env";
+import { signInvoiceVerification, verifyInvoiceVerification } from "./invoiceVerification";
 import { buildOwnerAlertReasons, canAccessTenantModule, hasActiveMembership, isOrganizationOwner } from "./tenantPolicy";
 import { canUseRetailPermission, type RetailPermission } from "./retailPermissionPolicy";
 import { hasValidExchangeRateDateRange, normalizeExchangeRateFilters } from "./exchangeRateFilters";
@@ -142,6 +144,15 @@ function assertDistributionScope(context: Awaited<ReturnType<typeof getTenantCon
 
 
 export const erpRouter = router({
+  invoiceVerification: router({
+    verify: publicProcedure.input(z.object({ token: z.string().min(16).max(1000) })).query(async ({ input }) => {
+      const payload = verifyInvoiceVerification(input.token, ENV.cookieSecret);
+      if (!payload) return { valid: false as const };
+      const invoice = await getPublicSalesInvoiceVerification(payload.organizationId, payload.invoiceId);
+      if (!invoice || invoice.invoiceNumber !== payload.invoiceNumber) return { valid: false as const };
+      return { valid: true as const, invoice };
+    }),
+  }),
   catalog: router({
     findProductByBarcode: protectedProcedure.input(z.object({ barcode: z.string().trim().min(2).max(96) })).query(async ({ ctx, input }) => {
       const context = await getTenantContext(ctx.user.id);
@@ -269,6 +280,9 @@ export const erpRouter = router({
         footerText: z.string().max(300).optional(),
         showSignature: z.boolean().optional(),
         useLogoWatermark: z.boolean().optional(),
+        headerTemplate: z.enum(["classic", "split", "minimal"]).optional(),
+        showElectronicSeal: z.boolean().optional(),
+        electronicSealLabel: z.string().trim().max(120).optional(),
         fontFamily: z.enum(["ibm-plex", "tajawal", "noto-arabic", "inter", "system"]).optional(),
         fontSize: z.enum(["small", "normal", "large"]).optional(),
         vat: z.object({ defaultRate: z.number().min(0).max(100), priceMode: z.enum(["exclusive", "inclusive"]) }).optional(),
@@ -476,7 +490,8 @@ export const erpRouter = router({
     }),
     invoicePrintData: protectedProcedure.input(z.object({ invoiceId: z.number().int().positive() })).query(async ({ ctx, input }) => {
       const context = await requireModule(ctx.user.id, "sales");
-      return getSalesInvoicePrintDataForOrganization(context.organization.id, input.invoiceId);
+      const data = await getSalesInvoicePrintDataForOrganization(context.organization.id, input.invoiceId);
+      return { ...data, verificationToken: signInvoiceVerification({ v: 1, organizationId: context.organization.id, invoiceId: input.invoiceId, invoiceNumber: data.invoice.invoiceNumber, issuedAt: new Date(data.invoice.createdAt).getTime() }, ENV.cookieSecret) };
     }),
     createInvoice: protectedProcedure.input(z.object({
       invoiceNumber: z.string().trim().min(1).max(64).optional(),

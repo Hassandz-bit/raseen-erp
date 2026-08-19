@@ -401,6 +401,13 @@ export async function getSalesInvoicePrintDataForOrganization(organizationId: nu
   return { ...header, items };
 }
 
+export async function getPublicSalesInvoiceVerification(organizationId: number, invoiceId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const [invoice] = await db.select({ organizationName: organizations.name, invoiceNumber: salesInvoices.invoiceNumber, status: salesInvoices.status, currencyCode: salesInvoices.currencyCode, grandTotal: salesInvoices.grandTotal, taxAmount: salesInvoices.taxAmount, createdAt: salesInvoices.createdAt }).from(salesInvoices).innerJoin(organizations, eq(organizations.id, salesInvoices.organizationId)).where(and(eq(salesInvoices.organizationId, organizationId), eq(salesInvoices.id, invoiceId))).limit(1);
+  return invoice ?? null;
+}
+
 export async function listPurchaseOrdersForOrganization(organizationId: number) {
   const db = await getDb();
   if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");

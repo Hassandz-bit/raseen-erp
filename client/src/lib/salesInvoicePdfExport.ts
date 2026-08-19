@@ -1,3 +1,4 @@
+import QRCode from "qrcode";
 import { createDocumentPreviewPdf, type DocumentPreviewExportData } from "./documentPreviewExport";
 
 type AppLanguage = "ar" | "fr" | "en";
@@ -5,9 +6,10 @@ type AppLanguage = "ar" | "fr" | "en";
 export type SalesInvoicePrintData = {
   organizationName: string;
   customerName: string | null;
-  documentSettings: { logoUrl?: string; headerText?: string; footerText?: string; taxNumber?: string; legalInfo?: string; showSignature?: boolean; useLogoWatermark?: boolean; fontFamily?: DocumentPreviewExportData["fontFamily"]; fontSize?: DocumentPreviewExportData["fontSize"]; paperSize?: DocumentPreviewExportData["paperSize"] } | null;
+  documentSettings: { logoUrl?: string; headerText?: string; footerText?: string; taxNumber?: string; legalInfo?: string; headerTemplate?: "classic" | "split" | "minimal"; showSignature?: boolean; useLogoWatermark?: boolean; showElectronicSeal?: boolean; electronicSealLabel?: string; fontFamily?: DocumentPreviewExportData["fontFamily"]; fontSize?: DocumentPreviewExportData["fontSize"]; paperSize?: DocumentPreviewExportData["paperSize"] } | null;
   invoice: { invoiceNumber: string; status: string; currencyCode: string; taxMode: "exclusive" | "inclusive"; netAmount: string | number; taxAmount: string | number; discountAmount: string | number; grandTotal: string | number; dueDate: Date | string | null; createdAt: Date | string };
   items: Array<{ id: number; productName: string; sku: string | null; quantity: string | number; unit: string; unitPrice: string | number; taxRate: string | number; lineTotal: string | number }>;
+  verificationToken?: string;
 };
 
 const copy = {
@@ -34,6 +36,9 @@ export function buildSalesInvoicePdfInput(data: SalesInvoicePrintData, language:
     taxNumber: settings.taxNumber,
     legalInfo: settings.legalInfo,
     useLogoWatermark: settings.useLogoWatermark,
+    headerTemplate: settings.headerTemplate,
+    showElectronicSeal: settings.showElectronicSeal,
+    electronicSealLabel: settings.electronicSealLabel,
     title: `${text.title} — ${data.organizationName}`,
     date: `${text.created}: ${date(data.invoice.createdAt, language)}`,
     documentLabel: `${text.invoice}: ${data.invoice.invoiceNumber}`,
@@ -58,7 +63,14 @@ export function buildSalesInvoicePdfInput(data: SalesInvoicePrintData, language:
 }
 
 export async function downloadSalesInvoicePdf(data: SalesInvoicePrintData, language: AppLanguage) {
-  const result = await createDocumentPreviewPdf(buildSalesInvoicePdfInput(data, language), `raseen-invoice-${data.invoice.invoiceNumber}.pdf`);
+  const input = buildSalesInvoicePdfInput(data, language);
+  if (data.verificationToken && typeof window !== "undefined") {
+    const verificationUrl = new URL("/verify/invoice", window.location.origin);
+    verificationUrl.searchParams.set("token", data.verificationToken);
+    input.verificationQrDataUrl = await QRCode.toDataURL(verificationUrl.toString(), { width: 160, margin: 1, errorCorrectionLevel: "M" });
+    input.verificationLabel = language === "ar" ? "امسح للتحقق من صحة الفاتورة" : language === "fr" ? "Scannez pour vérifier la facture" : "Scan to verify invoice";
+  }
+  const result = await createDocumentPreviewPdf(input, `raseen-invoice-${data.invoice.invoiceNumber}.pdf`);
   const url = URL.createObjectURL(result.blob);
   const anchor = document.createElement("a");
   anchor.href = url;
