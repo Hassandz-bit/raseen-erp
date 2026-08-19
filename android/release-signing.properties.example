@@ -1,0 +1,6 @@
+# انسخ هذا الملف باسم release-signing.properties ولا تضعه في Git أو في ملف تسليم عام.
+# ضع ملف JKS خارج مجلد المشروع أو في خدمة أسرار مؤسسية محمية.
+storeFile=../secure/raseen-release.jks
+storePassword=REPLACE_WITH_A_LONG_PRIVATE_PASSWORD
+keyAlias=raseen_release
+keyPassword=REPLACE_WITH_A_LONG_PRIVATE_PASSWORD
