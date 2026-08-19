@@ -1,5 +1,6 @@
 import QRCode from "qrcode";
 import { createDocumentPreviewPdf, type DocumentPreviewExportData } from "./documentPreviewExport";
+import { getInvoiceShareTemplate, renderInvoiceShareTemplate, type ShareTemplateSet } from "./invoiceShareMessageTemplates";
 
 export type AppLanguage = "ar" | "fr" | "en";
 
@@ -8,7 +9,7 @@ export type SalesInvoicePrintData = {
   customerName: string | null;
   customerPhone?: string | null;
   customerEmail?: string | null;
-  documentSettings: { logoUrl?: string; headerText?: string; footerText?: string; taxNumber?: string; legalInfo?: string; headerTemplate?: "classic" | "split" | "minimal"; showSignature?: boolean; useLogoWatermark?: boolean; showElectronicSeal?: boolean; electronicSealLabel?: string; fontFamily?: DocumentPreviewExportData["fontFamily"]; fontSize?: DocumentPreviewExportData["fontSize"]; paperSize?: DocumentPreviewExportData["paperSize"] } | null;
+  documentSettings: { logoUrl?: string; headerText?: string; footerText?: string; taxNumber?: string; legalInfo?: string; headerTemplate?: "classic" | "split" | "minimal"; showSignature?: boolean; useLogoWatermark?: boolean; showElectronicSeal?: boolean; electronicSealLabel?: string; shareTemplates?: ShareTemplateSet; fontFamily?: DocumentPreviewExportData["fontFamily"]; fontSize?: DocumentPreviewExportData["fontSize"]; paperSize?: DocumentPreviewExportData["paperSize"] } | null;
   invoice: { invoiceNumber: string; status: string; currencyCode: string; taxMode: "exclusive" | "inclusive"; netAmount: string | number; taxAmount: string | number; discountAmount: string | number; grandTotal: string | number; dueDate: Date | string | null; createdAt: Date | string };
   items: Array<{ id: number; productName: string; sku: string | null; quantity: string | number; unit: string; unitPrice: string | number; taxRate: string | number; lineTotal: string | number }>;
   verificationToken?: string;
@@ -74,9 +75,16 @@ export function buildInvoiceVerificationUrl(token: string | undefined) {
 export function buildInvoiceClientShareMessage(data: SalesInvoicePrintData, language: AppLanguage) {
   const total = money(data.invoice.grandTotal, data.invoice.currencyCode, language);
   const verificationUrl = buildInvoiceVerificationUrl(data.verificationToken);
-  const lead = language === "ar" ? `مرحباً، نشارك معكم فاتورة ${data.invoice.invoiceNumber} من ${data.organizationName}. الإجمالي: ${total}.` : language === "fr" ? `Bonjour, voici votre facture ${data.invoice.invoiceNumber} de ${data.organizationName}. Total : ${total}.` : `Hello, here is your invoice ${data.invoice.invoiceNumber} from ${data.organizationName}. Total: ${total}.`;
-  const verification = verificationUrl ? (language === "ar" ? ` رابط التحقق: ${verificationUrl}` : language === "fr" ? ` Lien de vérification : ${verificationUrl}` : ` Verification link: ${verificationUrl}`) : "";
-  return `${lead}${verification}`;
+  const values = { organization_name: data.organizationName, customer_name: data.customerName || (language === "ar" ? "عميلنا" : language === "fr" ? "Client" : "Customer"), invoice_number: data.invoice.invoiceNumber, invoice_total: total, verification_url: verificationUrl ?? "" };
+  return renderInvoiceShareTemplate(getInvoiceShareTemplate(data.documentSettings?.shareTemplates, "whatsapp", language), values);
+}
+
+export function buildInvoiceCustomerEmail(data: SalesInvoicePrintData, language: AppLanguage) {
+  const total = money(data.invoice.grandTotal, data.invoice.currencyCode, language);
+  const verificationUrl = buildInvoiceVerificationUrl(data.verificationToken);
+  const values = { organization_name: data.organizationName, customer_name: data.customerName || (language === "ar" ? "عميلنا" : language === "fr" ? "Client" : "Customer"), invoice_number: data.invoice.invoiceNumber, invoice_total: total, verification_url: verificationUrl ?? "" };
+  const templates = data.documentSettings?.shareTemplates;
+  return { subject: renderInvoiceShareTemplate(getInvoiceShareTemplate(templates, "emailSubject", language), values), body: renderInvoiceShareTemplate(getInvoiceShareTemplate(templates, "emailBody", language), values) };
 }
 
 export function buildWhatsAppCustomerUrl(phone: string | null | undefined, message: string) {

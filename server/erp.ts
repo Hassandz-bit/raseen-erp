@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { addOrganizationExchangeRate, adjustProductBatchQuantity, approveInventoryCount, approveStockTransfer, createBranchForOrganization, createBusinessParty, createInventoryCount, createOperationalNotifications, createOperationalRecord, createOrganizationForUser, createProductBatch, createProductMaster, createPurchaseOrder, createSalesInvoice, createStockTransfer, createWarehouseForOrganization, dispatchStockTransfer, findProductByBarcodeForOrganization, getCommerceReportSummary, getDashboardMetrics, getDefaultTenantContext, getFinancialReportSummary, getOrCreateOrganizationSettings, getOrCreateUserPreferences, getOrganizationRolePermissions, getPublicSalesInvoiceVerification, getSalesInvoicePrintDataForOrganization, issueSalesInvoiceWithFefo, issueStockByFefo, listActiveCustomersForOrganization, listBranchesForOrganization, listInventoryCountsForOrganization, listNotificationsForOrganization, listOperationalRecords, listOrganizationCurrencies, listOrganizationExchangeRates, listOrganizationMembersForOrganization, listProductBatchesForOrganization, listProductsForOrganization, listPurchaseOrdersForOrganization, listSalesInvoicesForOrganization, listStockMovementsForOrganization, listStockTransfersForOrganization, listWarehousesForOrganization, markAllNotificationsRead, markNotificationRead, previewFefoAllocation, receivePurchaseOrder, receiveStockTransfer, recordSalesInvoicePayment, recordStockMovement, saveOrganizationCurrency, searchCommandEntitiesForOrganization, sendPurchaseOrder, startInventoryCount, submitInventoryCount, updateOrganizationSettings, updateProductBatchStatus, updateUserPreferences, type OperationalModule } from "./db";
+import { addOrganizationExchangeRate, adjustProductBatchQuantity, approveInventoryCount, approveStockTransfer, createBranchForOrganization, createBusinessParty, createInventoryCount, createOperationalNotifications, createOperationalRecord, createOrganizationForUser, createProductBatch, createProductMaster, createPurchaseOrder, createSalesInvoice, createStockTransfer, createWarehouseForOrganization, dispatchStockTransfer, findProductByBarcodeForOrganization, getCommerceReportSummary, getDashboardMetrics, getDefaultTenantContext, getFinancialReportSummary, getOrCreateOrganizationSettings, getOrCreateUserPreferences, getOrganizationRolePermissions, getPublicSalesInvoiceVerification, getSalesInvoicePrintDataForOrganization, issueSalesInvoiceWithFefo, issueStockByFefo, listActiveCustomersForOrganization, listBranchesForOrganization, listInventoryCountsForOrganization, listNotificationsForOrganization, listOperationalRecords, listOrganizationCurrencies, listOrganizationExchangeRates, listOrganizationMembersForOrganization, listProductBatchesForOrganization, listProductsForOrganization, listPurchaseOrdersForOrganization, listSalesInvoiceShareEventsForOrganization, listSalesInvoicesForOrganization, listStockMovementsForOrganization, listStockTransfersForOrganization, listWarehousesForOrganization, markAllNotificationsRead, markNotificationRead, previewFefoAllocation, receivePurchaseOrder, receiveStockTransfer, recordSalesInvoicePayment, recordSalesInvoiceShareEventForOrganization, recordStockMovement, saveOrganizationCurrency, searchCommandEntitiesForOrganization, sendPurchaseOrder, startInventoryCount, submitInventoryCount, updateOrganizationSettings, updateProductBatchStatus, updateUserPreferences, type OperationalModule } from "./db";
 import { currencyCatalog } from "../shared/currencyCatalog";
 import { askNawaAI } from "./nawaAI";
 import { notifyOwner } from "./_core/notification";
@@ -283,6 +283,7 @@ export const erpRouter = router({
         headerTemplate: z.enum(["classic", "split", "minimal"]).optional(),
         showElectronicSeal: z.boolean().optional(),
         electronicSealLabel: z.string().trim().max(120).optional(),
+        shareTemplates: z.object({ whatsapp: z.object({ ar: z.string().max(2000).optional(), fr: z.string().max(2000).optional(), en: z.string().max(2000).optional() }).optional(), emailSubject: z.object({ ar: z.string().max(300).optional(), fr: z.string().max(300).optional(), en: z.string().max(300).optional() }).optional(), emailBody: z.object({ ar: z.string().max(2000).optional(), fr: z.string().max(2000).optional(), en: z.string().max(2000).optional() }).optional() }).optional(),
         fontFamily: z.enum(["ibm-plex", "tajawal", "noto-arabic", "inter", "system"]).optional(),
         fontSize: z.enum(["small", "normal", "large"]).optional(),
         vat: z.object({ defaultRate: z.number().min(0).max(100), priceMode: z.enum(["exclusive", "inclusive"]) }).optional(),
@@ -492,6 +493,14 @@ export const erpRouter = router({
       const context = await requireModule(ctx.user.id, "sales");
       const data = await getSalesInvoicePrintDataForOrganization(context.organization.id, input.invoiceId);
       return { ...data, verificationToken: signInvoiceVerification({ v: 1, organizationId: context.organization.id, invoiceId: input.invoiceId, invoiceNumber: data.invoice.invoiceNumber, issuedAt: new Date(data.invoice.createdAt).getTime() }, ENV.cookieSecret) };
+    }),
+    invoiceShareEvents: protectedProcedure.input(z.object({ invoiceId: z.number().int().positive() })).query(async ({ ctx, input }) => {
+      const context = await requireModule(ctx.user.id, "sales");
+      return listSalesInvoiceShareEventsForOrganization(context.organization.id, input.invoiceId);
+    }),
+    trackInvoiceShare: protectedProcedure.input(z.object({ invoiceId: z.number().int().positive(), channel: z.enum(["whatsapp", "email"]), status: z.enum(["opened", "confirmed_sent", "cancelled"]) })).mutation(async ({ ctx, input }) => {
+      const context = await requireModule(ctx.user.id, "sales");
+      return recordSalesInvoiceShareEventForOrganization(context.organization.id, ctx.user.id, input);
     }),
     createInvoice: protectedProcedure.input(z.object({
       invoiceNumber: z.string().trim().min(1).max(64).optional(),

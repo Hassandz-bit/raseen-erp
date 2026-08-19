@@ -410,6 +410,21 @@ export async function getPublicSalesInvoiceVerification(organizationId: number, 
   return invoice ?? null;
 }
 
+export async function listSalesInvoiceShareEventsForOrganization(organizationId: number, invoiceId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  return db.select({ id: auditLogs.id, actorUserId: auditLogs.actorUserId, action: auditLogs.action, metadata: auditLogs.metadata, createdAt: auditLogs.createdAt }).from(auditLogs).where(and(eq(auditLogs.organizationId, organizationId), eq(auditLogs.entityType, "sales_invoice_share"), eq(auditLogs.entityId, String(invoiceId)))).orderBy(desc(auditLogs.createdAt), desc(auditLogs.id)).limit(30);
+}
+
+export async function recordSalesInvoiceShareEventForOrganization(organizationId: number, actorUserId: number, input: { invoiceId: number; channel: "whatsapp" | "email"; status: "opened" | "confirmed_sent" | "cancelled" }) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
+  const [invoice] = await db.select({ id: salesInvoices.id }).from(salesInvoices).where(and(eq(salesInvoices.organizationId, organizationId), eq(salesInvoices.id, input.invoiceId))).limit(1);
+  if (!invoice) throw new Error("لم يتم العثور على الفاتورة ضمن المؤسسة الحالية.");
+  await db.insert(auditLogs).values({ organizationId, actorUserId, action: `sales_invoice.share_${input.status}`, entityType: "sales_invoice_share", entityId: String(input.invoiceId), metadata: { channel: input.channel, status: input.status } });
+  return { invoiceId: input.invoiceId, channel: input.channel, status: input.status };
+}
+
 export async function listPurchaseOrdersForOrganization(organizationId: number) {
   const db = await getDb();
   if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً.");
