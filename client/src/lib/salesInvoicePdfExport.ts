@@ -5,7 +5,7 @@ type AppLanguage = "ar" | "fr" | "en";
 export type SalesInvoicePrintData = {
   organizationName: string;
   customerName: string | null;
-  documentSettings: { logoUrl?: string; headerText?: string; footerText?: string; showSignature?: boolean; fontFamily?: DocumentPreviewExportData["fontFamily"]; fontSize?: DocumentPreviewExportData["fontSize"]; paperSize?: DocumentPreviewExportData["paperSize"] } | null;
+  documentSettings: { logoUrl?: string; headerText?: string; footerText?: string; taxNumber?: string; legalInfo?: string; showSignature?: boolean; useLogoWatermark?: boolean; fontFamily?: DocumentPreviewExportData["fontFamily"]; fontSize?: DocumentPreviewExportData["fontSize"]; paperSize?: DocumentPreviewExportData["paperSize"] } | null;
   invoice: { invoiceNumber: string; status: string; currencyCode: string; taxMode: "exclusive" | "inclusive"; netAmount: string | number; taxAmount: string | number; discountAmount: string | number; grandTotal: string | number; dueDate: Date | string | null; createdAt: Date | string };
   items: Array<{ id: number; productName: string; sku: string | null; quantity: string | number; unit: string; unitPrice: string | number; taxRate: string | number; lineTotal: string | number }>;
 };
@@ -31,6 +31,9 @@ export function buildSalesInvoicePdfInput(data: SalesInvoicePrintData, language:
   return {
     direction: language === "ar" ? "rtl" : "ltr",
     logoUrl: settings.logoUrl,
+    taxNumber: settings.taxNumber,
+    legalInfo: settings.legalInfo,
+    useLogoWatermark: settings.useLogoWatermark,
     title: `${text.title} — ${data.organizationName}`,
     date: `${text.created}: ${date(data.invoice.createdAt, language)}`,
     documentLabel: `${text.invoice}: ${data.invoice.invoiceNumber}`,

@@ -21,6 +21,14 @@ describe("تصدير معاينة المستند", () => {
     expect(externalLogo).not.toContain("example.com/logo.png");
   });
 
+  it("يعرض الترويسة القانونية والعلامة المائية الباهتة للشعار المعزول", () => {
+    const html = buildDocumentPreviewHtml({ direction: "rtl", title: "فاتورة", date: "2026-08-14", documentLabel: "مستند", amount: "100", logoUrl: "/manus-storage/organizations/3/document-logo.png", taxNumber: "123456789", legalInfo: "سجل تجاري 42", useLogoWatermark: true });
+    expect(html).toContain("الرقم الضريبي: 123456789");
+    expect(html).toContain("سجل تجاري 42");
+    expect(html).toContain('class="watermark"');
+    expect(html).toContain("opacity:.055");
+  });
+
   it("يجهز ملف معاينة HTML مسمى قابل للطباعة والحفظ PDF من المتصفح", () => {
     const result = createDocumentPreviewDownload({ direction: "rtl", title: "مستند", date: "2026-08-14", documentLabel: "فاتورة", amount: "١٠٠" }, "nawa-document-preview");
     expect(result.filename).toBe("nawa-document-preview.html");
