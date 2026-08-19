@@ -375,6 +375,8 @@ export async function getSalesInvoicePrintDataForOrganization(organizationId: nu
     invoice: salesInvoices,
     organizationName: organizations.name,
     customerName: businessParties.name,
+    customerPhone: businessParties.phone,
+    customerEmail: businessParties.email,
     documentSettings: organizationSettings.documentSettings,
   }).from(salesInvoices)
     .innerJoin(organizations, eq(organizations.id, salesInvoices.organizationId))
