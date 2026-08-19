@@ -254,6 +254,7 @@ export const erpRouter = router({
       accentColor: z.enum(["gold", "blue", "emerald", "violet"]).optional(),
       radiusPreset: z.enum(["soft", "rounded", "sharp"]).optional(),
       moduleViewMode: z.enum(["classic", "nawa_flow"]).optional(),
+      tablePreferences: z.record(z.string(), z.object({ density: z.enum(["compact", "normal", "comfortable"]).optional(), hiddenColumnIds: z.array(z.string().trim().min(1).max(64)).max(24).optional(), columnOrder: z.array(z.string().trim().min(1).max(64)).max(24).optional() })).optional(),
     })).mutation(({ ctx, input }) => updateUserPreferences(ctx.user.id, input)),
     organization: protectedProcedure.query(async ({ ctx }) => {
       const context = await getTenantContext(ctx.user.id);

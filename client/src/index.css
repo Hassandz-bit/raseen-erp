@@ -229,6 +229,9 @@ html:not(.dark) .text-slate-300 { color: oklch(.36 .018 255) !important; }
 .raseen-data-table th { white-space: nowrap; font-weight: 700; }
 .raseen-data-table td { max-width: 30rem; overflow-wrap: anywhere; }
 .raseen-data-table td:has(button), .raseen-data-table td:has(input), .raseen-data-table td:has([role="checkbox"]) { white-space: nowrap; }
+.raseen-data-table.table-density-compact :is(th, td) { padding: .34rem .52rem; line-height: 1.18; }
+.raseen-data-table.table-density-normal :is(th, td) { padding: .56rem .72rem; line-height: 1.32; }
+.raseen-data-table.table-density-comfortable :is(th, td) { padding: .82rem .94rem; line-height: 1.48; }
 .overflow-x-auto > table { width: max-content; min-width: 0; table-layout: auto; border-collapse: collapse; }
 .overflow-x-auto > table :is(th, td) { padding: .56rem .72rem; vertical-align: middle; line-height: 1.32; }
 .overflow-x-auto > table th { white-space: nowrap; }
