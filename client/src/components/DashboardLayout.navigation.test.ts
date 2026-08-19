@@ -50,8 +50,8 @@ describe("تنقل بوابات Nawa", () => {
   });
 
   it("يوفر إجراء طباعة عاماً لكل صفحة داخل التخطيط الموحد", () => {
-    expect(source).toContain("window.print()");
-    expect(source).toContain("chrome.print");
+    expect(source).toContain("PagePrintPreview");
+    expect(source).toContain("organizationSettings.data?.documentSettings");
     expect(source).toContain("nawa-print-only");
   });
 
