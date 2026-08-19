@@ -49,6 +49,12 @@ describe("تنقل بوابات Nawa", () => {
     expect(source).toContain("nawa-organization-switcher");
   });
 
+  it("يوفر إجراء طباعة عاماً لكل صفحة داخل التخطيط الموحد", () => {
+    expect(source).toContain("window.print()");
+    expect(source).toContain("chrome.print");
+    expect(source).toContain("nawa-print-only");
+  });
+
   it("يعرض منتقي الفروع من عقد محمي ويحفظ الاختيار المرئي", () => {
     expect(source).toContain("trpc.erp.preferences.availableBranches.useQuery");
     expect(source).toContain('const ACTIVE_BRANCH_KEY = "nawa:active-branch"');
