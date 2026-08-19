@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { RASEEN_PRINT_LOGO_URL } from "@/config/raseenBrandAssets";
 import { buildDocumentPreviewFilename, buildDocumentPreviewHtml, buildDocumentPreviewPdfFilename, createDocumentPreviewDownload } from "./documentPreviewExport";
 
 describe("تصدير معاينة المستند", () => {
@@ -18,6 +19,7 @@ describe("تصدير معاينة المستند", () => {
     const withLogo = buildDocumentPreviewHtml({ direction: "rtl", title: "فاتورة", date: "2026-08-14", documentLabel: "مستند", amount: "100", logoUrl: "/manus-storage/organizations/3/document-logo.png" });
     const externalLogo = buildDocumentPreviewHtml({ direction: "rtl", title: "فاتورة", date: "2026-08-14", documentLabel: "مستند", amount: "100", logoUrl: "https://example.com/logo.png" });
     expect(withLogo).toContain('src="/manus-storage/organizations/3/document-logo.png"');
+    expect(withLogo).toContain(`src="${RASEEN_PRINT_LOGO_URL}"`);
     expect(externalLogo).not.toContain("example.com/logo.png");
   });
 

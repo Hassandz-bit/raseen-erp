@@ -14,8 +14,8 @@ describe("RASEEN ERP PWA", () => {
     expect(manifest.start_url).toBe("/");
     expect(manifest.display).toBe("standalone");
     expect(manifest.icons).toEqual(expect.arrayContaining([
-      expect.objectContaining({ src: "/manus-storage/raseen-brand-mark_5c7cbd99.png", sizes: "192x192", type: "image/png" }),
-      expect.objectContaining({ src: "/manus-storage/raseen-brand-mark_5c7cbd99.png", sizes: "512x512", purpose: "any maskable" }),
+      expect.objectContaining({ src: "/manus-storage/raseen-app-icon_63585154.png", sizes: "192x192", type: "image/png" }),
+      expect.objectContaining({ src: "/manus-storage/raseen-app-icon_63585154.png", sizes: "512x512", purpose: "any maskable" }),
     ]));
   });
 

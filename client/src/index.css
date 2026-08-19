@@ -251,8 +251,8 @@ html:not(.dark) .text-slate-300 { color: oklch(.36 .018 255) !important; }
 .nawa-global-header { position: sticky; top: 0; z-index: 80; display: flex; height: 64px; align-items: center; justify-content: space-between; gap: 1rem; border-bottom: 1px solid color-mix(in oklch, var(--border) 82%, transparent); padding-inline: 1rem; background: color-mix(in oklch, var(--background) 92%, transparent); backdrop-filter: blur(18px) saturate(1.1); }
 .nawa-wordmark { display: inline-flex; align-items: center; gap: .55rem; color: var(--foreground); transition: color .18s cubic-bezier(.23,1,.32,1); }
 .nawa-wordmark:hover { color: var(--primary); }
-.nawa-wordmark-mark { position: relative; display: grid; width: 2rem; height: 2rem; place-items: center; overflow: hidden; border: 1px solid color-mix(in oklch, var(--primary) 34%, transparent); border-radius: .7rem; background: linear-gradient(145deg, color-mix(in oklch, var(--primary) 25%, transparent), color-mix(in oklch, var(--primary) 6%, transparent)); color: var(--primary); font-size: .92rem; font-weight: 900; box-shadow: inset 0 1px 0 color-mix(in oklch, white 18%, transparent); isolation: isolate; }
-.nawa-wordmark-mark::before { position: absolute; inset: .28rem; z-index: -1; border: 1px solid color-mix(in oklch, var(--primary) 62%, transparent); border-radius: .32rem; content: ""; transform: rotate(45deg); }
+.nawa-wordmark-mark { display: grid; width: 2rem; height: 2rem; place-items: center; overflow: hidden; border: 1px solid color-mix(in oklch, var(--primary) 34%, transparent); border-radius: .7rem; background: #0b0e14; box-shadow: inset 0 1px 0 color-mix(in oklch, white 18%, transparent); }
+.nawa-wordmark-mark img { width: 100%; height: 100%; object-fit: cover; }
 .nawa-current-portal, .nawa-header-icon { display: inline-grid; width: 2.45rem; height: 2.45rem; place-items: center; border-radius: .8rem; color: var(--muted-foreground); transition: color .18s cubic-bezier(.23,1,.32,1), background-color .18s cubic-bezier(.23,1,.32,1), transform .18s cubic-bezier(.23,1,.32,1); }
 .nawa-current-portal { border: 1px solid color-mix(in oklch, var(--primary) 24%, var(--border)); background: color-mix(in oklch, var(--primary) 8%, transparent); color: var(--primary); }
 .nawa-header-icon:hover, .nawa-current-portal:hover { background: color-mix(in oklch, var(--primary) 12%, transparent); color: var(--primary); }
@@ -379,7 +379,8 @@ html:not(.dark) .text-slate-300 { color: oklch(.36 .018 255) !important; }
   .nawa-shell-body, .nawa-workspace, .nawa-workspace-inner { display: block !important; width: 100% !important; min-height: 0 !important; max-width: none !important; padding: 0 !important; overflow: visible !important; }
   .nawa-print-only { display: flex !important; align-items: center; justify-content: space-between; gap: 3mm; margin: 0 0 7mm; padding: 0 0 4mm; border-bottom: 1px solid #9ca3af; color: #111827; font-size: 9pt; }
   .nawa-print-only strong { font-size: 13pt; }
-  .nawa-print-organization-logo { width: 24mm; height: 15mm; object-fit: contain; }
+  .nawa-print-platform-logo { width: 20mm; height: 15mm; object-fit: contain; }
+  .nawa-print-organization-logo { width: 18mm; height: 15mm; object-fit: contain; }
   .nawa-print-organization-copy, .nawa-print-organization-legal { display: grid; gap: 1mm; min-width: 0; }
   .nawa-print-organization-copy { flex: 1; }
   .nawa-print-organization-legal { max-width: 52mm; color: #4b5563; font-size: 8pt; text-align: end; }
