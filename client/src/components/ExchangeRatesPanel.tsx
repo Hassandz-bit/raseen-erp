@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { TableViewControls, useTableViewPreferences, type TableColumn } from "@/components/TableViewControls";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { buildExchangeRateExcel, buildExchangeRatePdf } from "@/lib/exchangeRateExport";
 import { formatOrganizationDate, formatOrganizationNumber } from "@/lib/formatting";
@@ -34,6 +35,9 @@ export function ExchangeRatesPanel() {
     onError: error => toast.error(error.message),
   });
   const text = { title: t("exchangeHistoryTitle"), description: t("exchangeHistoryDescription"), add: t("addExchangeRate"), base: t("baseCurrency"), quote: t("quoteCurrency"), rate: t("exchangeRate"), excel: "Excel", pdf: "PDF", filter: t("filterExchangeRates"), currency: t("currency"), from: t("from"), to: t("to"), clear: t("clearFilters"), effective: t("effectiveDate"), source: t("rateSource"), empty: t("noMatchingExchangeRates"), retry: t("retry") };
+  const rateColumns: TableColumn[] = [{ id: "base", label: text.base }, { id: "quote", label: text.quote }, { id: "rate", label: text.rate }, { id: "effective", label: text.effective }, { id: "source", label: text.source }];
+  const rateTableView = useTableViewPreferences("reports.exchange-rates", rateColumns);
+  const visibleRateColumns = rateTableView.columnOrder.filter(id => !rateTableView.hiddenColumnIds.includes(id));
   const exportFormatting = { formatRate: (value: number) => formatOrganizationNumber(value, { ...formatSettings, decimalPlaces: 8 }), formatDate: (value: Date | string) => formatOrganizationDate(value, formatSettings) };
   const pdfFormatting = { formatRate: (value: number) => formatOrganizationNumber(value, { ...formatSettings, numeralStyle: "western", decimalPlaces: 8 }), formatDate: (value: Date | string) => formatOrganizationDate(value, { ...formatSettings, numeralStyle: "western" }) };
   const hasFilters = Boolean(currencyCode || startDate || endDate);
@@ -57,7 +61,8 @@ export function ExchangeRatesPanel() {
   return <section className="surface rounded-3xl border p-7">
     <div className="flex flex-wrap items-start justify-between gap-4">
       <div><h2 className="text-xl font-bold text-white">{text.title}</h2><p className="mt-2 text-sm text-muted-foreground">{text.description}</p></div>
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
+        <TableViewControls view={rateTableView} />
         <Tooltip><TooltipTrigger asChild><Button variant="outline" onClick={exportExcel} disabled={!rates.data?.length} className="border-white/10 bg-white/[.03] text-slate-200"><FileSpreadsheet className="me-2 h-4 w-4" />{text.excel}</Button></TooltipTrigger><TooltipContent>{t("exportSpreadsheet")}</TooltipContent></Tooltip>
         <Tooltip><TooltipTrigger asChild><Button variant="outline" onClick={exportPdf} disabled={!rates.data?.length} className="border-white/10 bg-white/[.03] text-slate-200"><FileText className="me-2 h-4 w-4" />{text.pdf}</Button></TooltipTrigger><TooltipContent>{t("downloadPdf")}</TooltipContent></Tooltip>
       </div>
@@ -76,6 +81,6 @@ export function ExchangeRatesPanel() {
       <label className="text-xs text-muted-foreground">{text.rate}<Input type="number" min="0" step="0.00000001" value={rate} onChange={event => setRate(event.target.value)} className="mt-2 h-10 border-white/10 bg-white/[.04] text-white" /></label>
       <Tooltip><TooltipTrigger asChild><Button onClick={add} disabled={addRate.isPending || settings.isLoading} className="mt-5 h-10 bg-primary text-primary-foreground">{addRate.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}</Button></TooltipTrigger><TooltipContent>{text.add}</TooltipContent></Tooltip>
     </div>
-    {rates.isLoading ? <div className="mt-8 flex items-center gap-2 text-sm text-muted-foreground"><RefreshCw className="h-4 w-4 animate-spin text-primary" />{t("refreshingExchangeRates")}</div> : rates.isError ? <div className="mt-8 rounded-2xl border border-rose-400/20 bg-rose-400/10 p-4 text-sm text-rose-200"><p>{t("exchangeRatesLoadError")}</p><Button onClick={() => rates.refetch()} variant="outline" className="mt-3 border-rose-300/30 bg-transparent text-rose-100">{text.retry}</Button></div> : <div className="thin-scrollbar mt-6 overflow-x-auto"><table className="raseen-data-table text-start text-sm"><thead className="border-b border-white/10 text-muted-foreground"><tr><th className="p-3">{text.base}</th><th className="p-3">{text.quote}</th><th className="p-3">{text.rate}</th><th className="p-3">{text.effective}</th><th className="p-3">{text.source}</th></tr></thead><tbody>{rates.data?.map(row => <tr key={row.id} className="border-b border-white/[.06]"><td className="p-3 text-white">{row.baseCurrencyCode}</td><td className="p-3 text-white">{row.quoteCurrencyCode}</td><td className="p-3 text-primary">{formatOrganizationNumber(Number(row.rate), { ...formatSettings, decimalPlaces: 8 })}</td><td className="p-3 text-slate-300">{formatOrganizationDate(row.effectiveAt, formatSettings)}</td><td className="p-3 text-slate-300">{row.source}</td></tr>)}{rates.data?.length === 0 && <tr><td colSpan={5} className="p-7 text-center text-muted-foreground">{text.empty}</td></tr>}</tbody></table></div>}
+    {rates.isLoading ? <div className="mt-8 flex items-center gap-2 text-sm text-muted-foreground"><RefreshCw className="h-4 w-4 animate-spin text-primary" />{t("refreshingExchangeRates")}</div> : rates.isError ? <div className="mt-8 rounded-2xl border border-rose-400/20 bg-rose-400/10 p-4 text-sm text-rose-200"><p>{t("exchangeRatesLoadError")}</p><Button onClick={() => rates.refetch()} variant="outline" className="mt-3 border-rose-300/30 bg-transparent text-rose-100">{text.retry}</Button></div> : <div className="thin-scrollbar mt-6 overflow-x-auto"><table className={`raseen-data-table table-density-${rateTableView.density} text-start text-sm`}><thead className="border-b border-white/10 text-muted-foreground"><tr>{visibleRateColumns.map(id => <th key={id} className="p-3">{rateColumns.find(column => column.id === id)?.label}</th>)}</tr></thead><tbody>{rates.data?.map(row => <tr key={row.id} className="border-b border-white/[.06]">{visibleRateColumns.map(id => <td key={id} className={id === "rate" ? "p-3 text-primary" : id === "base" || id === "quote" ? "p-3 text-white" : "p-3 text-slate-300"}>{id === "base" ? row.baseCurrencyCode : id === "quote" ? row.quoteCurrencyCode : id === "rate" ? formatOrganizationNumber(Number(row.rate), { ...formatSettings, decimalPlaces: 8 }) : id === "effective" ? formatOrganizationDate(row.effectiveAt, formatSettings) : row.source}</td>)}</tr>)}{rates.data?.length === 0 && <tr><td colSpan={Math.max(1, visibleRateColumns.length)} className="p-7 text-center text-muted-foreground">{text.empty}</td></tr>}</tbody></table></div>}
   </section>;
 }

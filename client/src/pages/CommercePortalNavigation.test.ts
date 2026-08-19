@@ -6,6 +6,7 @@ import { getPortal } from "@/config/nawaPortals";
 const commercePage = readFileSync(resolve(process.cwd(), "client/src/pages/CommerceInventory.tsx"), "utf8");
 const operationsPanel = readFileSync(resolve(process.cwd(), "client/src/components/CommerceOperationsPanel.tsx"), "utf8");
 const commerceSectionPage = readFileSync(resolve(process.cwd(), "client/src/pages/CommerceSection.tsx"), "utf8");
+const exchangeRatesPanel = readFileSync(resolve(process.cwd(), "client/src/components/ExchangeRatesPanel.tsx"), "utf8");
 
 describe("تنقل بوابة التجارة والمخزون", () => {
   it("يعرض جميع أدوات التجارة والمخزون التشغيلية", () => {
@@ -21,5 +22,12 @@ describe("تنقل بوابة التجارة والمخزون", () => {
     expect(commerceSectionPage).toContain("listInvoices");
     expect(commerceSectionPage).toContain("listOrders");
     ["/commerce/products", "/commerce/warehouses", "/commerce/batches", "/commerce/sales", "/commerce/purchases"].forEach(route => expect(getPortal("commerce")?.localNavigation.some(item => item.href === route)).toBe(true));
+  });
+
+  it("يعرض أداة تخصيص مستقلة لكل جدول تشغيلي ولتقرير أسعار الصرف", () => {
+    expect(commerceSectionPage).toContain("TableViewControls");
+    expect(commerceSectionPage).toContain("`commerce.${section}`");
+    expect(exchangeRatesPanel).toContain("reports.exchange-rates");
+    expect(exchangeRatesPanel).toContain("TableViewControls");
   });
 });

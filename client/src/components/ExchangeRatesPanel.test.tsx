@@ -17,6 +17,8 @@ vi.mock("@/lib/trpc", () => ({
   trpc: {
     erp: {
       preferences: {
+        user: { useQuery: () => ({ data: { tablePreferences: {} }, refetch: vi.fn() }) },
+        saveUser: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
         organization: { useQuery: () => ({ data: { currencyCode: "DZD" }, isLoading: false }) },
         exchangeRates: { useQuery: () => ({
           data: state.mode === "data" ? [{ id: 1, baseCurrencyCode: "DZD", quoteCurrencyCode: "EUR", rate: "0.0062", effectiveAt: new Date("2026-03-15T00:00:00Z"), source: "manual" }] : [],
