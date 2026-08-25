@@ -13,6 +13,7 @@ import { hasValidExchangeRateDateRange, normalizeExchangeRateFilters } from "./e
 import { isValidTextBarcode } from "./barcodePolicy";
 import { classifyBranchPersistenceError } from "./branchPolicy";
 import { parseOrganizationLogoDataUrl, isTrustedOrganizationLogoUrl } from "./organizationLogo";
+import { createOrganizationBackup, getOrganizationBackupFilename, listOrganizationRecoveryEvents, MAX_ORGANIZATION_BACKUP_BYTES, previewOrganizationBackup, restoreOrganizationBackup } from "./organizationBackup";
 import { storagePut } from "./storage";
 import { canUseDistributionPermission, isScopedIdAllowed, type DistributionPermission } from "./distributionPolicy";
 import { addDistributionRouteExpense, completeDriverStop, createDistributionRoute, createDistributionTerritory, createDriverVanSale, createFleetVehicle, createMaintenanceRecord, createVehicleDocument, createVehicleLoadOrder, getDistributionControlCenter, getDistributionOwnerAlertReasons, getDistributionSettings, getDriverRouteFeed, getDriverRouteInventory, getLatestFleetLocations, listDistributionRoutes, listDistributionTerritories, listFleetVehicleDocumentAlerts, listFleetVehicles, listVehicleInventory, logFuel, recordDistributionCollection, recordDistributionDelivery, recordDistributionReturn, recordFleetGpsPoint, recordGeofenceEvent, returnVehicleStockToWarehouse, saveDistributionSettings, submitDistributionDeliveryProof, submitRouteClosing, transitionDistributionRoute, transitionRouteClosing, transitionVehicleLoadOrder } from "./distribution";
@@ -172,6 +173,25 @@ export const erpRouter = router({
         includeInventory: canAccessTenantModule({ membershipStatus: context.membership.status, moduleStatus: moduleStatus("inventory") }),
         includeSales: canAccessTenantModule({ membershipStatus: context.membership.status, moduleStatus: moduleStatus("sales") }),
       });
+    }),
+  }),
+  backup: router({
+    export: protectedProcedure.mutation(async ({ ctx }) => {
+      const context = await requireOrganizationOwner(ctx.user.id);
+      const bundle = await createOrganizationBackup(context.organization.id);
+      return { bundle, filename: getOrganizationBackupFilename(context.organization.name, bundle.payload.createdAt) };
+    }),
+    preview: protectedProcedure.input(z.object({ serialized: z.string().min(128).max(MAX_ORGANIZATION_BACKUP_BYTES) })).mutation(async ({ ctx, input }) => {
+      const context = await requireOrganizationOwner(ctx.user.id);
+      return previewOrganizationBackup(input.serialized, context.organization.id);
+    }),
+    restore: protectedProcedure.input(z.object({ serialized: z.string().min(128).max(MAX_ORGANIZATION_BACKUP_BYTES), confirmation: z.string().trim().min(1).max(64) })).mutation(async ({ ctx, input }) => {
+      const context = await requireOrganizationOwner(ctx.user.id);
+      return restoreOrganizationBackup(input.serialized, context.organization.id, ctx.user.id, input.confirmation);
+    }),
+    events: protectedProcedure.query(async ({ ctx }) => {
+      const context = await requireOrganizationOwner(ctx.user.id);
+      return listOrganizationRecoveryEvents(context.organization.id);
     }),
   }),
   demo: router({

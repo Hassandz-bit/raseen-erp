@@ -1,5 +1,5 @@
 import { AlertTriangle, ArrowDownUp, BadgeCheck, BadgePercent, Banknote, BookOpen, Bot, Boxes, CalendarCheck2, CalendarDays, CarFront, ChartNoAxesCombined, ClipboardCheck, ClipboardList, Clock3, Coins, Contact, Factory, FileText, Gauge, GitBranch, Landmark, LayoutDashboard, MapPin, MapPinned, NotebookPen, Package, PackageCheck, PackageSearch, ReceiptText, Route, RotateCcw, ScanLine, Scale, Settings2, ShieldAlert, ShoppingBag, ShoppingCart, Store, Truck, type LucideIcon, UserCog, UserRoundCheck, UsersRound, WalletCards, Warehouse, Workflow } from "lucide-react";
-
+import { HardDriveDownload } from "lucide-react";
 export type SupportedLanguage = "ar" | "fr" | "en";
 export type PortalId = "commerce" | "manufacturing" | "distribution" | "retail" | "finance" | "hr" | "ai" | "administration";
 
@@ -31,7 +31,7 @@ const navigationIcons: Record<string, LucideIcon> = {
   supplier: Store, accesses: UsersRound, outlets: MapPin, "retail-users": UserCog, promotions: BadgePercent, "retail-orders": ClipboardList, returns: RotateCcw, retailer: ShoppingBag,
   accounts: BookOpen, entries: NotebookPen, aging: Scale, treasury: WalletCards, reports: ChartNoAxesCombined,
   employees: Contact, attendance: CalendarCheck2, overtime: Clock3, leave: CalendarDays, payroll: Banknote, "self-service": UserRoundCheck,
-  workspace: Bot, flow: Workflow, settings: Settings2, modules: Boxes, security: ShieldAlert, details: FileText, "decision-alerts": AlertTriangle, vat: BadgePercent, appearance: Settings2, about: FileText,
+  workspace: Bot, flow: Workflow, settings: Settings2, modules: Boxes, security: ShieldAlert, backup: HardDriveDownload, details: FileText, "decision-alerts": AlertTriangle, vat: BadgePercent, appearance: Settings2, about: FileText,
 };
 
 export function getPortalNavigationIcon(itemId: string, fallback: LucideIcon) {
@@ -188,6 +188,7 @@ export const nawaPortals: NawaPortal[] = [
       { id: "users", label: text("المستخدمون", "Utilisateurs", "Users"), href: "/settings?section=users", group: text("الإدارة", "Administration", "Administration") },
       { id: "notifications", label: text("الإشعارات", "Notifications", "Notifications"), href: "/settings?section=notifications", group: text("الإدارة", "Administration", "Administration") },
       { id: "security", label: text("الأمان", "Sécurité", "Security"), href: "/settings?section=security", group: text("الإدارة", "Administration", "Administration") },
+      { id: "backup", label: text("النسخ والتعافي", "Sauvegarde et reprise", "Backup & recovery"), href: "/settings?section=backup", group: text("الإدارة", "Administration", "Administration") },
       { id: "settings", label: text("ملخص الإعدادات", "Résumé des paramètres", "Settings overview"), href: "/settings", group: text("الإدارة", "Administration", "Administration") },
       { id: "modules", label: text("الوحدات والاشتراكات", "Modules et abonnements", "Modules & subscriptions"), href: "/modules", group: text("الاشتراك", "Abonnement", "Subscription") },
       { id: "about", label: text("حول رصين", "À propos de RASEEN", "About RASEEN"), href: "/about", group: text("الإدارة", "Administration", "Administration") },
