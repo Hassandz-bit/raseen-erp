@@ -8,7 +8,7 @@ describe("تنقل بوابات Nawa", () => {
   it("يستمد البوابة والتنقل المحلي من تعريف مركزي", () => {
     expect(source).toContain("getPortalForPath");
     expect(source).toContain("activePortal?.localNavigation");
-    expect(source).toContain("chrome.ai");
+    expect(source).not.toContain('navigate("/workspace")');
   });
 
   it("يبقي الرئيسية خفيفة ولا يعيد القائمة العالمية السابقة", () => {
@@ -21,9 +21,9 @@ describe("تنقل بوابات Nawa", () => {
     expect(source).not.toContain("organizationId=");
   });
 
-  it("يوفر انتقالاً واحداً واضحاً لمساحة Nawa AI ويحذف مبدل البوابات المكرر", () => {
-    expect(source).toContain("chrome.ai");
-    expect(source).toContain('navigate("/workspace")');
+  it("لا يعرض انتقالاً إلى مساحة ذكاء رصين المسحوبة ويحذف مبدل البوابات المكرر", () => {
+    expect(source).not.toContain('navigate("/workspace")');
+    expect(source).not.toContain("<Bot");
     expect(source).not.toContain("placeholder={chrome.search}");
     expect(source).not.toContain("nawaPortals.map(portal");
   });

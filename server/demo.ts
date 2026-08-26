@@ -16,7 +16,7 @@ export const DEMO_ORGANIZATION = {
   slug: "nawa-demo",
   name: "شركة نواة للتوزيع والصناعات",
   datasetVersion: "2026.08.1",
-  moduleKeys: ["inventory", "sales", "purchases", "finance", "hr", "reports", "ai_assistant", "distribution", "manufacturing", "nawa_retail"],
+  moduleKeys: ["inventory", "sales", "purchases", "finance", "hr", "reports", "distribution", "manufacturing", "nawa_retail"],
 } as const;
 
 const DEMO_BRANCHES = [

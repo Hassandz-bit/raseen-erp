@@ -5,11 +5,9 @@ import { describe, expect, it } from "vitest";
 const source = (name: string) => readFileSync(resolve(process.cwd(), `client/src/pages/${name}`), "utf8");
 
 describe("حالات الفشل في الواجهات التشغيلية", () => {
-  it("يفصل فشل مساحة العمل عن حالة إنشاء مؤسسة جديدة", () => {
-    const workspace = source("Workspace.tsx");
-    expect(workspace).toContain("bootstrap.isError");
-    expect(workspace).toContain("bootstrap.refetch()");
-    expect(workspace).toContain("viewSaveError");
+  it("يعيد توجيه رابط مساحة العمل المسحوبة إلى الملخص التنفيذي", () => {
+    const app = readFileSync(resolve(process.cwd(), "client/src/App.tsx"), "utf8");
+    expect(app).toContain('<Route path="/workspace"><Redirect to="/executive" /></Route>');
   });
 
   it("يعرض المالية والموارد البشرية وRetail خطأً وإجراء إعادة محاولة", () => {

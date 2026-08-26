@@ -2,7 +2,6 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { addOrganizationExchangeRate, adjustProductBatchQuantity, approveInventoryCount, approveStockTransfer, createBranchForOrganization, createBusinessParty, createInventoryCount, createOperationalNotifications, createOperationalRecord, createOrganizationForUser, createProductBatch, createProductCategoryForOrganization, createProductMaster, createPurchaseOrder, createSalesInvoice, createStockTransfer, createWarehouseForOrganization, dispatchStockTransfer, findProductByBarcodeForOrganization, getCommerceReportSummary, getDashboardMetrics, getDefaultTenantContext, getFinancialReportSummary, getOrCreateOrganizationSettings, getOrCreateUserPreferences, getOrganizationRolePermissions, getPublicSalesInvoiceVerification, getSalesInvoicePrintDataForOrganization, issueSalesInvoiceWithFefo, issueStockByFefo, listActiveCustomersForOrganization, listBranchesForOrganization, listInventoryCountsForOrganization, listNotificationsForOrganization, listOperationalRecords, listOrganizationCurrencies, listOrganizationExchangeRates, listOrganizationMembersForOrganization, listProductBatchesForOrganization, listProductCategoriesForOrganization, listProductsForOrganization, listPurchaseOrdersForOrganization, listSalesInvoiceShareEventsForOrganization, listSalesInvoicesForOrganization, listStockMovementsForOrganization, listStockTransfersForOrganization, listWarehousesForOrganization, markAllNotificationsRead, markNotificationRead, previewFefoAllocation, receivePurchaseOrder, receiveStockTransfer, recordSalesInvoicePayment, recordSalesInvoiceShareEventForOrganization, recordStockMovement, saveOrganizationCurrency, searchCommandEntitiesForOrganization, sendPurchaseOrder, startInventoryCount, submitInventoryCount, updateOrganizationSettings, updateProductBatchStatus, updateUserPreferences, type OperationalModule } from "./db";
 import { currencyCatalog } from "../shared/currencyCatalog";
-import { askNawaAI } from "./nawaAI";
 import { notifyOwner } from "./_core/notification";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { ENV } from "./_core/env";
@@ -37,7 +36,7 @@ import { assertHrEmployeeInScope, hasRestrictedHrScope, resolveHrEmployeeScope }
 import { decideTeamAdvanceRequest, decideTeamLeaveRequest, getEmployeeSelfService, submitSelfAdvanceRequest, submitSelfLeaveRequest } from "./hrSelfService";
 import { activateDemoOrganizationForUser, deleteDemoOrganization, ensureDemoOrganization, getDemoOrganizationForUser, getDemoShowcaseMetricsForUser, resetDemoOrganization, seedDemoCatalog, seedDemoCommerceScenarios, seedDemoCommercialMaster, seedDemoFoundation, seedDemoOperationsScenarios, seedDemoPromotions, seedDemoRetailHrPayrollScenarios } from "./demo";
 
-type ModuleKey = "inventory" | "sales" | "purchases" | "finance" | "hr" | "reports" | "ai_assistant" | "distribution" | "manufacturing" | "nawa_retail";
+type ModuleKey = "inventory" | "sales" | "purchases" | "finance" | "hr" | "reports" | "distribution" | "manufacturing" | "nawa_retail";
 const operationalModuleKeys = ["inventory", "sales", "purchases", "finance", "hr"] as const;
 
 async function getTenantContext(userId: number) {
@@ -1289,46 +1288,6 @@ export const erpRouter = router({
       const context = await getTenantContext(ctx.user.id);
       return markAllNotificationsRead(context.organization.id);
     }),
-  }),
-
-  ai: router({
-    ask: protectedProcedure
-      .input(z.object({ prompt: z.string().trim().min(3).max(1200) }))
-      .mutation(async ({ ctx, input }) => {
-        const context = await requireModule(ctx.user.id, "ai_assistant");
-        const metrics = await getDashboardMetrics(context.organization.id);
-        return askNawaAI({ organizationId: context.organization.id, userId: ctx.user.id, feature: "assistant", prompt: input.prompt, safeContext: { currency: context.organization.baseCurrency, metrics } });
-      }),
-    insight: protectedProcedure
-      .input(z.object({ domain: z.enum(["commerce", "inventory", "manufacturing", "finance", "hr", "distribution"]) }))
-      .mutation(async ({ ctx, input }) => {
-        const context = await requireModule(ctx.user.id, "ai_assistant");
-        if (input.domain === "manufacturing") {
-          const manufacturingContext = await requireManufacturingPermission(ctx.user.id, "manufacturing.view");
-          const manufacturing = await getManufacturingOverview(manufacturingContext.organization.id, manufacturingContext.membership.dataScope);
-          return askNawaAI({ organizationId: manufacturingContext.organization.id, userId: ctx.user.id, feature: "manufacturing", prompt: "حلل مخاطر نقص المواد والإنتاج والجودة والهدر من الملخص المتاح فقط. قدّم توصية واحدة تتطلب موافقة بشرية.", safeContext: { manufacturing } });
-        }
-        if (input.domain === "finance") {
-          await requireModule(ctx.user.id, "reports");
-          const finance = await getFinancialReportSummary(context.organization.id);
-          return askNawaAI({ organizationId: context.organization.id, userId: ctx.user.id, feature: "finance", prompt: "حلل مؤشرات التدفق النقدي والذمم والربحية من الملخص المالي فقط. لا تقدم توقعاً دقيقاً بلا بيانات كافية، وقدّم توصية واحدة تتطلب موافقة بشرية.", safeContext: { currency: context.organization.baseCurrency, finance } });
-        }
-        if (input.domain === "hr") {
-          const hrContext = await requireHrOwner(ctx.user.id);
-          const payroll = await getPayrollDashboard(hrContext.organization.id);
-          return askNawaAI({ organizationId: hrContext.organization.id, userId: ctx.user.id, feature: "hr", prompt: "حلل مؤشرات الرواتب والسلف من الملخص الإجمالي فقط. لا تقترح قراراً آلياً عن موظف، وقدّم توصية واحدة تتطلب موافقة بشرية.", safeContext: { currency: hrContext.organization.baseCurrency, payroll } });
-        }
-        if (input.domain === "distribution") {
-          const distributionContext = await requireDistributionPermission(ctx.user.id, "distribution.view");
-          const distribution = await getDistributionControlCenter(distributionContext.organization.id);
-          return askNawaAI({ organizationId: distributionContext.organization.id, userId: ctx.user.id, feature: "distribution", prompt: "حلل مخاطر الجولات والتحصيلات ووثائق المركبات من مركز التحكم المتاح فقط، وقدّم توصية واحدة تتطلب موافقة بشرية.", safeContext: { distribution } });
-        }
-        const commerce = await getCommerceReportSummary(context.organization.id);
-        const prompt = input.domain === "commerce"
-          ? "حلل مؤشرات التجارة وقدّم توصية واحدة قابلة للتنفيذ بعد موافقة بشرية، مع ذكر الدليل المتاح فقط."
-          : "حلل مخاطر المخزون من المؤشرات المتاحة وقدّم توصية واحدة قابلة للتنفيذ بعد موافقة بشرية، مع ذكر الدليل المتاح فقط.";
-        return askNawaAI({ organizationId: context.organization.id, userId: ctx.user.id, feature: input.domain, prompt, safeContext: { currency: context.organization.baseCurrency, commerce } });
-      }),
   }),
 
   alerts: router({

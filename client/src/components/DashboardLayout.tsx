@@ -10,7 +10,7 @@ import { getPortalForPath, getPortalNavigationIcon, nawaPortals, type PortalNavi
 import { RASEEN_APP_ICON_URL, RASEEN_PRINT_LOGO_URL } from "@/config/raseenBrandAssets";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { trpc } from "@/lib/trpc";
-import { Bell, Bot, CheckCheck, ChevronDown, ChevronLeft, Download, Grid2X2, Home, Inbox, Loader2, LogOut, Menu, Pin, PinOff, Plus, Search, Settings2, X } from "lucide-react";
+import { Bell, CheckCheck, ChevronDown, ChevronLeft, Download, Grid2X2, Home, Inbox, Loader2, LogOut, Menu, Pin, PinOff, Plus, Search, Settings2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { useLocation, useSearch } from "wouter";
@@ -154,7 +154,6 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
         <Button variant="ghost" size="icon" onClick={() => setCommandOpen(true)} aria-label={chrome.portalSearch} className="nawa-header-icon lg:hidden"><Search className="h-5 w-5" /></Button>
         <Button variant="ghost" size="icon" onClick={() => window.dispatchEvent(new Event("nawa-pwa-open-install"))} aria-label={language === "ar" ? "تثبيت التطبيق" : language === "fr" ? "Installer l’application" : "Install app"} className="nawa-header-icon"><Download className="h-5 w-5" /></Button>
         <PagePrintPreview language={language} direction={direction} organizationName={bootstrap.data?.organization?.name ?? "RASEEN ERP"} pageLabel={`${activePortal?.name[language] ?? chrome.executive}${activeMenuItem ? ` · ${activeMenuItem.label[language]}` : ""}`} documentSettings={organizationSettings.data?.documentSettings} />
-        <Button variant="ghost" size="icon" onClick={() => navigate("/workspace")} aria-label={chrome.ai} className="nawa-header-icon"><Bot className="h-5 w-5" /></Button>
         <NotificationMenu />
         <div className="hidden min-w-0 lg:block"><OrganizationPicker /></div>
         <DropdownMenu><DropdownMenuTrigger asChild><button type="button" aria-label={chrome.profile} className="rounded-xl p-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"><Avatar className="h-9 w-9 border border-primary/20"><AvatarFallback className="bg-primary/10 text-xs font-black text-primary">{user?.name?.charAt(0).toUpperCase() || "R"}</AvatarFallback></Avatar></button></DropdownMenuTrigger><DropdownMenuContent align={direction === "rtl" ? "start" : "end"} className="w-52 rounded-2xl p-1.5"><div className="px-2.5 py-2"><p className="truncate text-sm font-bold">{user?.name || "—"}</p><p className="mt-0.5 truncate text-xs text-muted-foreground">{user?.email || "—"}</p></div><DropdownMenuSeparator /><DropdownMenuItem onClick={() => navigate("/settings?section=appearance")} className="cursor-pointer rounded-xl py-2.5"><Settings2 className="me-2 h-4 w-4" />{chrome.preferences}</DropdownMenuItem><DropdownMenuItem onClick={logout} className="cursor-pointer rounded-xl py-2.5 text-destructive focus:text-destructive"><LogOut className="me-2 h-4 w-4" />{t("signOut")}</DropdownMenuItem></DropdownMenuContent></DropdownMenu>

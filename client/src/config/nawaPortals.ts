@@ -1,7 +1,7 @@
 import { AlertTriangle, ArrowDownUp, BadgeCheck, BadgePercent, Banknote, BookOpen, Bot, Boxes, CalendarCheck2, CalendarDays, CarFront, ChartNoAxesCombined, ClipboardCheck, ClipboardList, Clock3, Coins, Contact, Factory, FileText, Gauge, GitBranch, Landmark, LayoutDashboard, MapPin, MapPinned, NotebookPen, Package, PackageCheck, PackageSearch, ReceiptText, Route, RotateCcw, ScanLine, Scale, Settings2, ShieldAlert, ShoppingBag, ShoppingCart, Store, Truck, type LucideIcon, UserCog, UserRoundCheck, UsersRound, WalletCards, Warehouse, Workflow } from "lucide-react";
 import { HardDriveDownload } from "lucide-react";
 export type SupportedLanguage = "ar" | "fr" | "en";
-export type PortalId = "commerce" | "manufacturing" | "distribution" | "retail" | "finance" | "hr" | "ai" | "administration";
+export type PortalId = "commerce" | "manufacturing" | "distribution" | "retail" | "finance" | "hr" | "administration";
 
 export type LocalizedPortalText = Record<SupportedLanguage, string>;
 
@@ -31,7 +31,7 @@ const navigationIcons: Record<string, LucideIcon> = {
   supplier: Store, accesses: UsersRound, outlets: MapPin, "retail-users": UserCog, promotions: BadgePercent, "retail-orders": ClipboardList, returns: RotateCcw, retailer: ShoppingBag,
   accounts: BookOpen, entries: NotebookPen, aging: Scale, treasury: WalletCards, reports: ChartNoAxesCombined,
   employees: Contact, attendance: CalendarCheck2, overtime: Clock3, leave: CalendarDays, payroll: Banknote, "self-service": UserRoundCheck,
-  workspace: Bot, flow: Workflow, settings: Settings2, modules: Boxes, security: ShieldAlert, backup: HardDriveDownload, details: FileText, "decision-alerts": AlertTriangle, vat: BadgePercent, appearance: Settings2, about: FileText,
+  settings: Settings2, modules: Boxes, security: ShieldAlert, backup: HardDriveDownload, details: FileText, "decision-alerts": AlertTriangle, vat: BadgePercent, appearance: Settings2, about: FileText,
 };
 
 export function getPortalNavigationIcon(itemId: string, fallback: LucideIcon) {
@@ -152,19 +152,6 @@ export const nawaPortals: NawaPortal[] = [
     ],
   },
   {
-    id: "ai",
-    icon: Bot,
-    name: text("ذكاء رصين", "Intelligence RASEEN", "RASEEN AI"),
-    description: text("ذكاء رصين وخريطة تدفق رصين للعمليات", "RASEEN AI et la carte des flux opérationnels", "RASEEN AI and operational flow mapping"),
-    href: "/workspace",
-    accent: "gold",
-    requiredModules: ["ai_assistant"],
-    localNavigation: [
-      { id: "ai", label: text("ذكاء رصين", "RASEEN AI", "RASEEN AI"), href: "/workspace", group: text("التحليل", "Analyse", "Analysis") },
-      { id: "flow", label: text("تدفق رصين", "Flux RASEEN", "RASEEN Flow"), href: "/workspace?view=nawa_flow", group: text("العمليات", "Processus", "Processes") },
-    ],
-  },
-  {
     id: "administration",
     icon: Settings2,
     name: text("الإدارة والإعدادات", "Administration et paramètres", "Administration & settings"),
@@ -207,7 +194,6 @@ export function getPortalForPath(path: string) {
   if (path.startsWith("/commerce")) return getPortal("commerce");
   if (path.startsWith("/manufacturing")) return getPortal("manufacturing");
   if (path.startsWith("/finance")) return getPortal("finance");
-  if (path.startsWith("/workspace")) return getPortal("ai");
   if (path.startsWith("/settings") || path.startsWith("/appearance") || path.startsWith("/about") || path.startsWith("/modules") || path.startsWith("/alerts")) return getPortal("administration");
   return undefined;
 }

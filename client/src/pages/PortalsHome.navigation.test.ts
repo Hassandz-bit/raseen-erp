@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 const portalsSource = readFileSync(resolve(process.cwd(), "client/src/pages/PortalsHome.tsx"), "utf8");
 const appSource = readFileSync(resolve(process.cwd(), "client/src/App.tsx"), "utf8");
+const portalConfigSource = readFileSync(resolve(process.cwd(), "client/src/config/nawaPortals.ts"), "utf8");
 const guideSource = readFileSync(resolve(process.cwd(), "client/src/pages/DemoGuide.tsx"), "utf8");
 const layoutSource = readFileSync(resolve(process.cwd(), "client/src/components/DashboardLayout.tsx"), "utf8");
 
@@ -20,9 +21,10 @@ describe("صفحة بوابات Nawa", () => {
     expect(appSource).toContain('path="/executive" component={Home}');
   });
 
-  it("يقدّم بوابة RASEEN AI في ترتيب البطاقات", () => {
-    expect(portalsSource).toContain('a.id === "ai" ? -1');
-    expect(portalsSource).toContain("portal.name[language]");
+  it("لا يعرض بوابة ذكاء رصين أو مسار مساحة العمل غير التشغيلي", () => {
+    expect(portalsSource).not.toContain('a.id === "ai"');
+    expect(portalConfigSource).not.toContain('id: "ai"');
+    expect(appSource).toContain('<Route path="/workspace"><Redirect to="/executive" /></Route>');
   });
 
   it("يعرض دليل Demo ومؤشراته فقط عند وسم المؤسسة الخادمي", () => {

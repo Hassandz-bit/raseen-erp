@@ -4,7 +4,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import NotFound from "@/pages/NotFound";
 import { useEffect } from "react";
-import { Route, Switch } from "wouter";
+import { Redirect, Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { PwaStatus } from "./components/PwaStatus";
 import { LanguageProvider, useLanguage } from "./contexts/LanguageContext";
@@ -23,7 +23,6 @@ import B2BOrders from "./pages/B2BOrders";
 import LogisticsCheck from "./pages/LogisticsCheck";
 import ModulesPage from "./pages/Modules";
 import SettingsPage from "./pages/Settings";
-import Workspace from "./pages/Workspace";
 import Manufacturing from "./pages/Manufacturing";
 import ManufacturingSectionPage from "./pages/ManufacturingSection";
 import Finance from "./pages/Finance";
@@ -36,7 +35,7 @@ import AboutApp from "./pages/AboutApp";
 import InvoiceVerification from "./pages/InvoiceVerification";
 
 function Router() {
-  return <Switch><Route path="/" component={PortalsHome} /><Route path="/verify/invoice" component={InvoiceVerification} /><Route path="/demo-guide" component={DemoGuide} /><Route path="/executive" component={Home} /><Route path="/alerts" component={DecisionAlerts} /><Route path="/workspace" component={Workspace} /><Route path="/commerce/:section/:id" component={CommerceRecordDetail} /><Route path="/commerce/:section" component={CommerceSectionPage} /><Route path="/commerce" component={CommerceInventory} /><Route path="/manufacturing/:section" component={ManufacturingSectionPage} /><Route path="/manufacturing" component={Manufacturing} /><Route path="/distribution/:section" component={DistributionSectionPage} /><Route path="/distribution" component={Distribution} /><Route path="/finance/:section" component={Finance} /><Route path="/finance" component={Finance} /><Route path="/hr/:section" component={HRPayroll} /><Route path="/hr" component={HRPayroll} /><Route path="/hr-payroll" component={HRPayroll} /><Route path="/self-service" component={EmployeeSelfService} /><Route path="/logistics-check" component={LogisticsCheck} /><Route path="/driver" component={Driver} /><Route path="/retail/:section" component={RetailSectionPage} /><Route path="/retailer" component={Retailer} /><Route path="/b2b-orders" component={B2BOrders} /><Route path="/modules" component={ModulesPage} /><Route path="/appearance" component={BrandAppearance} /><Route path="/about" component={AboutApp} /><Route path="/settings" component={SettingsPage} /><Route path="/404" component={NotFound} /><Route component={NotFound} /></Switch>;
+  return <Switch><Route path="/" component={PortalsHome} /><Route path="/verify/invoice" component={InvoiceVerification} /><Route path="/demo-guide" component={DemoGuide} /><Route path="/executive" component={Home} /><Route path="/alerts" component={DecisionAlerts} /><Route path="/workspace"><Redirect to="/executive" /></Route><Route path="/commerce/:section/:id" component={CommerceRecordDetail} /><Route path="/commerce/:section" component={CommerceSectionPage} /><Route path="/commerce" component={CommerceInventory} /><Route path="/manufacturing/:section" component={ManufacturingSectionPage} /><Route path="/manufacturing" component={Manufacturing} /><Route path="/distribution/:section" component={DistributionSectionPage} /><Route path="/distribution" component={Distribution} /><Route path="/finance/:section" component={Finance} /><Route path="/finance" component={Finance} /><Route path="/hr/:section" component={HRPayroll} /><Route path="/hr" component={HRPayroll} /><Route path="/hr-payroll" component={HRPayroll} /><Route path="/self-service" component={EmployeeSelfService} /><Route path="/logistics-check" component={LogisticsCheck} /><Route path="/driver" component={Driver} /><Route path="/retail/:section" component={RetailSectionPage} /><Route path="/retailer" component={Retailer} /><Route path="/b2b-orders" component={B2BOrders} /><Route path="/modules" component={ModulesPage} /><Route path="/appearance" component={BrandAppearance} /><Route path="/about" component={AboutApp} /><Route path="/settings" component={SettingsPage} /><Route path="/404" component={NotFound} /><Route component={NotFound} /></Switch>;
 }
 
 function PreferencesHydrator({ children }: { children: React.ReactNode }) {
