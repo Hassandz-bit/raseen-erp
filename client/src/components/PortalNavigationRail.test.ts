@@ -35,7 +35,7 @@ describe("مكوّن تنقل البوابات المركزي", () => {
   });
 
   it("يكبر الشريط وعناصره بنسبة 60% تقريباً على سطح المكتب ويحافظ على مقاس لمس مناسب للهاتف", () => {
-    expect(styles).toContain("width: 116px; height: calc(100dvh - 126px); flex-basis: 116px");
+    expect(styles).toContain("width: var(--nawa-rail-width, 116px); height: calc(100dvh - 126px); flex-basis: var(--nawa-rail-width, 116px)");
     expect(styles).toContain(".nawa-rail-button { width: 4.4rem; height: 4.4rem");
     expect(styles).toContain(".nawa-rail-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 1.26rem");
     expect(styles).toContain(".nawa-expanded-page { display: flex; width: 100%; align-items: center; gap: .8rem");

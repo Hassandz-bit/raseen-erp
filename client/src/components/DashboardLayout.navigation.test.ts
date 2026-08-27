@@ -84,6 +84,16 @@ describe("تنقل بوابات Nawa", () => {
     expect(source).toContain("localStorage.setItem(preferenceKey, navigationMode)");
   });
 
+  it("يحفظ عرض شريط الأدوات القابل للسحب ضمن حدود آمنة ويحوّل وضع العرض تلقائياً", () => {
+    expect(source).toContain('const NAVIGATION_WIDTH_KEY = "nawa:navigation-width"');
+    expect(source).toContain("function getStoredNavigationWidth");
+    expect(source).toContain("Math.min(480, Math.max(96, Math.round(requestedWidth)))");
+    expect(source).toContain('setNavigationMode(nextWidth >= 300 ? "expanded" : "compact")');
+    expect(source).toContain("localStorage.setItem(widthPreferenceKey, String(railWidth))");
+    expect(railSource).toContain("nawa-rail-resize-handle");
+    expect(railSource).toContain("onPointerDown={startResize}");
+  });
+
   it("يوسع بوابة النظرة العامة ويصغر صفحات العمل تلقائياً مع تثبيت اختياري", () => {
     expect(source).toContain("const isPortalOverview");
     expect(source).toContain('isPortalOverview ? "expanded" : "compact"');

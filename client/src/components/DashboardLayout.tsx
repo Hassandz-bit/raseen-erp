@@ -20,6 +20,7 @@ import { type NavigationMode, PortalNavigationRail } from "./PortalNavigationRai
 
 const ACTIVE_BRANCH_KEY = "nawa:active-branch";
 const NAVIGATION_MODE_KEY = "nawa:navigation-mode";
+const NAVIGATION_WIDTH_KEY = "nawa:navigation-width";
 
 const portalChrome = {
   ar: { portals: "كل البوابات", executive: "الملخص التنفيذي", workspace: "مساحة العمل", tools: "أدوات البوابة", notifications: "التنبيهات", markAllRead: "تحديد الكل كمقروء", emptyNotifications: "لا توجد تنبيهات حديثة", ai: "ذكاء رصين", demo: "بيانات تجريبية", portalSearch: "ابحث عن منتج، عميل، فاتورة أو صفحة…", searchTools: "ابحث في أدوات هذه البوابة", commandTitle: "أوامر رصين", commandDescription: "انتقل إلى بوابة أو أداة متاحة لك", pages: "الصفحات والأدوات", quickCreate: "إنشاء", quickCreateHint: "إجراء سريع في البوابة الحالية", noQuickCreate: "لا توجد إجراءات سريعة لهذه البوابة", pinNav: "تثبيت التنقل الموسع", unpinNav: "العودة للوضع التلقائي", navAuto: "تلقائي", navExpanded: "موسع", navCompact: "مضغوط", defaultBranch: "الفرع الافتراضي", profile: "الملف الشخصي", preferences: "التفضيلات", settings: "الإعدادات", print: "طباعة الصفحة", lightMode: "تفعيل الوضع الفاتح", darkMode: "تفعيل الوضع الليلي", noResults: "لا توجد صفحات أو أدوات مطابقة", operational: "وضع العمل", discovery: "استكشاف البوابة" },
@@ -29,6 +30,11 @@ const portalChrome = {
 
 function getStoredNavigationMode(value: string | null): NavigationMode {
   return value === "expanded" || value === "compact" || value === "auto" ? value : "auto";
+}
+
+function getStoredNavigationWidth(value: string | null): number {
+  const width = Number(value);
+  return Number.isFinite(width) && width >= 96 && width <= 480 ? width : 116;
 }
 
 function formatNotificationTime(value: Date | string | number, language: "ar" | "fr" | "en") {
@@ -69,7 +75,9 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
     return Array.from(map.values());
   }, [language, localItems]);
   const preferenceKey = `${NAVIGATION_MODE_KEY}:${user?.id ?? "anonymous"}`;
+  const widthPreferenceKey = `${NAVIGATION_WIDTH_KEY}:${user?.id ?? "anonymous"}`;
   const [navigationMode, setNavigationMode] = useState<NavigationMode>(() => getStoredNavigationMode(localStorage.getItem(preferenceKey)));
+  const [railWidth, setRailWidth] = useState(() => getStoredNavigationWidth(localStorage.getItem(widthPreferenceKey)));
   const [isPanelOpen, setPanelOpen] = useState(false);
   const [activeGroupKey, setActiveGroupKey] = useState<string | null>(null);
   const [isRailOpenOnMobile, setRailOpenOnMobile] = useState(false);
@@ -117,9 +125,16 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
   const scheduleGroupOpen = useCallback((key: string) => { if (!window.matchMedia("(min-width: 901px)").matches) return; clearHoverTimer(); hoverTimer.current = setTimeout(() => openGroup(key), 240); }, [clearHoverTimer, openGroup]);
   const closePanelSoon = useCallback(() => { clearHoverTimer(); hoverTimer.current = setTimeout(() => setPanelOpen(false), 320); }, [clearHoverTimer]);
   const navigate = useCallback((href: string) => { setLocation(href); setPanelOpen(false); setRailOpenOnMobile(false); }, [setLocation]);
+  const setSafeRailWidth = useCallback((requestedWidth: number) => {
+    const nextWidth = Math.min(480, Math.max(96, Math.round(requestedWidth)));
+    setRailWidth(nextWidth);
+    setNavigationMode(nextWidth >= 300 ? "expanded" : "compact");
+  }, []);
 
   useEffect(() => { setNavigationMode(getStoredNavigationMode(localStorage.getItem(preferenceKey))); }, [preferenceKey]);
+  useEffect(() => { setRailWidth(getStoredNavigationWidth(localStorage.getItem(widthPreferenceKey))); }, [widthPreferenceKey]);
   useEffect(() => { localStorage.setItem(preferenceKey, navigationMode); }, [navigationMode, preferenceKey]);
+  useEffect(() => { localStorage.setItem(widthPreferenceKey, String(railWidth)); }, [railWidth, widthPreferenceKey]);
   useEffect(() => { if (selectedBranch) localStorage.setItem(ACTIVE_BRANCH_KEY, String(selectedBranch.id)); }, [selectedBranch]);
   useEffect(() => () => clearHoverTimer(), [clearHoverTimer]);
   useEffect(() => {
@@ -169,7 +184,7 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
     </CommandDialog>
 
     <div className={`nawa-shell-body ${isPortalLauncher ? "nawa-shell-body-launcher" : ""}`}>
-      {!isPortalLauncher ? <PortalNavigationRail activePortal={activePortal} activeMenuItem={activeMenuItem} groups={groups} selectedGroup={selectedGroup} filteredTools={filteredTools} language={language} chrome={chrome} navigationMode={navigationMode} navigationModeLabel={navigationModeLabel} navigationRendersExpanded={navigationRendersExpanded} isPortalOverview={isPortalOverview} isPanelOpen={isPanelOpen} isRailOpenOnMobile={isRailOpenOnMobile} tooltipSide={tooltipSide} onNavigate={navigate} onOpenGroup={openGroup} onScheduleGroupOpen={scheduleGroupOpen} onClosePanelSoon={closePanelSoon} onClearHoverTimer={clearHoverTimer} onNavigationModeChange={setNavigationMode} onPanelOpenChange={setPanelOpen} onRailOpenChange={setRailOpenOnMobile} onToolQueryChange={setToolQuery} /> : null}
+      {!isPortalLauncher ? <PortalNavigationRail activePortal={activePortal} activeMenuItem={activeMenuItem} groups={groups} selectedGroup={selectedGroup} filteredTools={filteredTools} language={language} chrome={chrome} navigationMode={navigationMode} navigationModeLabel={navigationModeLabel} navigationRendersExpanded={navigationRendersExpanded} isPortalOverview={isPortalOverview} isPanelOpen={isPanelOpen} isRailOpenOnMobile={isRailOpenOnMobile} railWidth={railWidth} tooltipSide={tooltipSide} onNavigate={navigate} onOpenGroup={openGroup} onScheduleGroupOpen={scheduleGroupOpen} onClosePanelSoon={closePanelSoon} onClearHoverTimer={clearHoverTimer} onNavigationModeChange={setNavigationMode} onPanelOpenChange={setPanelOpen} onRailOpenChange={setRailOpenOnMobile} onRailWidthChange={setSafeRailWidth} onToolQueryChange={setToolQuery} /> : null}
       <div className="nawa-workspace"><div className="nawa-workspace-inner"><div className="nawa-print-only"><img src={RASEEN_PRINT_LOGO_URL} alt="RASEEN ERP" className="nawa-print-platform-logo" />{organizationSettings.data?.documentSettings?.logoUrl ? <img src={organizationSettings.data.documentSettings.logoUrl} alt="" className="nawa-print-organization-logo" /> : null}<span className="nawa-print-organization-copy"><strong>{bootstrap.data?.organization?.name ?? "RASEEN ERP"}</strong><span>{activePortal?.name[language] ?? chrome.executive}{activeMenuItem ? ` · ${activeMenuItem.label[language]}` : ""}</span></span><span className="nawa-print-organization-legal">{[organizationSettings.data?.documentSettings?.address, organizationSettings.data?.documentSettings?.phone, organizationSettings.data?.documentSettings?.taxNumber ? `${language === "ar" ? "الرقم الضريبي" : language === "fr" ? "N° fiscal" : "Tax number"}: ${organizationSettings.data.documentSettings.taxNumber}` : undefined, organizationSettings.data?.documentSettings?.legalInfo].filter(Boolean).map((item, index) => <span key={index}>{item}</span>)}</span><span>{new Intl.DateTimeFormat(language === "ar" ? "ar" : language === "fr" ? "fr-FR" : "en-US", { dateStyle: "medium", timeStyle: "short" }).format(new Date())}</span></div>{!isPortalLauncher && activeMenuItem ? <div className="nawa-page-context"><span className="text-primary">{activePortal?.name[language]}</span><ChevronLeft className="h-3.5 w-3.5 text-muted-foreground" /><span>{activeMenuItem.label[language]}</span></div> : null}{children}</div></div>
     </div>
   </div>;
