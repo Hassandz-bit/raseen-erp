@@ -16,6 +16,8 @@ describe("مكوّن تنقل البوابات المركزي", () => {
     expect(source).toContain('className={`nawa-expanded-page ${isActive ? "nawa-expanded-page-active" : ""}`}');
     expect(source).toContain('aria-current={isActive ? "page" : undefined}');
     expect(source).toContain("nawa-active-dot");
+    expect(source).toContain('className="nawa-rail-icon"');
+    expect(source).toContain('className="nawa-expanded-page-icon"');
   });
 
   it("يوفر تلميحات قابلة للوصول للأيقونات في الوضع المضغوط", () => {
@@ -30,5 +32,13 @@ describe("مكوّن تنقل البوابات المركزي", () => {
     expect(styles).toContain("@keyframes nawa-rail-content-in");
     expect(styles).toContain("opacity: 0; transform: translateX(8px)");
     expect(styles).toContain("@media (prefers-reduced-motion: reduce)");
+  });
+
+  it("يكبر الشريط وعناصره بنسبة 60% تقريباً على سطح المكتب ويحافظ على مقاس لمس مناسب للهاتف", () => {
+    expect(styles).toContain("width: 116px; height: calc(100dvh - 126px); flex-basis: 116px");
+    expect(styles).toContain(".nawa-rail-button { width: 4.4rem; height: 4.4rem");
+    expect(styles).toContain(".nawa-rail-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 1.26rem");
+    expect(styles).toContain(".nawa-expanded-page { display: flex; width: 100%; align-items: center; gap: .8rem");
+    expect(styles).toContain("@media (max-width: 900px) { .nawa-navigation-rail { width: 72px; flex-basis: 72px");
   });
 });
