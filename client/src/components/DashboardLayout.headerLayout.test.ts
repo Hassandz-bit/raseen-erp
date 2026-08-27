@@ -4,19 +4,20 @@ import { describe, expect, it } from "vitest";
 
 const styles = readFileSync(resolve(process.cwd(), "client/src/index.css"), "utf8");
 const layout = readFileSync(resolve(process.cwd(), "client/src/components/DashboardLayout.tsx"), "utf8");
+const header = readFileSync(resolve(process.cwd(), "client/src/components/AppHeader.tsx"), "utf8");
 
 describe("توزيع رأس RASEEN ERP", () => {
   it("يبني رأس ERP كامل العرض بصف هوية وسياق وصف عمل مستقلين", () => {
-    expect(layout).toContain('className="nawa-header-topline"');
-    expect(layout).toContain('className="nawa-header-workline"');
-    expect(layout).toContain('className="nawa-header-brandline"');
-    expect(layout).toContain('className="nawa-header-organization"');
-    expect(layout).toContain('className="nawa-header-context"');
-    expect(layout).toContain('className="nawa-header-accountline"');
+    expect(header).toContain('className="nawa-header-topline"');
+    expect(header).toContain('className="nawa-header-workline"');
+    expect(header).toContain('className="nawa-header-brandline"');
+    expect(header).toContain('className="nawa-header-organization"');
+    expect(header).toContain('className="nawa-header-context"');
+    expect(header).toContain('className="nawa-header-accountline"');
     expect(layout).toContain('className="nawa-header-breadcrumb truncate"');
-    expect(layout).toContain('className="nawa-header-navigation"');
-    expect(layout).toContain('className="nawa-header-search"');
-    expect(layout).toContain('className="nawa-header-utilities"');
+    expect(header).toContain('className="nawa-header-navigation"');
+    expect(header).toContain('className="nawa-header-search"');
+    expect(header).toContain('className="nawa-header-utilities"');
     expect(styles).toContain("width: 100vw; max-width: 100vw; min-width: 0; box-sizing: border-box");
   });
 

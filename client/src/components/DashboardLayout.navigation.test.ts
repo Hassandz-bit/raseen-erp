@@ -3,6 +3,8 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const source = readFileSync(resolve(process.cwd(), "client/src/components/DashboardLayout.tsx"), "utf8");
+const railSource = readFileSync(resolve(process.cwd(), "client/src/components/PortalNavigationRail.tsx"), "utf8");
+const headerSource = readFileSync(resolve(process.cwd(), "client/src/components/AppHeader.tsx"), "utf8");
 
 describe("تنقل بوابات Nawa", () => {
   it("يستمد البوابة والتنقل المحلي من تعريف مركزي", () => {
@@ -29,7 +31,7 @@ describe("تنقل بوابات Nawa", () => {
   });
 
   it("يعرض Rail نشطاً وعداد تنبيهات خادمي", () => {
-    expect(source).toContain("nawa-rail-button-active");
+    expect(railSource).toContain("nawa-rail-button-active");
     expect(source).toContain("trpc.erp.notifications.list.useQuery");
     expect(source).toContain("refetchInterval: 30_000");
     expect(source).toContain("unreadCount");
@@ -44,7 +46,7 @@ describe("تنقل بوابات Nawa", () => {
   });
 
   it("يعرض رأساً عالمياً مقتضباً واسم المؤسسة بوضوح", () => {
-    expect(source).toContain("nawa-global-header");
+    expect(headerSource).toContain("nawa-global-header");
     expect(source).toContain("nawa-wordmark");
     expect(source).toContain("nawa-organization-switcher");
   });
@@ -64,18 +66,18 @@ describe("تنقل بوابات Nawa", () => {
   });
 
   it("يوفر بحثاً سياقياً ضمن لوحة أدوات البوابة", () => {
-    expect(source).toContain('setToolQuery(event.target.value)');
-    expect(source).toContain("nawa-context-panel");
-    expect(source).toContain("nawa-context-tool");
+    expect(railSource).toContain("onToolQueryChange(event.target.value)");
+    expect(railSource).toContain("nawa-context-panel");
+    expect(railSource).toContain("nawa-context-tool");
   });
 
   it("يثبت الرأس العلوي فوق المحتوى أثناء التمرير", () => {
-    expect(source).toContain("nawa-global-header");
+    expect(headerSource).toContain("nawa-global-header");
   });
 
   it("يدعم أوضاع AUTO وEXPANDED وCOMPACT كتفضيل شخصي محفوظ", () => {
     expect(source).toContain('const NAVIGATION_MODE_KEY = "nawa:navigation-mode"');
-    expect(source).toContain('type NavigationMode = "auto" | "expanded" | "compact"');
+    expect(railSource).toContain('export type NavigationMode = "auto" | "expanded" | "compact"');
     expect(source).toContain("effectiveNavigationMode");
     expect(source).toContain("localStorage.setItem(preferenceKey, navigationMode)");
   });
@@ -83,14 +85,15 @@ describe("تنقل بوابات Nawa", () => {
   it("يوسع بوابة النظرة العامة ويصغر صفحات العمل تلقائياً مع تثبيت اختياري", () => {
     expect(source).toContain("const isPortalOverview");
     expect(source).toContain('isPortalOverview ? "expanded" : "compact"');
-    expect(source).toContain("nawa-navigation-rail-expanded");
-    expect(source).toContain("chrome.pinNav");
-    expect(source).toContain("chrome.unpinNav");
+    expect(railSource).toContain("nawa-navigation-rail-expanded");
+    expect(railSource).toContain("chrome.pinNav");
+    expect(railSource).toContain("chrome.unpinNav");
   });
 
   it("يفتح أدوات المجموعة بالنقر والتمرير ويجعل Drawer الهاتف نصياً", () => {
-    expect(source).toContain("onPointerEnter");
-    expect(source).toContain("setTimeout(() => openGroup(group.key), 240)");
+    expect(railSource).toContain("onPointerEnter");
+    expect(source).toContain("const scheduleGroupOpen");
+    expect(railSource).toContain("onPointerEnter={() => onScheduleGroupOpen(group.key)}");
     expect(source).toContain("navigationRendersExpanded");
     expect(source).toContain("setRailOpenOnMobile(true)");
   });
