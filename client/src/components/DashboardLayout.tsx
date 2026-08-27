@@ -10,7 +10,7 @@ import { getPortalForPath, getPortalNavigationIcon, nawaPortals, type PortalNavi
 import { RASEEN_APP_ICON_URL, RASEEN_PRINT_LOGO_URL } from "@/config/raseenBrandAssets";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { trpc } from "@/lib/trpc";
-import { Bell, CheckCheck, ChevronDown, ChevronLeft, Download, Grid2X2, Home, Inbox, Loader2, LogOut, Menu, Pin, PinOff, Plus, Search, Settings2, X } from "lucide-react";
+import { Bell, CheckCheck, ChevronDown, ChevronLeft, CircleHelp, Download, Grid2X2, Home, Inbox, Loader2, LogOut, Menu, Pin, PinOff, Plus, Search, Settings2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { useLocation, useSearch } from "wouter";
@@ -144,30 +144,38 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
     <header className="nawa-global-header nawa-command-bar">
       <div className="nawa-header-topline">
         <div className="nawa-header-brandline">
-          <button type="button" onClick={() => navigate("/")} className="nawa-wordmark" aria-label={chrome.portals}><span className="nawa-wordmark-mark"><img src={RASEEN_APP_ICON_URL} alt="" /></span><span className="hidden text-sm font-black tracking-tight sm:inline">RASEEN ERP</span></button>
-          <span className="nawa-header-divider hidden sm:block" aria-hidden="true" />
-          <span className="hidden text-xs font-bold text-muted-foreground md:inline">{activePortal?.name[language] ?? chrome.executive}</span>
+          <button type="button" onClick={() => navigate("/")} className="nawa-wordmark" aria-label={chrome.portals} title={chrome.portals}><span className="nawa-wordmark-mark"><img src={RASEEN_APP_ICON_URL} alt="" /></span><span className="hidden text-sm font-black tracking-tight sm:inline">RASEEN ERP</span></button>
         </div>
+        <div className="nawa-header-organization">
+          <OrganizationPicker />
+        </div>
+        <nav className="nawa-header-context" aria-label={isPortalLauncher ? chrome.portals : activePortal?.name[language] ?? chrome.executive}>
+          <button type="button" onClick={() => activePortal ? navigate(activePortal.href) : navigate("/executive")} className="nawa-header-context-portal" title={isPortalLauncher ? chrome.portals : activePortal?.name[language] ?? chrome.executive}><PortalIcon className="h-5 w-5 shrink-0" /><span className="truncate">{isPortalLauncher ? chrome.portals : activePortal?.name[language] ?? chrome.executive}</span></button>
+        </nav>
+        <span className="nawa-header-top-spacer" aria-hidden="true" />
         <div className="nawa-header-accountline">
-          <div className="hidden min-w-0 md:block"><OrganizationPicker /></div>
-          <DropdownMenu><DropdownMenuTrigger asChild><button type="button" aria-label={chrome.profile} className="rounded-xl p-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"><Avatar className="h-9 w-9 border border-primary/20"><AvatarFallback className="bg-primary/10 text-xs font-black text-primary">{user?.name?.charAt(0).toUpperCase() || "R"}</AvatarFallback></Avatar></button></DropdownMenuTrigger><DropdownMenuContent align={direction === "rtl" ? "start" : "end"} className="w-52 rounded-2xl p-1.5"><div className="px-2.5 py-2"><p className="truncate text-sm font-bold">{user?.name || "—"}</p><p className="mt-0.5 truncate text-xs text-muted-foreground">{user?.email || "—"}</p></div><DropdownMenuSeparator /><DropdownMenuItem onClick={() => navigate("/settings?section=appearance")} className="cursor-pointer rounded-xl py-2.5"><Settings2 className="me-2 h-4 w-4" />{chrome.preferences}</DropdownMenuItem><DropdownMenuItem onClick={logout} className="cursor-pointer rounded-xl py-2.5 text-destructive focus:text-destructive"><LogOut className="me-2 h-4 w-4" />{t("signOut")}</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
+          <span className="nawa-header-usercopy hidden lg:grid"><strong className="truncate">{user?.name || "—"}</strong><small>{chrome.profile}</small></span>
+          <DropdownMenu><DropdownMenuTrigger asChild><button type="button" aria-label={chrome.profile} title={chrome.profile} className="rounded-xl p-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"><Avatar className="h-9 w-9 border border-primary/20"><AvatarFallback className="bg-primary/10 text-xs font-black text-primary">{user?.name?.charAt(0).toUpperCase() || "R"}</AvatarFallback></Avatar></button></DropdownMenuTrigger><DropdownMenuContent align={direction === "rtl" ? "start" : "end"} className="w-52 rounded-2xl p-1.5"><div className="px-2.5 py-2"><p className="truncate text-sm font-bold">{user?.name || "—"}</p><p className="mt-0.5 truncate text-xs text-muted-foreground">{user?.email || "—"}</p></div><DropdownMenuSeparator /><DropdownMenuItem onClick={() => navigate("/settings?section=appearance")} className="cursor-pointer rounded-xl py-2.5"><Settings2 className="me-2 h-4 w-4" />{chrome.preferences}</DropdownMenuItem><DropdownMenuItem onClick={logout} className="cursor-pointer rounded-xl py-2.5 text-destructive focus:text-destructive"><LogOut className="me-2 h-4 w-4" />{t("signOut")}</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
         </div>
       </div>
       <div className="nawa-header-workline">
-        <div className="nawa-header-navigation">
-          {!isPortalLauncher ? <Button variant="ghost" size="icon" onClick={() => setRailOpenOnMobile(true)} aria-label={chrome.tools} className="nawa-mobile-rail-trigger"><Menu className="h-5 w-5" /></Button> : null}
-          <Button variant="ghost" size="icon" onClick={() => navigate("/")} aria-label={chrome.portals} className="nawa-header-icon hidden sm:inline-grid"><Grid2X2 className="h-4.5 w-4.5" /></Button>
-          {!isPortalLauncher && activePortal ? <button type="button" onClick={() => navigate(activePortal.href)} className="nawa-current-portal"><PortalIcon className="h-4 w-4 shrink-0" /><span className="max-w-28 truncate text-xs font-bold">{activePortal.name[language]}</span></button> : null}
-        </div>
+        <nav className="nawa-header-navigation" aria-label={chrome.portals}>
+          {!isPortalLauncher ? <Button variant="ghost" size="icon" onClick={() => setRailOpenOnMobile(true)} aria-label={chrome.tools} title={chrome.tools} className="nawa-mobile-rail-trigger"><Menu className="h-5 w-5" /></Button> : null}
+          <button type="button" onClick={() => navigate("/")} className="nawa-mobile-wordmark sm:hidden" aria-label={chrome.portals} title={chrome.portals}><img src={RASEEN_APP_ICON_URL} alt="" /></button>
+          <Button variant="ghost" size="icon" onClick={() => navigate("/")} aria-label={chrome.portals} title={chrome.portals} className="nawa-header-icon hidden sm:inline-grid"><Grid2X2 className="h-5 w-5" /></Button>
+          <span className="nawa-workline-divider hidden sm:block" aria-hidden="true" />
+          <span className="nawa-header-breadcrumb truncate">{activeMenuItem?.label[language] ?? chrome.executive}</span>
+        </nav>
         <div className="nawa-header-search">
-          <button type="button" onClick={() => setCommandOpen(true)} className="nawa-command-trigger" aria-label={chrome.portalSearch}><Search className="h-5 w-5 shrink-0" /><span className="truncate">{chrome.portalSearch}</span><kbd className="hidden shrink-0 lg:inline-flex">⌘K</kbd></button>
+          <button type="button" onClick={() => setCommandOpen(true)} className="nawa-command-trigger" aria-label={chrome.portalSearch} title={chrome.portalSearch}><Search className="h-5 w-5 shrink-0" /><span className="truncate">{chrome.portalSearch}</span><kbd className="hidden shrink-0 lg:inline-flex">⌘K</kbd></button>
         </div>
         <div className="nawa-header-utilities">
           {canQuickCreate && quickActions.length ? <DropdownMenu><DropdownMenuTrigger asChild><Button size="sm" className="nawa-quick-create hidden gap-1.5 sm:inline-flex"><Plus className="h-4 w-4" />{chrome.quickCreate}</Button></DropdownMenuTrigger><DropdownMenuContent align={direction === "rtl" ? "start" : "end"} className="w-56 rounded-2xl p-1.5"><DropdownMenuLabel className="px-2.5 py-2 text-xs text-muted-foreground">{chrome.quickCreateHint}</DropdownMenuLabel><DropdownMenuSeparator />{quickActions.map(action => <DropdownMenuItem key={action.href} onClick={() => navigate(action.href)} className="cursor-pointer rounded-xl py-2.5"><Plus className="me-2 h-4 w-4 text-primary" />{action.label}</DropdownMenuItem>)}</DropdownMenuContent></DropdownMenu> : null}
-          <Button variant="ghost" size="icon" onClick={() => setCommandOpen(true)} aria-label={chrome.portalSearch} className="nawa-header-icon lg:hidden"><Search className="h-5 w-5" /></Button>
-          <Button variant="ghost" size="icon" onClick={() => window.dispatchEvent(new Event("nawa-pwa-open-install"))} aria-label={language === "ar" ? "تثبيت التطبيق" : language === "fr" ? "Installer l’application" : "Install app"} className="nawa-header-icon"><Download className="h-5 w-5" /></Button>
+          <Button variant="ghost" size="icon" onClick={() => setCommandOpen(true)} aria-label={chrome.portalSearch} title={chrome.portalSearch} className="nawa-header-icon lg:hidden"><Search className="h-5 w-5" /></Button>
+          <Button variant="ghost" size="icon" onClick={() => window.dispatchEvent(new Event("nawa-pwa-open-install"))} aria-label={language === "ar" ? "تثبيت التطبيق" : language === "fr" ? "Installer l’application" : "Install app"} title={language === "ar" ? "تثبيت التطبيق" : language === "fr" ? "Installer l’application" : "Install app"} className="nawa-header-icon"><Download className="h-5 w-5" /></Button>
           <PagePrintPreview language={language} direction={direction} organizationName={bootstrap.data?.organization?.name ?? "RASEEN ERP"} pageLabel={`${activePortal?.name[language] ?? chrome.executive}${activeMenuItem ? ` · ${activeMenuItem.label[language]}` : ""}`} documentSettings={organizationSettings.data?.documentSettings} />
           <NotificationMenu />
+          <Button variant="ghost" size="icon" onClick={() => toast.info(language === "ar" ? "سيضاف مركز المساعدة في تحديث لاحق." : language === "fr" ? "Le centre d’aide sera ajouté dans une prochaine mise à jour." : "The help center will be added in a future update.")} aria-label={language === "ar" ? "المساعدة" : language === "fr" ? "Aide" : "Help"} title={language === "ar" ? "المساعدة" : language === "fr" ? "Aide" : "Help"} className="nawa-header-icon"><CircleHelp className="h-5 w-5" /></Button>
         </div>
       </div>
     </header>
