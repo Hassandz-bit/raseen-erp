@@ -53,8 +53,8 @@ describe("تنقل بوابات Nawa", () => {
     expect(source).not.toContain("nawa-mobile-wordmark");
   });
 
-  it("يوفر إجراء طباعة عاماً لكل صفحة داخل التخطيط الموحد", () => {
-    expect(source).toContain("PagePrintPreview");
+  it("لا يعرض الطباعة في الرأس العام ويحافظ على ترويسة طباعة المستندات", () => {
+    expect(source).not.toContain("PagePrintPreview");
     expect(source).toContain("organizationSettings.data?.documentSettings");
     expect(source).toContain("nawa-print-only");
   });
