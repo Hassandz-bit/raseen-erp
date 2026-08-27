@@ -8,6 +8,11 @@ function PreferenceProbe() {
   return <button onClick={() => updatePreferences({ fontFamily: "tajawal", fontScale: "extra_large", sidebarFontScale: "extra_large", highContrast: true, tabletSidebarWidth: "wide", numeralStyle: "arabic_indic", moduleViewMode: "nawa_flow" })}>{preferences.fontFamily}</button>;
 }
 
+function ThemeToggleProbe() {
+  const { theme, toggleTheme } = useTheme();
+  return <button onClick={toggleTheme}>{theme}</button>;
+}
+
 describe("مزود تفضيلات المظهر", () => {
   beforeEach(() => {
     localStorage.clear();
@@ -23,5 +28,14 @@ describe("مزود تفضيلات المظهر", () => {
     const stored = JSON.parse(localStorage.getItem("nawa-appearance") ?? "{}");
     expect(stored).toMatchObject({ fontFamily: "tajawal", fontScale: "extra_large", sidebarFontScale: "extra_large", highContrast: true, tabletSidebarWidth: "wide", numeralStyle: "arabic_indic", moduleViewMode: "nawa_flow" });
     expect(document.documentElement.dataset).toMatchObject({ font: "tajawal", fontScale: "extra_large", sidebarFontScale: "extra_large", highContrast: "true", tabletSidebarWidth: "wide", numeralStyle: "arabic_indic" });
+  });
+
+  it("يبدل بين الوضعين الفاتح والداكن ويحفظ الاختيار", () => {
+    render(<ThemeProvider defaultTheme="light"><ThemeToggleProbe /></ThemeProvider>);
+    fireEvent.click(screen.getByRole("button", { name: "light" }));
+
+    expect(screen.getByRole("button", { name: "dark" })).toBeTruthy();
+    expect(document.documentElement.classList.contains("dark")).toBe(true);
+    expect(JSON.parse(localStorage.getItem("nawa-appearance") ?? "{}")).toMatchObject({ themeMode: "dark" });
   });
 });

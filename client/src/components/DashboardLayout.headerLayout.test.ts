@@ -22,10 +22,20 @@ describe("توزيع رأس RASEEN ERP", () => {
   });
 
   it("يكبر الخط ويستعمل كامل العرض مع استجابة لا تخفي عناصر الهاتف الأساسية", () => {
-    expect(styles).toContain(".nawa-organization-switcher > span > span:first-child { font-size: 1.16rem");
+    expect(styles).toContain(".nawa-organization-switcher { width: 100%; min-width: 0; justify-content: flex-start");
+    expect(styles).toContain(".nawa-organization-inline-separator");
     expect(styles).toContain(".nawa-command-trigger { display: flex; width: 100%; min-width: 0; min-height: 46px");
-    expect(layout).toContain('className="nawa-mobile-wordmark sm:hidden"');
+    expect(layout).not.toContain('className="nawa-mobile-wordmark sm:hidden"');
     expect(layout).toContain("CircleHelp");
     expect(styles).toContain("@media (max-width: 900px) { .nawa-global-header { display: flex; height: 62px");
+  });
+
+  it("يوفر تبديل الوضع الليلي ويزيل زر البحث المكرر قرب التثبيت", () => {
+    expect(layout).toContain("const { theme, toggleTheme } = useTheme()");
+    expect(layout).toContain("nawa-theme-toggle");
+    expect(layout).toContain("MoonStar");
+    expect(layout).toContain("SunMedium");
+    expect(layout).not.toContain('className="nawa-header-icon lg:hidden"><Search');
+    expect(styles).toContain(".dark .nawa-theme-toggle-dark");
   });
 });

@@ -49,6 +49,8 @@ describe("تنقل بوابات Nawa", () => {
     expect(headerSource).toContain("nawa-global-header");
     expect(source).toContain("nawa-wordmark");
     expect(source).toContain("nawa-organization-switcher");
+    expect(source).toContain("nawa-organization-inline-separator");
+    expect(source).not.toContain("nawa-mobile-wordmark");
   });
 
   it("يوفر إجراء طباعة عاماً لكل صفحة داخل التخطيط الموحد", () => {
