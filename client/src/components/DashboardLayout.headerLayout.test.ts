@@ -22,7 +22,9 @@ describe("توزيع رأس RASEEN ERP", () => {
   });
 
   it("يكبر الخط ويستعمل كامل العرض مع استجابة لا تخفي عناصر الهاتف الأساسية", () => {
-    expect(styles).toContain(".nawa-organization-switcher { width: 100%; min-width: 0; justify-content: flex-start");
+    expect(styles).toContain(".nawa-header-topline { grid-template-columns: max-content fit-content(38rem)");
+    expect(styles).toContain(".nawa-header-organization { width: fit-content; min-width: min(16rem, 100%); max-width: min(38rem, 40vw)");
+    expect(styles).toContain(".nawa-organization-switcher { width: fit-content; max-width: 100%; min-width: 0; justify-content: flex-start");
     expect(styles).toContain(".nawa-organization-inline-separator");
     expect(styles).toContain(".nawa-command-trigger { display: flex; width: 100%; min-width: 0; min-height: 46px");
     expect(layout).not.toContain('className="nawa-mobile-wordmark sm:hidden"');

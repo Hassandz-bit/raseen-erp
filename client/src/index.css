@@ -332,10 +332,10 @@ html:not(.dark) .text-slate-300 { color: oklch(.36 .018 255) !important; }
 /* ERP command header: a full-width identity row and a separate work row. */
 .nawa-global-header { position: sticky; inset-inline: 0; display: grid; width: 100vw; max-width: 100vw; min-width: 0; box-sizing: border-box; justify-content: stretch; grid-template-rows: 58px 68px; height: 126px; gap: 0; padding: 0; background: color-mix(in oklch, var(--background) 97%, transparent); }
 .nawa-header-topline, .nawa-header-workline { display: grid; width: 100%; min-width: 0; box-sizing: border-box; align-items: center; padding-inline: clamp(1rem, 2.4vw, 2.75rem); }
-.nawa-header-topline { grid-template-columns: max-content minmax(15rem, 23rem) max-content minmax(2rem, 1fr) max-content; gap: clamp(.9rem, 2vw, 2.5rem); border-bottom: 1px solid color-mix(in oklch, var(--border) 74%, transparent); background: linear-gradient(90deg, color-mix(in oklch, var(--muted) 36%, transparent), color-mix(in oklch, var(--background) 94%, transparent)); }
+.nawa-header-topline { grid-template-columns: max-content fit-content(38rem) max-content minmax(2rem, 1fr) max-content; gap: clamp(.9rem, 2vw, 2.5rem); border-bottom: 1px solid color-mix(in oklch, var(--border) 74%, transparent); background: linear-gradient(90deg, color-mix(in oklch, var(--muted) 36%, transparent), color-mix(in oklch, var(--background) 94%, transparent)); }
 .nawa-header-brandline, .nawa-header-organization, .nawa-header-accountline, .nawa-header-navigation, .nawa-header-utilities, .nawa-header-context { display: flex; min-width: 0; align-items: center; white-space: nowrap; }
 .nawa-header-brandline { padding-inline-end: clamp(.8rem, 1.6vw, 1.5rem); border-inline-end: 1px solid color-mix(in oklch, var(--border) 72%, transparent); }
-.nawa-header-organization { min-width: 0; }
+.nawa-header-organization { width: fit-content; min-width: min(16rem, 100%); max-width: min(38rem, 40vw); }
 .nawa-header-top-spacer { min-width: 0; }
 .nawa-header-accountline { justify-content: flex-end; gap: .65rem; padding-inline-start: .85rem; border-inline-start: 1px solid color-mix(in oklch, var(--border) 72%, transparent); }
 .nawa-header-usercopy { min-width: 6.25rem; gap: .04rem; text-align: end; }
@@ -352,7 +352,7 @@ html:not(.dark) .text-slate-300 { color: oklch(.36 .018 255) !important; }
 .nawa-header-search { display: flex; width: 100%; min-width: 0; }
 .nawa-mobile-wordmark { display: grid; width: 2.35rem; height: 2.35rem; place-items: center; overflow: hidden; border: 1px solid color-mix(in oklch, var(--primary) 34%, transparent); border-radius: .7rem; background: #0b0e14; }
 .nawa-mobile-wordmark img { width: 100%; height: 100%; object-fit: cover; }
-.nawa-organization-switcher { width: 100%; min-width: 0; justify-content: flex-start; gap: .6rem; padding: .25rem .1rem; text-align: start; font-size: 1.03rem; }
+.nawa-organization-switcher { width: fit-content; max-width: 100%; min-width: 0; justify-content: flex-start; gap: .6rem; padding: .25rem .1rem; text-align: start; font-size: 1.03rem; }
 .nawa-organization-inline-separator { width: 1px; height: 1.25rem; flex: 0 0 auto; background: color-mix(in oklch, var(--border) 86%, transparent); }
 .nawa-theme-toggle { border: 1px solid color-mix(in oklch, var(--primary) 24%, transparent); background: color-mix(in oklch, var(--primary) 7%, transparent); color: var(--primary); }
 .nawa-theme-toggle:hover { border-color: color-mix(in oklch, var(--primary) 48%, transparent); background: color-mix(in oklch, var(--primary) 16%, transparent); color: var(--primary); }
