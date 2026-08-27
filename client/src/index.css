@@ -365,7 +365,22 @@ html:not(.dark) .text-slate-300 { color: oklch(.36 .018 255) !important; }
 .nawa-wordmark-mark { width: 2.6rem; height: 2.6rem; border-radius: .85rem; }
 .nawa-header-icon { width: 2.65rem; height: 2.65rem; border-radius: .8rem; }
 .nawa-header-print { width: auto !important; min-height: 2.65rem !important; gap: .45rem !important; padding-inline: .7rem !important; font-size: .94rem !important; }
-.nawa-command-dialog { width: min(42rem, calc(100vw - 1.5rem)); border-radius: 1.1rem !important; border-color: color-mix(in oklch, var(--primary) 20%, var(--border)) !important; box-shadow: 0 28px 90px oklch(.04 .01 255 / .42) !important; }
+.nawa-command-dialog { width: min(39rem, calc(100vw - 2rem)); max-height: min(70vh, 34rem); border-radius: 1.25rem !important; border-color: color-mix(in oklch, var(--primary) 20%, var(--border)) !important; background: color-mix(in oklch, var(--card) 96%, var(--background)) !important; box-shadow: 0 28px 90px oklch(.04 .01 255 / .42) !important; }
+.nawa-command-dialog-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; border-bottom: 1px solid color-mix(in oklch, var(--border) 72%, transparent); padding: 1rem 1.15rem .8rem; background: linear-gradient(135deg, color-mix(in oklch, var(--primary) 10%, var(--card)), color-mix(in oklch, var(--card) 95%, transparent)); }
+.nawa-command-dialog-heading-icon { display: grid; width: 2rem; height: 2rem; flex: 0 0 auto; place-items: center; border: 1px solid color-mix(in oklch, var(--primary) 32%, transparent); border-radius: .7rem; background: color-mix(in oklch, var(--primary) 12%, transparent); color: var(--primary); }
+.nawa-command-escape-key { border: 1px solid color-mix(in oklch, var(--border) 80%, transparent); border-radius: .42rem; background: color-mix(in oklch, var(--muted) 45%, transparent); padding: .18rem .38rem; color: var(--muted-foreground); font-size: .64rem; font-weight: 900; letter-spacing: .06em; }
+.nawa-command-dialog [data-slot="command-input-wrapper"] { height: 3rem; margin: .8rem 1rem .45rem; border: 1px solid color-mix(in oklch, var(--border) 92%, transparent); border-radius: .8rem; background: color-mix(in oklch, var(--muted) 35%, transparent); padding-inline: .85rem; }
+.nawa-command-dialog [data-slot="command-input-wrapper"]:focus-within { border-color: color-mix(in oklch, var(--primary) 56%, var(--border)); box-shadow: 0 0 0 3px color-mix(in oklch, var(--primary) 13%, transparent); }
+.nawa-command-dialog [data-slot="command-input"] { height: 2.85rem; font-size: .98rem; }
+.nawa-command-list-shell { padding: 0 .65rem .7rem; }
+.nawa-command-result-list { max-height: min(43vh, 20rem) !important; padding: .1rem .1rem .25rem; scrollbar-color: color-mix(in oklch, var(--primary) 40%, transparent) transparent; scrollbar-width: thin; }
+.nawa-command-section { margin-top: .25rem; padding: .25rem !important; border: 1px solid color-mix(in oklch, var(--border) 62%, transparent); border-radius: .85rem; background: color-mix(in oklch, var(--background) 48%, transparent); }
+.nawa-command-section + .nawa-command-section { margin-top: .55rem; }
+.nawa-command-section [cmdk-group-heading] { padding: .3rem .55rem .4rem !important; color: var(--muted-foreground) !important; font-size: .68rem !important; font-weight: 900 !important; }
+.nawa-command-result { min-height: 2.7rem; gap: .7rem !important; border-radius: .68rem !important; padding: .55rem .65rem !important; font-size: .9rem !important; font-weight: 700; transition: background-color .16s cubic-bezier(.23,1,.32,1), color .16s cubic-bezier(.23,1,.32,1), transform .16s cubic-bezier(.23,1,.32,1); }
+.nawa-command-result[data-selected="true"] { background: color-mix(in oklch, var(--primary) 14%, transparent) !important; color: var(--foreground) !important; transform: translateX(-2px); }
+[dir="ltr"] .nawa-command-result[data-selected="true"] { transform: translateX(2px); }
+.nawa-command-result-meta { max-width: 38%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted-foreground); font-size: .67rem !important; font-weight: 700; letter-spacing: 0 !important; }
 .nawa-shell-body { min-height: calc(100svh - 126px); }
 .nawa-navigation-rail { inset-block-start: 126px; width: 72px; height: calc(100dvh - 126px); flex-basis: 72px; overflow: hidden; transition: width .22s cubic-bezier(.23,1,.32,1), flex-basis .22s cubic-bezier(.23,1,.32,1), padding .22s cubic-bezier(.23,1,.32,1); }
 .nawa-navigation-rail-expanded { width: 17.5rem; flex-basis: 17.5rem; padding-inline: .6rem; }

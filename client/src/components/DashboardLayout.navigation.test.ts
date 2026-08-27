@@ -106,5 +106,8 @@ describe("تنقل بوابات Nawa", () => {
     expect(source).toContain('event.key.toLowerCase() === "k"');
     expect(source).toContain("allowedPortals");
     expect(source).not.toContain("trpc.erp.globalSearch");
+    expect(source).toContain("nawa-command-dialog-heading");
+    expect(source).toContain("nawa-command-result-list");
+    expect(source).toContain("localItems.slice(0, 6)");
   });
 });
