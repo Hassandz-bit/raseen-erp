@@ -54,6 +54,7 @@ export const nawaPortals: NawaPortal[] = [
       { id: "products", label: text("المنتجات", "Produits", "Products"), href: "/commerce/products", group: text("الكتالوج", "Catalogue", "Catalog") },
       { id: "warehouses", label: text("المخازن", "Entrepôts", "Warehouses"), href: "/commerce/warehouses", group: text("المخزون", "Stock", "Inventory") },
       { id: "batches", label: text("الدفعات وFEFO", "Lots et FEFO", "Batches & FEFO"), href: "/commerce/batches", group: text("المخزون", "Stock", "Inventory") },
+      { id: "inventory-reports", label: text("تقارير المخزون", "Rapports de stock", "Inventory reports"), href: "/commerce/reports", group: text("المخزون", "Stock", "Inventory") },
       { id: "sales", label: text("فواتير المبيعات", "Factures de vente", "Sales invoices"), href: "/commerce/sales", group: text("المبيعات", "Ventes", "Sales") },
       { id: "purchases", label: text("أوامر الشراء", "Commandes d’achat", "Purchase orders"), href: "/commerce/purchases", group: text("المشتريات", "Achats", "Purchasing") },
       { id: "operations", label: text("العمليات التجارية", "Opérations commerciales", "Commercial operations"), href: "/commerce#operations", group: text("التشغيل", "Opérations", "Operations") },
